@@ -1,0 +1,14 @@
+{
+    "name": "aia-cdp-worker",
+    "main": "src/worker.ts",
+    "compatibility_date": "2025-09-16",
+    "r2_buckets": [
+        {
+            "binding": "STORE",
+            "bucket_name": "aia-cdp"
+        }
+    ],
+    "vars": {
+        "SITE_NAME": "Acha PKI AIA/CDP"
+    }
+}
