@@ -411,33 +411,36 @@ function humanLabel(key: string) {
 }
 
 function indexHtml(title: string, caPairs: Map<string, { der?: string; pem?: string }>, crlPairs: Map<string, { der?: string; pem?: string }>) {
-  const css = `
-  :root{--fg:#1b1f23;--muted:#6a737d;--link:#0366d6;--bg:#fff;--card:#f6f8fa;}
-  @media (prefers-color-scheme: dark){
-    :root{--fg:#c9d1d9;--muted:#8b949e;--link:#58a6ff;--bg:#0d1117;--card:#161b22;--border:#30363d;--code-bg:#0b0f14;}
-    header{background:var(--card);border-bottom:1px solid var(--border);box-shadow:0 1px 0 rgba(255,255,255,.03) inset;}
-    section{background:var(--card);border:1px solid var(--border);}
-    section>h2{background:var(--card);border-bottom:1px solid var(--border);}
-    ul.files li{border-top:1px solid var(--border);}body{background:var(--bg);color:var(--fg);}
-    .meta{color:var(--muted);}a{color:var(--link);}a:hover{color:#79c0ff;}
-    code{background:var(--code-bg);border:1px solid var(--border);}
-    a:focus-visible{outline:2px solid var(--link);outline-offset:2px;border-radius:4px;}}
-  *{box-sizing:border-box}body{margin:0;font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Apple Color Emoji","Segoe UI Emoji";background:var(--bg);color:var(--fg)}
-  header{padding:28px 16px;border-bottom:1px solid #e1e4e8;background:#fff;position:sticky;top:0}
-  h1{margin:0;font-size:20px}
-  main{max-width:900px;margin:24px auto;padding:0 16px}
-  section{margin:18px 0;background:var(--card);border:1px solid #e1e4e8;border-radius:8px;overflow:hidden}
-  section>h2{margin:0;padding:12px 14px;font-size:16px;border-bottom:1px solid #e1e4e8;background:#fff}
-  ul.files{list-style:none;margin:0;padding:0}
-  ul.files li{display:flex;justify-content:space-between;gap:12px;padding:10px 14px;border-top:1px solid #e1e4e8}
-  ul.files li:first-child{border-top:none}
-  .meta{color:var(--muted);font-size:12px}
-  a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
-  footer{max-width:900px;margin:24px auto 40px;padding:0 16px;color:var(--muted);font-size:12px}
-  code{background:#fff;border:1px solid #e1e4e8;border-radius:4px;padding:0 4px}
-  `;
+  const css =
+    `:root{--fg:#24292f;--muted:#57606a;--link:#0969da;--link-hover:#1f6feb;--bg:#fff;--card:#f6f8fa;--border:#d0d7de;
+--shadow:0 1px 0 rgba(27,31,36,0.04),0 8px 24px rgba(140,149,159,0.2);--code-bg:#f6f8fa;--kbd-bg:#f6f8fa;--kbd-border:#d0d7de;
+--header-bg:#f6f8fa;--h2-bg:#eaeef2;--focus:#0969da}:root[data-theme="dark"]{--fg:#c9d1d9;--muted:#8b949e;--link:#58a6ff;
+--link-hover:#79c0ff;--bg:#0d1117;--card:#161b22;--border:#30363d;--shadow:0 0 0 rgba(0,0,0,0),0 8px 24px rgba(1,4,9,0.6);
+--code-bg:#0b0f14;--kbd-bg:#161b22;--kbd-border:#30363d;--focus:#58a6ff}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--fg:#c9d1d9;--muted:#8b949e;--link:#58a6ff;--link-hover:#79c0ff;
+--bg:#0d1117;--card:#161b22;--border:#30363d;--shadow:0 0 0 rgba(0,0,0,0),0 8px 24px rgba(1,4,9,0.6);--code-bg:#0b0f14;
+--kbd-bg:#161b22;--kbd-border:#30363d;--header-bg:#21262d;--h2-bg:#2d333b;--focus:#58a6ff}}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,
+"Helvetica Neue",Arial,"Noto Sans","Apple Color Emoji","Segoe UI Emoji";background:var(--bg);color:var(--fg);
+-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}header{position:sticky;top:0;z-index:10;padding:28px 16px;
+background:var(--header-bg);border-bottom:1px solid var(--border);box-shadow:0 1px 0 rgba(255,255,255,0.03) inset}
+h1{margin:0;font-size:20px;font-weight:600}h2{margin:0;font-size:16px;font-weight:600}main{max-width:900px;margin:24px auto;padding:0 16px}
+section{margin:18px 0;background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden;box-shadow:var(--shadow)}
+section>h2{padding:12px 14px;background:var(--h2-bg);border-bottom:1px solid var(--border)}
+ul.files{list-style:none;margin:0;padding:0}ul.files li{display:flex;justify-content:space-between;align-items:center;gap:12px;
+padding:12px 14px;border-top:1px solid var(--border)}ul.files li:first-child{border-top:none}ul.files strong{font-weight:600}
+.meta{color:var(--muted);font-size:12px}a{color:var(--link);text-decoration:none}a:hover{color:var(--link-hover);text-decoration:underline}
+a:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+code,pre,kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;font-size:12.5px}
+code{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:0 6px}
+pre{margin:0;padding:12px 14px;background:var(--code-bg);border-top:1px solid var(--border)}
+kbd{background:var(--kbd-bg);border:1px solid var(--kbd-border);border-bottom-width:2px;border-radius:6px;padding:2px 6px}
+footer{max-width:900px;margin:24px auto 40px;padding:0 16px;color:var(--muted);font-size:12px}
+@media(max-width:640px){ul.files li{flex-direction:column;align-items:flex-start}}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;
+transition-duration:.01ms!important;scroll-behavior:auto!important}}`;
 
-  function renderPairs(pairs: Map<string, { der?: string; pem?: string }>, kind: "crt"|"crl") {
+  function renderPairs(pairs: Map<string, { der?: string; pem?: string }>, kind: "crt" | "crl") {
     const items = [...pairs.entries()].sort(([a], [b]) => a.localeCompare(b));
     if (items.length === 0) return `<p class="meta" style="padding:12px 14px;">无可用 ${kind.toUpperCase()} 文件</p>`;
     return `<ul class="files">` + items.map(([base, v]) => {
@@ -468,7 +471,7 @@ function indexHtml(title: string, caPairs: Map<string, { der?: string; pem?: str
   <section>
     <h2>Upload CRL</h2>
     <div style="padding:12px 14px">
-      <p>POST PEM (X509 CRL) to <code>/crl</code> , with <code>Content-Type</code> <code>text/plain</code> or <code>application/x-pem-file</code>.</p>
+      <p>POST PEM (X509 CRL) to <code>/crl</code> , with Content-Type <code>text/plain</code> or <code>application/x-pem-file</code>.</p>
     </div>
   </section>
 </main>
