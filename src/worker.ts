@@ -413,11 +413,15 @@ function humanLabel(key: string) {
 function indexHtml(title: string, caPairs: Map<string, { der?: string; pem?: string }>, crlPairs: Map<string, { der?: string; pem?: string }>) {
   const css = `
   :root{--fg:#1b1f23;--muted:#6a737d;--link:#0366d6;--bg:#fff;--card:#f6f8fa;}
-  @media (prefers-color-scheme: dark) {
-    :root{--fg:#c9d1d9;--muted:#8b949e;--link:#58a6ff;--bg:#0d1117;--card:#161b22;}
-    header,section>h2,code{background:#161b22;}
-    body{background:var(--bg);color:var(--fg);}
-  }
+  @media (prefers-color-scheme: dark){
+    :root{--fg:#c9d1d9;--muted:#8b949e;--link:#58a6ff;--bg:#0d1117;--card:#161b22;--border:#30363d;--code-bg:#0b0f14;}
+    header{background:var(--card);border-bottom:1px solid var(--border);box-shadow:0 1px 0 rgba(255,255,255,.03) inset;}
+    section{background:var(--card);border:1px solid var(--border);}
+    section>h2{background:var(--card);border-bottom:1px solid var(--border);}
+    ul.files li{border-top:1px solid var(--border);}body{background:var(--bg);color:var(--fg);}
+    .meta{color:var(--muted);}a{color:var(--link);}a:hover{color:#79c0ff;}
+    code{background:var(--code-bg);border:1px solid var(--border);}
+    a:focus-visible{outline:2px solid var(--link);outline-offset:2px;border-radius:4px;}}
   *{box-sizing:border-box}body{margin:0;font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Apple Color Emoji","Segoe UI Emoji";background:var(--bg);color:var(--fg)}
   header{padding:28px 16px;border-bottom:1px solid #e1e4e8;background:#fff;position:sticky;top:0}
   h1{margin:0;font-size:20px}
