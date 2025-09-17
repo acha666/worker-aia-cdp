@@ -459,7 +459,7 @@ function indexHtml(title: string, caPairs: Map<string, { der?: string; pem?: str
   <section>
     <h2>Upload CRL</h2>
     <div style="padding:12px 14px">
-      <p>POST PEM (X509 CRL) 到 <code>/crl</code>，<code>Content-Type</code> 使用 <code>text/plain</code> 或 <code>application/x-pem-file</code>。</p>
+      <p>POST PEM (X509 CRL) to <code>/crl</code> , with <code>Content-Type</code> <code>text/plain</code> or <code>application/x-pem-file</code>.</p>
     </div>
   </section>
 </main>
