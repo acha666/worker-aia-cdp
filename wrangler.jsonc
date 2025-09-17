@@ -10,5 +10,10 @@
     ],
     "vars": {
         "SITE_NAME": "Acha PKI AIA/CDP"
+    },
+    "observability": {
+        "logs": {
+            "enabled": true
+        }
     }
 }
