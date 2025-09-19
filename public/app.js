@@ -4,23 +4,30 @@ async function list(prefix) {
     return res.json();
 }
 
+/** Build a row for a cert/crl.
+ *  Minimal DOM changes, but clearer structure and styles. */
 function itemLi(base, hasDer, hasPem) {
     const li = document.createElement('li');
+
     const name = base.replace(/^([^/]+)\//, '').replace(/\.(crt|crl)$/i, '');
+    const hrefDer = hasDer ? `/${base}` : '';
+    const hrefPem = hasPem ? `/${base}.pem` : '';
+
     li.innerHTML = `
-    <div>
-      <strong>${name}</strong>
-      <div class="meta">${base}</div>
-      <div class="toggle">
-        <button class="btn-detail" data-key="/${hasDer ? base : base + '.pem'}">详情</button>
-        <span class="loading" hidden><span class="spinner"></span></span>
+    <div class="item-left">
+      <div class="item-title">${name}</div>
+      <div class="item-path">${base}</div>
+      <div class="actions">
+        <button class="btn btn-detail" data-key="${hasDer ? hrefDer : hrefPem}">Details</button>
+        <span class="loading" hidden><span class="spinner" aria-hidden="true"></span></span>
       </div>
-      <div class="details" data-panel="/${hasDer ? base : base + '.pem'}" hidden></div>
+      <div class="details" data-panel="${hasDer ? hrefDer : hrefPem}" hidden></div>
     </div>
-    <div>
-      ${hasDer ? `<a href="/${base}">DER</a>` : ''}
-      ${hasPem ? `${hasDer ? ' | ' : ''}<a href="/${base}.pem">PEM</a>` : ''}
-    </div>`;
+    <div class="item-right">
+      ${hasDer ? `<a href="${hrefDer}">DER</a>` : ''}
+      ${hasPem ? `<a href="${hrefPem}">PEM</a>` : ''}
+    </div>
+  `;
     return li;
 }
 
@@ -32,31 +39,58 @@ async function render() {
 
     const certMap = new Map();
     certs.objects.forEach(o => {
-        if (o.key.endsWith('.crt')) certMap.set(o.key, { der: true });
-        if (o.key.endsWith('.crt.pem')) certMap.set(o.key.replace(/\.pem$/, ''), { ...(certMap.get(o.key.replace(/\.pem$/, '')) || {}), pem: true });
+        if (o.key.endsWith('.crt')) {
+            const prev = certMap.get(o.key) || {};
+            certMap.set(o.key, { ...prev, der: true });
+        }
+        if (o.key.endsWith('.crt.pem')) {
+            const base = o.key.replace(/\.pem$/, '');
+            const prev = certMap.get(base) || {};
+            certMap.set(base, { ...prev, pem: true });
+        }
     });
-    [...certMap.entries()].sort(([a], [b]) => a.localeCompare(b)).forEach(([base, v]) => {
-        certUL.appendChild(itemLi(base, !!v.der, !!v.pem));
-    });
+    [...certMap.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .forEach(([base, v]) => {
+            certUL.appendChild(itemLi(base, !!v.der, !!v.pem));
+        });
 
     const crlMap = new Map();
-    crls.objects.filter(o => !o.key.startsWith('crl/archive/') && !o.key.startsWith('crl/by-keyid/')).forEach(o => {
-        if (o.key.endsWith('.crl')) crlMap.set(o.key, { der: true });
-        if (o.key.endsWith('.crl.pem')) crlMap.set(o.key.replace(/\.pem$/, ''), { ...(crlMap.get(o.key.replace(/\.pem$/, '')) || {}), pem: true });
-    });
-    [...crlMap.entries()].sort(([a], [b]) => a.localeCompare(b)).forEach(([base, v]) => {
-        crlUL.appendChild(itemLi(base, !!v.der, !!v.pem));
-    });
+    crls.objects
+        .filter(o => !o.key.startsWith('crl/archive/') && !o.key.startsWith('crl/by-keyid/'))
+        .forEach(o => {
+            if (o.key.endsWith('.crl')) {
+                const prev = crlMap.get(o.key) || {};
+                crlMap.set(o.key, { ...prev, der: true });
+            }
+            if (o.key.endsWith('.crl.pem')) {
+                const base = o.key.replace(/\.pem$/, '');
+                const prev = crlMap.get(base) || {};
+                crlMap.set(base, { ...prev, pem: true });
+            }
+        });
+
+    [...crlMap.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .forEach(([base, v]) => {
+            crlUL.appendChild(itemLi(base, !!v.der, !!v.pem));
+        });
 }
 
 addEventListener('click', async e => {
     const btn = (e.target.closest?.('.btn-detail')) || null;
     if (!btn) return;
+
     const key = btn.getAttribute('data-key');
     const panel = document.querySelector(`.details[data-panel="${key}"]`);
     const spinner = btn.parentElement.querySelector('.loading');
     if (!panel || !spinner) return;
-    if (!panel.hasAttribute('hidden')) { panel.setAttribute('hidden', ''); return; }
+
+    if (!panel.hasAttribute('hidden')) {
+        panel.setAttribute('hidden', '');
+        return;
+    }
+
     spinner.removeAttribute('hidden');
     try {
         const r = await fetch('/meta?key=' + encodeURIComponent(key));
@@ -65,7 +99,7 @@ addEventListener('click', async e => {
         panel.innerHTML = '<pre>' + JSON.stringify(j, null, 2) + '</pre>';
         panel.removeAttribute('hidden');
     } catch (err) {
-        panel.innerHTML = '<div class="error">加载详情失败：' + err.message + '</div>';
+        panel.innerHTML = '<div class="error">Failed to load details: ' + err.message + '</div>';
         panel.removeAttribute('hidden');
     } finally {
         spinner.setAttribute('hidden', '');

@@ -12,20 +12,26 @@
     <header>
         <h1>PKI AIA/CDP</h1>
     </header>
+
     <main>
         <section>
             <h2>Certificates (AIA)</h2>
-            <ul id="certs" class="files"></ul>
+            <ul id="certs" class="files" aria-live="polite"></ul>
         </section>
+
         <section>
             <h2>CRLs (CDP)</h2>
-            <ul id="crls" class="files"></ul>
+            <ul id="crls" class="files" aria-live="polite"></ul>
         </section>
+
         <section>
             <h2>Upload CRL</h2>
-            <p>POST PEM (X509 CRL) 到 <code>/crl</code></p>
+            <p class="hint">
+                Send a <code>PEM</code> (X.509 CRL) via <kbd>POST</kbd> to <code>/crl</code>.
+            </p>
         </section>
     </main>
+
     <script src="/app.js" type="module"></script>
 </body>
 

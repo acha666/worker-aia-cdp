@@ -5,7 +5,8 @@
     "r2_buckets": [
         {
             "binding": "STORE",
-            "bucket_name": "aia-cdp"
+            "bucket_name": "aia-cdp",
+            "preview_bucket_name": "aia-cdp-dev"
         }
     ],
     "vars": {
