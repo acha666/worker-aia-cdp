@@ -442,7 +442,7 @@ transition-duration:.01ms!important;scroll-behavior:auto!important}}`;
 
   function renderPairs(pairs: Map<string, { der?: string; pem?: string }>, kind: "crt" | "crl") {
     const items = [...pairs.entries()].sort(([a], [b]) => a.localeCompare(b));
-    if (items.length === 0) return `<p class="meta" style="padding:12px 14px;">无可用 ${kind.toUpperCase()} 文件</p>`;
+    if (items.length === 0) return `<p class="meta" style="padding:12px 14px;">No ${kind.toUpperCase()} files available</p>`;
     return `<ul class="files">` + items.map(([base, v]) => {
       const label = humanLabel(base);
       const left = `<strong>${label}</strong>`;
@@ -479,7 +479,7 @@ transition-duration:.01ms!important;scroll-behavior:auto!important}}`;
 }
 
 const indexPage: RouteHandler = async (_req, env) => {
-  const title = env.SITE_NAME || "Acha PKI AIA/CDP";
+  const title = env.SITE_NAME || "PKI AIA/CDP";
 
   // 动态读取 ca/ 与 crl/ 目录
   const [caObjs, crlObjs] = await Promise.all([
