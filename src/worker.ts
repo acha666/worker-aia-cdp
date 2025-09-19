@@ -15,6 +15,20 @@ pkijs.setEngine(
   new pkijs.CryptoEngine({ name: "cloudflare", crypto, subtle: crypto.subtle }),
 );
 
+/** ---------- 缓存参数（新增） ---------- */
+const LIST_CACHE_TTL = 60; // 秒：R2 列表缓存 TTL（短缓存，减少配额占用）
+const META_CACHE_TTL = 60; // 秒：/meta 解析结果 TTL（短缓存 + 上传时清理）
+
+const LIST_CACHE_KEYS = {
+  CA: new Request("https://r2cache.internal/list?prefix=ca/"),
+  CRL: new Request("https://r2cache.internal/list?prefix=crl/"),
+};
+
+// 生成某个对象的 meta 缓存键（对象级别元信息缓存）
+function metaCacheKey(key: string) {
+  return new Request(`https://r2cache.internal/meta?key=${encodeURIComponent(key)}`);
+}
+
 /** ---------- 小工具 ---------- */
 const b2ab = (b: ArrayBuffer | Uint8Array) => (b instanceof Uint8Array ? b.buffer : b);
 const toHex = (buf: ArrayBuffer | Uint8Array) =>
@@ -103,7 +117,6 @@ function friendlyNameFromCert(cert: pkijs.Certificate): string {
 
 /** ---------- Content-Type 与缓存 ---------- */
 function contentTypeByKey(key: string) {
-  // PEM 按文本直出，便于浏览器内联展示
   if (key.endsWith(".pem") || key.endsWith(".crt.pem") || key.endsWith(".crl.pem"))
     return "text/plain; charset=utf-8";
   if (key.endsWith(".crt")) return "application/pkix-cert";
@@ -130,7 +143,7 @@ function httpHeadersForBinaryLike(obj: R2ObjectBody | R2Object, key: string) {
   return h;
 }
 
-/** ---------- R2 列表/读写 ---------- */
+/** ---------- R2 列表/读写 + 列表缓存（新增） ---------- */
 async function listAllWithPrefix(env: Env, prefix: string) {
   const out: R2Object[] = [];
   let cursor: string | undefined;
@@ -142,25 +155,60 @@ async function listAllWithPrefix(env: Env, prefix: string) {
   return out;
 }
 
+// 使用 Cache API 对 R2 列表做短缓存，减少 R2 list 成本
+async function cachedListAllWithPrefix(env: Env, prefix: "ca/" | "crl/"): Promise<R2Object[]> {
+  const cache = caches.default;
+  const key = prefix === "ca/" ? LIST_CACHE_KEYS.CA : LIST_CACHE_KEYS.CRL;
+
+  // 命中返回
+  const hit = await cache.match(key);
+  if (hit) {
+    const j = await hit.json();
+    // 仅存储必要字段，反序列化回 R2Object 兼容结构
+    return (j.items as Array<{ key: string; size: number; uploaded?: string }>).map(x => ({
+      key: x.key,
+      size: x.size,
+      uploaded: x.uploaded ? new Date(x.uploaded) : undefined,
+    } as unknown as R2Object));
+  }
+
+  // 未命中：查询 R2 并写入缓存
+  const objs = await listAllWithPrefix(env, prefix);
+  const payload = JSON.stringify({
+    items: objs.map(o => ({
+      key: o.key,
+      size: (o as any).size ?? 0,
+      uploaded: (o as any).uploaded instanceof Date ? (o as any).uploaded.toISOString() : undefined,
+    })),
+    cachedAt: new Date().toISOString(),
+  });
+
+  const res = new Response(payload, {
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": `public, max-age=${LIST_CACHE_TTL}`,
+    },
+  });
+  await cache.put(key, res.clone());
+  return objs;
+}
+
 async function listCACandidates(env: Env): Promise<Array<{ key: string; der: ArrayBuffer; cert: pkijs.Certificate }>> {
   const out: Array<{ key: string; der: ArrayBuffer; cert: pkijs.Certificate }> = [];
-  let cursor: string | undefined;
-  do {
-    const listing = await env.STORE.list({ prefix: "ca/", cursor });
-    cursor = listing.truncated ? listing.cursor : undefined;
-    for (const obj of listing.objects) {
-      if (!obj.key.endsWith(".crt")) continue;
-      const file = await env.STORE.get(obj.key);
-      if (!file) continue;
-      const der = await file.arrayBuffer();
-      try {
-        const cert = parseCertificate(der);
-        out.push({ key: obj.key, der, cert });
-      } catch (e) {
-        console.warn("Skip bad cert:", obj.key, String(e));
-      }
+  // NOTE: CA 目录也使用了列表缓存
+  const caObjs = await cachedListAllWithPrefix(env, "ca/");
+  for (const obj of caObjs) {
+    if (!obj.key.endsWith(".crt")) continue;
+    const file = await env.STORE.get(obj.key);
+    if (!file) continue;
+    const der = await file.arrayBuffer();
+    try {
+      const cert = parseCertificate(der);
+      out.push({ key: obj.key, der, cert });
+    } catch (e) {
+      console.warn("Skip bad cert:", obj.key, String(e));
     }
-  } while (cursor);
+  }
   console.log("CA candidates:", out.map(c => ({ key: c.key, cn: getCN(c.cert), ski: getSKIHex(c.cert) })));
   return out;
 }
@@ -243,6 +291,88 @@ function extractPEMBlock(pemText: string, begin: string, end: string): Uint8Arra
   return bytes;
 }
 
+/** ---------- 元数据 API（新增） ---------- */
+async function getMetaJSON(env: Env, key: string) {
+  if (!/^\/(ca|crl)\//.test(key)) throw new Error("Bad key");
+  const r2key = key.replace(/^\/+/, "");
+  const obj = await env.STORE.get(r2key);
+  if (!obj) return { error: "Not Found" };
+
+  const isCert = r2key.endsWith(".crt") || r2key.endsWith(".crt.pem");
+  const isCRL = r2key.endsWith(".crl") || r2key.endsWith(".crl.pem");
+
+  const raw = r2key.endsWith(".pem") ? new TextEncoder().encode(await obj.text()).buffer : await obj.arrayBuffer();
+  let body: any = {};
+  try {
+    if (isCert) {
+      const der = r2key.endsWith(".pem") ? extractPEMBlock(new TextDecoder().decode(raw), "-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----").buffer : raw;
+      const cert = parseCertificate(der);
+      body = {
+        type: "certificate",
+        subject: cert.subject.typesAndValues.map(tv => ({ oid: tv.type, value: tv.value.valueBlock.value })),
+        issuer: cert.issuer.typesAndValues.map(tv => ({ oid: tv.type, value: tv.value.valueBlock.value })),
+        notBefore: toJSDate((cert as any).notBefore)?.toISOString() ?? null,
+        notAfter: toJSDate((cert as any).notAfter)?.toISOString() ?? null,
+        serialNumberHex: (cert.serialNumber.valueBlock.valueHex && toHex(cert.serialNumber.valueBlock.valueHex)) || null,
+        signatureAlg: cert.signatureAlgorithm.algorithmId,
+        publicKeyAlg: cert.subjectPublicKeyInfo.algorithm.algorithmId,
+        ski: getSKIHex(cert) || null,
+        cn: getCN(cert) || null,
+      };
+    } else if (isCRL) {
+      const der = r2key.endsWith(".pem") ? extractPEMBlock(new TextDecoder().decode(raw), "-----BEGIN X509 CRL-----", "-----END X509 CRL-----").buffer : raw;
+      const crl = parseCRL(der);
+      body = {
+        type: "crl",
+        issuer: crl.issuer.typesAndValues.map(tv => ({ oid: tv.type, value: tv.value.valueBlock.value })),
+        thisUpdate: toJSDate(crl.thisUpdate)?.toISOString() ?? null,
+        nextUpdate: toJSDate(crl.nextUpdate)?.toISOString() ?? null,
+        crlNumber: getCRLNumber(crl)?.toString() ?? null,
+        aki: getCRLAKIHex(crl) || null,
+        signatureAlg: crl.signatureAlgorithm.algorithmId,
+        entryCount: (crl as any).revokedCertificates?.length ?? 0,
+      };
+    } else {
+      body = { type: "binary", size: (obj as any).size ?? null };
+    }
+  } catch (e) {
+    body = { error: "parse_error", detail: String(e) };
+  }
+
+  const meta = {
+    key: r2key,
+    size: (obj as any).size ?? null,
+    uploaded: (obj as any).uploaded instanceof Date ? (obj as any).uploaded.toISOString() : null,
+    etag: (obj as any).etag ?? (obj as any).httpEtag ?? null,
+  };
+
+  return { meta, body };
+}
+
+const getMeta: RouteHandler = async (req, env) => {
+  const url = new URL(req.url);
+  const key = url.searchParams.get("key") || "";
+  if (!key) return new Response(JSON.stringify({ error: "missing key" }), { status: 400, headers: { "Content-Type": "application/json" } });
+
+  const cache = caches.default;
+  const ck = metaCacheKey(key);
+  // 缓存命中
+  const cached = await cache.match(ck);
+  if (cached) return cached;
+
+  const data = await getMetaJSON(env, key);
+  const res = new Response(JSON.stringify(data), {
+    status: data && !(data as any).error ? 200 : (data as any).error === "Not Found" ? 404 : 500,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": `public, max-age=${META_CACHE_TTL}`,
+    },
+  });
+  // 写入缓存
+  await cache.put(ck, res.clone());
+  return res;
+};
+
 /** ---------- 路由：文件 GET/HEAD（PEM 直接文本） ---------- */
 const getBinaryOrText: RouteHandler = async (req, env) => {
   const url = new URL(req.url);
@@ -259,13 +389,10 @@ const getBinaryOrText: RouteHandler = async (req, env) => {
 
   const hdr = httpHeadersForBinaryLike(obj, key);
 
-  // 对 .pem：以文本直出（避免下载）
   if (key.endsWith(".pem")) {
     const text = await obj.text();
     return new Response(text, { status: 200, headers: hdr });
   }
-
-  // 其它按二进制直出
   return new Response(await obj.arrayBuffer(), { status: 200, headers: hdr });
 };
 
@@ -373,6 +500,16 @@ const postCRL: RouteHandler = async (req, env) => {
   await putBinary(env, logicalPEMKey, new TextEncoder().encode(pemText), meta);
   if (byAkiKey) await putBinary(env, byAkiKey, derBytes, meta);
 
+  // ---------- 失效列表/元数据缓存（新增，确保上传后立即生效） ----------
+  const cache = caches.default;
+  await Promise.allSettled([
+    cache.delete(LIST_CACHE_KEYS.CRL),
+    cache.delete(LIST_CACHE_KEYS.CA), // 通常无变化，但一并清即可
+    cache.delete(metaCacheKey("/" + logicalDERKey)),
+    cache.delete(metaCacheKey("/" + logicalPEMKey)),
+    ...(byAkiKey ? [cache.delete(metaCacheKey("/" + byAkiKey))] : []),
+  ]);
+
   return new Response(
     JSON.stringify({
       status: "ok",
@@ -386,15 +523,14 @@ const postCRL: RouteHandler = async (req, env) => {
   );
 };
 
-/** ---------- 首页（动态生成 AIA/CDP 列表） ---------- */
+/** ---------- 首页（支持展开详情，使用列表缓存）（改造） ---------- */
 function groupPairs(keys: string[]) {
-  // 将 *.crt / *.crt.pem、*.crl / *.crl.pem 成对归并
   const map = new Map<string, { der?: string; pem?: string }>();
   for (const k of keys) {
     if (k.endsWith(".crt") || k.endsWith(".crl")) {
       map.set(k, { ...(map.get(k) || {}), der: k });
     } else if (k.endsWith(".crt.pem") || k.endsWith(".crl.pem")) {
-      const base = k.replace(/\.pem$/, ""); // *.crt.pem -> *.crt / *.crl.pem -> *.crl
+      const base = k.replace(/\.pem$/, "");
       map.set(base, { ...(map.get(base) || {}), pem: k });
     }
   }
@@ -402,15 +538,18 @@ function groupPairs(keys: string[]) {
 }
 
 function shortName(key: string) {
-  return key.split("/").slice(1).join("/"); // 去掉前缀目录
+  return key.split("/").slice(1).join("/");
 }
 
 function humanLabel(key: string) {
-  // 显示更友好的标题：去扩展名、保留算法/位数
   return shortName(key).replace(/\.(crt|crl)(\.pem)?$/i, "");
 }
 
-function indexHtml(title: string, caPairs: Map<string, { der?: string; pem?: string }>, crlPairs: Map<string, { der?: string; pem?: string }>) {
+function indexHtml(
+  title: string,
+  caPairs: Map<string, { der?: string; pem?: string }>,
+  crlPairs: Map<string, { der?: string; pem?: string }>
+) {
   const css =
     `:root{--fg:#24292f;--muted:#57606a;--link:#0969da;--link-hover:#1f6feb;--bg:#fff;--card:#f6f8fa;--border:#d0d7de;
 --shadow:0 1px 0 rgba(27,31,36,0.04),0 8px 24px rgba(140,149,159,0.2);--code-bg:#f6f8fa;--kbd-bg:#f6f8fa;--kbd-border:#d0d7de;
@@ -437,22 +576,94 @@ pre{margin:0;padding:12px 14px;background:var(--code-bg);border-top:1px solid va
 kbd{background:var(--kbd-bg);border:1px solid var(--kbd-border);border-bottom-width:2px;border-radius:6px;padding:2px 6px}
 footer{max-width:900px;margin:24px auto 40px;padding:0 16px;color:var(--muted);font-size:12px}
 @media(max-width:640px){ul.files li{flex-direction:column;align-items:flex-start}}
-@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;
-transition-duration:.01ms!important;scroll-behavior:auto!important}}`;
+.toggle{font-size:12px}
+.details{margin-top:8px;padding:8px 10px;background:var(--code-bg);border:1px solid var(--border);border-radius:6px}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid var(--muted);border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-left:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error{color:#d1242f}
+`;
 
   function renderPairs(pairs: Map<string, { der?: string; pem?: string }>, kind: "crt" | "crl") {
     const items = [...pairs.entries()].sort(([a], [b]) => a.localeCompare(b));
     if (items.length === 0) return `<p class="meta" style="padding:12px 14px;">No ${kind.toUpperCase()} files available</p>`;
     return `<ul class="files">` + items.map(([base, v]) => {
       const label = humanLabel(base);
-      const left = `<strong>${label}</strong>`;
+      const left = `<strong>${label}</strong><div class="meta">${shortName(base)}</div>`;
       const right = [
         v.der ? `<a href="/${v.der}">DER</a>` : "",
         v.pem ? `<a href="/${v.pem}">PEM</a>` : ""
       ].filter(Boolean).join(" | ");
-      return `<li><div>${left}</div><div>${right}</div></li>`;
+      // 新增 “详情” 按钮和容器
+      const details = `<div class="toggle"><button data-key="/${(v.der || v.pem)!}" class="btn-detail">详情</button><span class="loading" hidden><span class="spinner"></span></span></div><div class="details" data-panel="/${(v.der || v.pem)!}" hidden></div>`;
+      return `<li><div>${left}${details}</div><div>${right}</div></li>`;
     }).join("") + `</ul>`;
   }
+
+  const js = `
+  addEventListener('click', async (e) => {
+    const btn = (e.target as HTMLElement).closest('.btn-detail') as HTMLButtonElement | null;
+    if (!btn) return;
+    const key = btn.getAttribute('data-key')!;
+    const panel = document.querySelector('.details[data-panel="'+key+'"]') as HTMLElement;
+    const spinner = btn.parentElement?.querySelector('.loading') as HTMLElement;
+    if (!panel || !spinner) return;
+    if (!panel.hasAttribute('hidden')) { panel.setAttribute('hidden',''); return; }
+    spinner.removeAttribute('hidden');
+    try {
+      const r = await fetch('/meta?key='+encodeURIComponent(key));
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.error || 'meta error');
+      panel.innerHTML = renderMeta(j);
+      panel.removeAttribute('hidden');
+    } catch (err) {
+      panel.innerHTML = '<div class="error">加载详情失败：'+(err as Error).message+'</div>';
+      panel.removeAttribute('hidden');
+    } finally {
+      spinner.setAttribute('hidden','');
+    }
+  });
+
+  function renderDN(arr:any[]):string{
+    try{
+      const map:any = { "2.5.4.3":"CN","2.5.4.6":"C","2.5.4.7":"L","2.5.4.8":"ST","2.5.4.10":"O","2.5.4.11":"OU" };
+      return arr.map((x:any)=> (map[x.oid]||x.oid)+'='+(x.value??'')).join(', ');
+    }catch{return ''}
+  }
+
+  function renderMeta(j:any):string{
+    const m = j.meta || {};
+    const b = j.body || {};
+    let html = '<div class="meta">size='+(m.size??'?')+', uploaded='+(m.uploaded??'?')+', etag='+(m.etag??'?')+'</div>';
+    if (b.type==='certificate'){
+      html += '<pre>'+[
+        'Type: Certificate',
+        'Subject: '+renderDN(b.subject||[]),
+        'Issuer:  '+renderDN(b.issuer||[]),
+        'Serial:  '+(b.serialNumberHex||''),
+        'NotBefore: '+(b.notBefore||''),
+        'NotAfter:  '+(b.notAfter||''),
+        'SignatureAlg: '+(b.signatureAlg||''),
+        'PublicKeyAlg: '+(b.publicKeyAlg||''),
+        'SKI: '+(b.ski||''),
+        'CN:  '+(b.cn||'')
+      ].join('\\n')+'</pre>';
+    }else if(b.type==='crl'){
+      html += '<pre>'+[
+        'Type: CRL',
+        'Issuer:   '+renderDN(b.issuer||[]),
+        'ThisUpdate: '+(b.thisUpdate||''),
+        'NextUpdate: '+(b.nextUpdate||''),
+        'CRLNumber: '+(b.crlNumber||''),
+        'AKI: '+(b.aki||''),
+        'SignatureAlg: '+(b.signatureAlg||''),
+        'Entries: '+(b.entryCount??0)
+      ].join('\\n')+'</pre>';
+    }else{
+      html += '<pre>Binary object</pre>';
+    }
+    return html;
+  }
+  `;
 
   return `<!doctype html><meta charset="utf-8">
 <title>${title}</title>
@@ -475,16 +686,17 @@ transition-duration:.01ms!important;scroll-behavior:auto!important}}`;
     </div>
   </section>
 </main>
-<footer>Generated from R2 at ${new Date().toISOString()}</footer>`;
+<footer>Generated from R2 at ${new Date().toISOString()}</footer>
+<script type="module">${js}</script>`;
 }
 
 const indexPage: RouteHandler = async (_req, env) => {
   const title = env.SITE_NAME || "PKI AIA/CDP";
 
-  // 动态读取 ca/ 与 crl/ 目录
+  // 使用带缓存的列表函数
   const [caObjs, crlObjs] = await Promise.all([
-    listAllWithPrefix(env, "ca/"),
-    listAllWithPrefix(env, "crl/"),
+    cachedListAllWithPrefix(env, "ca/"),
+    cachedListAllWithPrefix(env, "crl/"),
   ]);
 
   const caKeys = caObjs
@@ -493,7 +705,6 @@ const indexPage: RouteHandler = async (_req, env) => {
 
   const crlKeys = crlObjs
     .map(o => o.key)
-    // 首页只展示主 CRL/CRL.pem 与 archive/by-keyid 可选：这里过滤 archive 与 by-keyid，保持简洁
     .filter(k => !k.startsWith("crl/archive/") && !k.startsWith("crl/by-keyid/"))
     .filter(k => k.endsWith(".crl") || k.endsWith(".crl.pem"));
 
@@ -513,6 +724,9 @@ export default {
     try {
       if (method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
         return indexPage(req, env, ctx);
+      }
+      if (method === "GET" && url.pathname === "/meta") {
+        return getMeta(req, env, ctx); // 新增：元数据 API
       }
       if (method === "GET" && /^\/(ca|crl)\//.test(url.pathname)) {
         return getBinaryOrText(req, env, ctx);
