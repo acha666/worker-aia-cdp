@@ -383,23 +383,33 @@ const getBinaryOrText: RouteHandler = async (req, env) => {
 
 /** ---------- /crl（上传 + 缓存失效） ---------- */
 const postCRL: RouteHandler = async (req, env) => {
-  const ct = (req.headers.get("content-type") || "").toLowerCase();
-  if (!ct.includes("pem") && !ct.includes("text") && !ct.includes("plain") && !ct.includes("x-pem-file")) {
+  const ctRaw = req.headers.get("content-type") || "";
+  const ct = ctRaw.toLowerCase();
+  if (!ct.startsWith("text/")) {
     return new Response(
-      JSON.stringify({ error: "Expect PEM CRL. Content-Type should be text/plain or application/x-pem-file" }),
+      JSON.stringify({ error: "Only text/plain PEM is accepted (CRL PEM in request body). Content-Type must be text/plain." }),
       { status: 415, headers: { "Content-Type": "application/json" } },
     );
   }
 
   let pemText = "";
-  try { pemText = await req.text(); }
-  catch { return new Response(JSON.stringify({ error: "Bad request body" }), { status: 400, headers: { "Content-Type": "application/json" } }); }
+  try {
+    pemText = await req.text();
+  } catch {
+    return new Response(
+      JSON.stringify({ error: "Bad request body: expected CRL PEM text in request body." }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
 
   let derBytes: Uint8Array;
   try { derBytes = extractPEMBlock(pemText, "-----BEGIN X509 CRL-----", "-----END X509 CRL-----"); }
   catch (e) {
     console.error("PEM parse error:", e);
-    return new Response(JSON.stringify({ error: "Invalid CRL PEM" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    return new Response(
+      JSON.stringify({ error: "Invalid CRL PEM" }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
   }
 
   let crl: pkijs.CertificateRevocationList;
@@ -552,7 +562,7 @@ export default {
         return postCRL(req, env, ctx);
       }
 
-      // 5) 静态资源（首页、CSS、JS）—— 不写死在 TS，交给 Assets
+      // 5) 静态资源（首页、CSS、JS）
       return env.ASSETS.fetch(req);
     } catch (e) {
       console.error("Unhandled error:", e);
