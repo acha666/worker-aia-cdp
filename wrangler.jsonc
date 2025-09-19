@@ -15,5 +15,8 @@
         "logs": {
             "enabled": true
         }
+    },
+    "assets": {
+        "directory": "./public"
     }
 }
