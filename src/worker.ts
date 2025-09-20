@@ -25,6 +25,7 @@ const META_CACHE_TTL = 60;
 const LIST_CACHE_KEYS = {
   CA: new Request("https://r2cache.internal/list?prefix=ca/&delimiter=/"),
   CRL: new Request("https://r2cache.internal/list?prefix=crl/&delimiter=/"),
+  DCRL: new Request("https://r2cache.internal/list?prefix=dcrl/&delimiter=/"), // ★ 新增
 };
 
 function metaCacheKey(key: string) {
@@ -110,6 +111,21 @@ function getCRLNumber(crl: pkijs.CertificateRevocationList): bigint | undefined 
   return n;
 }
 
+/** ★ 新增：Delta CRL 识别与 BaseCRLNumber 解析（2.5.29.27） */
+function getDeltaBaseCRLNumber(crl: pkijs.CertificateRevocationList): bigint | undefined {
+  const ext = crl.crlExtensions?.extensions.find(e => e.extnID === "2.5.29.27");
+  if (!ext) return undefined;
+  const asn1 = fromBER(ext.extnValue.valueBlock.valueHex);
+  const int = asn1.result as Integer;
+  const bytes = new Uint8Array(int.valueBlock.valueHex);
+  let n = 0n;
+  for (const b of bytes) n = (n << 8n) + BigInt(b);
+  return n;
+}
+function isDeltaCRL(crl: pkijs.CertificateRevocationList): boolean {
+  return getDeltaBaseCRLNumber(crl) !== undefined;
+}
+
 function friendlyNameFromCert(cert: pkijs.Certificate): string {
   const cn = getCN(cert);
   if (cn) return cn.replace(/[^\w.-]+/g, "").replace(/\s+/g, "");
@@ -157,10 +173,13 @@ async function listAllWithPrefix(env: Env, prefix: string) {
   return out;
 }
 
-// 你已有：只对 ca/ 与 crl/ 的汇总缓存（用于首页/元数据解析）
-async function cachedListAllWithPrefix(env: Env, prefix: "ca/" | "crl/"): Promise<R2Object[]> {
+// ★ 扩展：支持 "dcrl/"
+async function cachedListAllWithPrefix(env: Env, prefix: "ca/" | "crl/" | "dcrl/"): Promise<R2Object[]> {
   const cache = caches.default;
-  const key = prefix === "ca/" ? LIST_CACHE_KEYS.CA : LIST_CACHE_KEYS.CRL;
+  const key =
+    prefix === "ca/" ? LIST_CACHE_KEYS.CA :
+      prefix === "crl/" ? LIST_CACHE_KEYS.CRL :
+        LIST_CACHE_KEYS.DCRL;
 
   const hit = await cache.match(key);
   if (hit) {
@@ -277,7 +296,7 @@ function extractPEMBlock(pemText: string, begin: string, end: string): Uint8Arra
 
 /** ---------- /meta（带缓存） ---------- */
 async function getMetaJSON(env: Env, key: string) {
-  if (!/^\/(ca|crl)\//.test(key)) throw new Error("Bad key");
+  if (!/^\/(ca|crl|dcrl)\//.test(key)) throw new Error("Bad key"); // ★ 支持 dcrl
   const r2key = key.replace(/^\/+/, "");
   const obj = await env.STORE.get(r2key);
   if (!obj) return { error: "Not Found" };
@@ -306,6 +325,7 @@ async function getMetaJSON(env: Env, key: string) {
     } else if (isCRL) {
       const der = r2key.endsWith(".pem") ? extractPEMBlock(new TextDecoder().decode(raw), "-----BEGIN X509 CRL-----", "-----END X509 CRL-----").buffer : raw;
       const crl = parseCRL(der);
+      const baseNum = getDeltaBaseCRLNumber(crl); // ★
       body = {
         type: "crl",
         issuer: crl.issuer.typesAndValues.map(tv => ({ oid: tv.type, value: tv.value.valueBlock.value })),
@@ -315,6 +335,8 @@ async function getMetaJSON(env: Env, key: string) {
         aki: getCRLAKIHex(crl) || null,
         signatureAlg: crl.signatureAlgorithm.algorithmId,
         entryCount: (crl as any).revokedCertificates?.length ?? 0,
+        isDelta: baseNum !== undefined,                        // ★ 新增
+        baseCRLNumber: baseNum !== undefined ? baseNum.toString() : null, // ★ 新增
       };
     } else {
       body = { type: "binary", size: (obj as any).size ?? null };
@@ -358,7 +380,7 @@ const getMeta: RouteHandler = async (req, env) => {
 /** ---------- /file/* （新增边缘缓存命中） ---------- */
 const getBinaryOrText: RouteHandler = async (req, env) => {
   const url = new URL(req.url);
-  if (!/^\/(ca|crl)\//.test(url.pathname)) return new Response("Not Found", { status: 404 });
+  if (!/^\/(ca|crl|dcrl)\//.test(url.pathname)) return new Response("Not Found", { status: 404 }); // ★ 支持 dcrl
 
   const key = url.pathname.replace(/^\/+/, "");
   const cache = caches.default;
@@ -430,24 +452,33 @@ const postCRL: RouteHandler = async (req, env) => {
     .replace(/RootCA/gi, "RootCA");
   const logicalBase = /Issuing/i.test(friendly) ? "AchaIssuingCA01" : "AchaRootCA";
 
-  const logicalDERKey = `crl/${logicalBase}.crl`;
-  const logicalPEMKey = `crl/${logicalBase}.crl.pem`;
+  // ★ 判断是否 Delta
+  const deltaBase = getDeltaBaseCRLNumber(crl);
+  const isDelta = deltaBase !== undefined;
+
+  // ★ 根据类型选择不同命名空间
+  const folder = isDelta ? "dcrl" : "crl";
+  const logicalDERKey = `${folder}/${logicalBase}.crl`;
+  const logicalPEMKey = `${folder}/${logicalBase}.crl.pem`;
   const byAkiKey = (() => {
     const aki = getCRLAKIHex(crl);
-    return aki ? `crl/by-keyid/${aki}.crl` : undefined;
+    return aki ? `${folder}/by-keyid/${aki}.crl` : undefined;
   })();
 
+  // 比较“同类最新”
   const existing = await getExistingCRL(env, logicalDERKey);
   if (!isNewerCRL(crl, existing?.parsed)) {
-    return new Response(JSON.stringify({ status: "ignored", reason: "CRL not newer" }), { status: 409, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ status: "ignored", reason: isDelta ? "Delta CRL not newer" : "CRL not newer" }), { status: 409, headers: { "Content-Type": "application/json" } });
   }
 
+  // 归档上一版（同类）
   if (existing) {
     const oldNum = getCRLNumber(existing.parsed);
     const oldTag = oldNum !== undefined ? oldNum.toString() : (await sha256Hex(existing.der)).slice(0, 16);
-    await putBinary(env, `crl/archive/${friendly}-${oldTag}.crl`, existing.der, {
+    await putBinary(env, `${folder}/archive/${friendly}-${oldTag}.crl`, existing.der, {
       issuerCN: getCN(issuer.cert) || "",
       archivedAt: new Date().toISOString(),
+      kind: isDelta ? "delta" : "full",
     });
   }
 
@@ -460,6 +491,8 @@ const postCRL: RouteHandler = async (req, env) => {
     crlNumber: crlNum !== undefined ? crlNum.toString() : "",
     thisUpdate: thisUpd ? thisUpd.toISOString() : "",
     nextUpdate: nextUpd ? nextUpd.toISOString() : "",
+    isDelta: String(isDelta),
+    baseCRLNumber: isDelta && deltaBase !== undefined ? deltaBase.toString() : "",
   };
 
   await putBinary(env, logicalDERKey, derBytes, meta);
@@ -470,20 +503,23 @@ const postCRL: RouteHandler = async (req, env) => {
   const cache = caches.default;
   await Promise.allSettled([
     cache.delete(LIST_CACHE_KEYS.CRL),
+    cache.delete(LIST_CACHE_KEYS.DCRL), // ★
     cache.delete(LIST_CACHE_KEYS.CA),
     cache.delete(metaCacheKey("/" + logicalDERKey)),
     cache.delete(metaCacheKey("/" + logicalPEMKey)),
     ...(byAkiKey ? [cache.delete(metaCacheKey("/" + byAkiKey))] : []),
-    // 失效 /api/list 通用键（如果前端用 /api/list?prefix=crl/&delimiter=/ 之类）
     cache.delete(new Request("https://r2cache.internal/api-list?prefix=crl/&delimiter=/")),
+    cache.delete(new Request("https://r2cache.internal/api-list?prefix=dcrl/&delimiter=/")), // ★
   ]);
 
   return new Response(
     JSON.stringify({
       status: "ok",
+      kind: isDelta ? "delta" : "full",
       stored: { der: logicalDERKey, pem: logicalPEMKey },
       byAki: byAkiKey || null,
       crlNumber: meta.crlNumber || null,
+      baseCRLNumber: meta.baseCRLNumber || null,
       thisUpdate: meta.thisUpdate || null,
       nextUpdate: meta.nextUpdate || null,
     }),
@@ -549,7 +585,7 @@ export default {
       }
 
       // 3) 文件 GET/HEAD（带内容缓存）
-      if ((method === "GET" || method === "HEAD") && /^\/(ca|crl)\//.test(url.pathname)) {
+      if ((method === "GET" || method === "HEAD") && /^\/(ca|crl|dcrl)\//.test(url.pathname)) { // ★ 支持 dcrl
         if (method === "HEAD") {
           const r = await getBinaryOrText(new Request(req, { method: "GET" }), env, ctx);
           return new Response(null, { status: r.status, headers: r.headers });
@@ -557,7 +593,7 @@ export default {
         return getBinaryOrText(req, env, ctx);
       }
 
-      // 4) CRL 上传
+      // 4) CRL / Delta CRL 上传（统一入口）
       if (method === "POST" && url.pathname === "/crl") {
         return postCRL(req, env, ctx);
       }

@@ -25,9 +25,15 @@
         </section>
 
         <section>
+            <h2>Delta CRLs (Delta-CDP)</h2>
+            <ul id="dcrls" class="files" aria-live="polite"></ul>
+        </section>
+
+        <section>
             <h2>Upload CRL</h2>
             <p class="hint">
-                Send a <code>PEM</code> (X.509 CRL) via <kbd>POST</kbd> to <code>/crl</code>.
+                Send a <code>PEM</code> (X.509 <strong>CRL</strong> or <strong>Delta CRL</strong>) via
+                <kbd>POST</kbd> to <code>/crl</code>.
             </p>
         </section>
     </main>

@@ -34,9 +34,15 @@ function itemLi(base, hasDer, hasPem) {
 async function render() {
     const certUL = document.getElementById('certs');
     const crlUL = document.getElementById('crls');
+    const dcrlUL = document.getElementById('dcrls');
 
-    const [certs, crls] = await Promise.all([list('ca/'), list('crl/')]);
+    const [certs, crls, dcrls] = await Promise.all([
+        list('ca/'),
+        list('crl/'),
+        list('dcrl/'),
+    ]);
 
+    // ---- Certs
     const certMap = new Map();
     certs.objects.forEach(o => {
         if (o.key.endsWith('.crt')) {
@@ -55,6 +61,7 @@ async function render() {
             certUL.appendChild(itemLi(base, !!v.der, !!v.pem));
         });
 
+    // ---- Full CRLs
     const crlMap = new Map();
     crls.objects
         .filter(o => !o.key.startsWith('crl/archive/') && !o.key.startsWith('crl/by-keyid/'))
@@ -69,11 +76,31 @@ async function render() {
                 crlMap.set(base, { ...prev, pem: true });
             }
         });
-
     [...crlMap.entries()]
         .sort(([a], [b]) => a.localeCompare(b))
         .forEach(([base, v]) => {
             crlUL.appendChild(itemLi(base, !!v.der, !!v.pem));
+        });
+
+    // ---- Delta CRLs
+    const dcrlMap = new Map();
+    dcrls.objects
+        .filter(o => !o.key.startsWith('dcrl/archive/') && !o.key.startsWith('dcrl/by-keyid/'))
+        .forEach(o => {
+            if (o.key.endsWith('.crl')) {
+                const prev = dcrlMap.get(o.key) || {};
+                dcrlMap.set(o.key, { ...prev, der: true });
+            }
+            if (o.key.endsWith('.crl.pem')) {
+                const base = o.key.replace(/\.pem$/, '');
+                const prev = dcrlMap.get(base) || {};
+                dcrlMap.set(base, { ...prev, pem: true });
+            }
+        });
+    [...dcrlMap.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .forEach(([base, v]) => {
+            dcrlUL.appendChild(itemLi(base, !!v.der, !!v.pem));
         });
 }
 
