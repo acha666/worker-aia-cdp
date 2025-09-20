@@ -6,6 +6,7 @@ import * as pkijs from "pkijs";
 interface Env {
   STORE: R2Bucket;
   SITE_NAME?: string;
+  ASSETS: Fetcher;          // ★ 新增：Assets 绑定
 }
 type RouteHandler = (req: Request, env: Env, ctx: ExecutionContext) => Promise<Response>;
 
@@ -14,6 +15,22 @@ pkijs.setEngine(
   "cloudflare",
   new pkijs.CryptoEngine({ name: "cloudflare", crypto, subtle: crypto.subtle }),
 );
+
+/** ---------- 缓存参数 ---------- */
+const LIST_CACHE_TTL = 60;                   // 秒：/api/list 的客户端强缓存
+const LIST_CACHE_SMAXAGE = 300;              // 秒：边缘缓存
+const LIST_CACHE_SWR = 86400;                // 秒：陈旧可用
+const META_CACHE_TTL = 60;
+
+const LIST_CACHE_KEYS = {
+  CA: new Request("https://r2cache.internal/list?prefix=ca/&delimiter=/"),
+  CRL: new Request("https://r2cache.internal/list?prefix=crl/&delimiter=/"),
+  DCRL: new Request("https://r2cache.internal/list?prefix=dcrl/&delimiter=/"), // ★ 新增
+};
+
+function metaCacheKey(key: string) {
+  return new Request(`https://r2cache.internal/meta?key=${encodeURIComponent(key)}`);
+}
 
 /** ---------- 小工具 ---------- */
 const b2ab = (b: ArrayBuffer | Uint8Array) => (b instanceof Uint8Array ? b.buffer : b);
@@ -30,10 +47,10 @@ function toJSDate(maybeTime: any): Date | undefined {
     if (!maybeTime) return undefined;
     if (maybeTime instanceof Date) return maybeTime;
     if (typeof maybeTime.toDate === "function") return maybeTime.toDate();
-    if (maybeTime.value instanceof Date) return maybeTime.value;
-    if (maybeTime.valueBlock?.value instanceof Date) return maybeTime.valueBlock.value;
-    if (typeof maybeTime === "string" || typeof maybeTime?.value === "string") {
-      const s = typeof maybeTime === "string" ? maybeTime : maybeTime.value;
+    if ((maybeTime as any).value instanceof Date) return (maybeTime as any).value;
+    if ((maybeTime as any).valueBlock?.value instanceof Date) return (maybeTime as any).valueBlock.value;
+    const s = typeof maybeTime === "string" ? maybeTime : (maybeTime as any)?.value;
+    if (typeof s === "string") {
       const d = new Date(s);
       if (!isNaN(d.getTime())) return d;
     }
@@ -94,6 +111,21 @@ function getCRLNumber(crl: pkijs.CertificateRevocationList): bigint | undefined 
   return n;
 }
 
+/** ★ 新增：Delta CRL 识别与 BaseCRLNumber 解析（2.5.29.27） */
+function getDeltaBaseCRLNumber(crl: pkijs.CertificateRevocationList): bigint | undefined {
+  const ext = crl.crlExtensions?.extensions.find(e => e.extnID === "2.5.29.27");
+  if (!ext) return undefined;
+  const asn1 = fromBER(ext.extnValue.valueBlock.valueHex);
+  const int = asn1.result as Integer;
+  const bytes = new Uint8Array(int.valueBlock.valueHex);
+  let n = 0n;
+  for (const b of bytes) n = (n << 8n) + BigInt(b);
+  return n;
+}
+function isDeltaCRL(crl: pkijs.CertificateRevocationList): boolean {
+  return getDeltaBaseCRLNumber(crl) !== undefined;
+}
+
 function friendlyNameFromCert(cert: pkijs.Certificate): string {
   const cn = getCN(cert);
   if (cn) return cn.replace(/[^\w.-]+/g, "").replace(/\s+/g, "");
@@ -103,7 +135,6 @@ function friendlyNameFromCert(cert: pkijs.Certificate): string {
 
 /** ---------- Content-Type 与缓存 ---------- */
 function contentTypeByKey(key: string) {
-  // PEM 按文本直出，便于浏览器内联展示
   if (key.endsWith(".pem") || key.endsWith(".crt.pem") || key.endsWith(".crl.pem"))
     return "text/plain; charset=utf-8";
   if (key.endsWith(".crt")) return "application/pkix-cert";
@@ -123,45 +154,79 @@ function httpHeadersForBinaryLike(obj: R2ObjectBody | R2Object, key: string) {
 
   // 缓存策略：DER 长缓存、CRL 短缓存、PEM 参照对应类型
   if (key.endsWith(".crt") || key.endsWith(".crt.pem"))
-    h.set("Cache-Control", "public, max-age=31536000, immutable");
+    h.set("Cache-Control", "public, max-age=31536000, immutable, s-maxage=31536000, stale-while-revalidate=604800");
   else if (key.endsWith(".crl") || key.endsWith(".crl.pem"))
-    h.set("Cache-Control", "public, max-age=3600, must-revalidate");
-  else h.set("Cache-Control", "public, max-age=300");
+    h.set("Cache-Control", "public, max-age=3600, must-revalidate, s-maxage=86400, stale-while-revalidate=604800");
+  else h.set("Cache-Control", "public, max-age=300, s-maxage=86400, stale-while-revalidate=604800");
   return h;
 }
 
-/** ---------- R2 列表/读写 ---------- */
+/** ---------- R2 列表/读写 + 列表缓存 ---------- */
 async function listAllWithPrefix(env: Env, prefix: string) {
   const out: R2Object[] = [];
   let cursor: string | undefined;
   do {
-    const listing = await env.STORE.list({ prefix, cursor });
+    const listing = await env.STORE.list({ prefix, cursor, delimiter: undefined });
     cursor = listing.truncated ? listing.cursor : undefined;
     for (const obj of listing.objects) out.push(obj);
   } while (cursor);
   return out;
 }
 
+// ★ 扩展：支持 "dcrl/"
+async function cachedListAllWithPrefix(env: Env, prefix: "ca/" | "crl/" | "dcrl/"): Promise<R2Object[]> {
+  const cache = caches.default;
+  const key =
+    prefix === "ca/" ? LIST_CACHE_KEYS.CA :
+      prefix === "crl/" ? LIST_CACHE_KEYS.CRL :
+        LIST_CACHE_KEYS.DCRL;
+
+  const hit = await cache.match(key);
+  if (hit) {
+    const j = await hit.json();
+    return (j.items as Array<{ key: string; size: number; uploaded?: string }>).map(x => ({
+      key: x.key,
+      size: x.size,
+      uploaded: x.uploaded ? new Date(x.uploaded) : undefined,
+    } as unknown as R2Object));
+  }
+
+  const objs = await listAllWithPrefix(env, prefix);
+  const payload = JSON.stringify({
+    items: objs.map(o => ({
+      key: o.key,
+      size: (o as any).size ?? 0,
+      uploaded: (o as any).uploaded instanceof Date ? (o as any).uploaded.toISOString() : undefined,
+    })),
+    cachedAt: new Date().toISOString(),
+  });
+
+  const res = new Response(payload, {
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": `public, max-age=${LIST_CACHE_TTL}, s-maxage=${LIST_CACHE_SMAXAGE}, stale-while-revalidate=${LIST_CACHE_SWR}`,
+    },
+  });
+  await cache.put(key, res.clone());
+  return objs;
+}
+
+/** ---------- 证书候选（沿用你的解析逻辑） ---------- */
 async function listCACandidates(env: Env): Promise<Array<{ key: string; der: ArrayBuffer; cert: pkijs.Certificate }>> {
   const out: Array<{ key: string; der: ArrayBuffer; cert: pkijs.Certificate }> = [];
-  let cursor: string | undefined;
-  do {
-    const listing = await env.STORE.list({ prefix: "ca/", cursor });
-    cursor = listing.truncated ? listing.cursor : undefined;
-    for (const obj of listing.objects) {
-      if (!obj.key.endsWith(".crt")) continue;
-      const file = await env.STORE.get(obj.key);
-      if (!file) continue;
-      const der = await file.arrayBuffer();
-      try {
-        const cert = parseCertificate(der);
-        out.push({ key: obj.key, der, cert });
-      } catch (e) {
-        console.warn("Skip bad cert:", obj.key, String(e));
-      }
+  const caObjs = await cachedListAllWithPrefix(env, "ca/");
+  for (const obj of caObjs) {
+    if (!obj.key.endsWith(".crt")) continue;
+    const file = await env.STORE.get(obj.key);
+    if (!file) continue;
+    const der = await file.arrayBuffer();
+    try {
+      const cert = parseCertificate(der);
+      out.push({ key: obj.key, der, cert });
+    } catch (e) {
+      console.warn("Skip bad cert:", obj.key, String(e));
     }
-  } while (cursor);
-  console.log("CA candidates:", out.map(c => ({ key: c.key, cn: getCN(c.cert), ski: getSKIHex(c.cert) })));
+  }
   return out;
 }
 
@@ -170,40 +235,27 @@ async function putBinary(env: Env, key: string, data: ArrayBuffer | Uint8Array, 
   return env.STORE.put(key, data, { httpMetadata: {}, customMetadata: meta });
 }
 
-/** ---------- CRL 发行者定位/验证 ---------- */
+/** ---------- CRL 关联/校验 ---------- */
 async function findIssuerCertForCRL(env: Env, crl: pkijs.CertificateRevocationList) {
   const akiHex = getCRLAKIHex(crl);
-  console.log("CRL AKI:", akiHex);
   const candidates = await listCACandidates(env);
   if (akiHex) {
     for (const c of candidates) {
       const ski = getSKIHex(c.cert);
-      if (ski && ski.toLowerCase() === akiHex.toLowerCase()) {
-        console.log("Issuer matched by AKI/SKI:", c.key);
-        return c;
-      }
+      if (ski && ski.toLowerCase() === akiHex.toLowerCase()) return c;
     }
   }
   const issuerDN = crl.issuer.typesAndValues.map(tv => `${tv.type}=${tv.value.valueBlock.value}`).join(",");
   for (const c of candidates) {
     const subjDN = c.cert.subject.typesAndValues.map(tv => `${tv.type}=${tv.value.valueBlock.value}`).join(",");
-    if (issuerDN === subjDN) {
-      console.log("Issuer matched by DN:", c.key);
-      return c;
-    }
+    if (issuerDN === subjDN) return c;
   }
-  console.warn("Issuer not found. issuerDN =", issuerDN);
   return undefined;
 }
 
 async function verifyCRLWithIssuer(crl: pkijs.CertificateRevocationList, issuer: pkijs.Certificate) {
-  try {
-    const ok = await crl.verify({ issuerCertificate: issuer });
-    return ok === true;
-  } catch (e) {
-    console.error("crl.verify threw:", e);
-    return false;
-  }
+  try { return (await crl.verify({ issuerCertificate: issuer })) === true; }
+  catch (e) { console.error("crl.verify threw:", e); return false; }
 }
 
 async function getExistingCRL(env: Env, key: string) {
@@ -225,7 +277,6 @@ function isNewerCRL(incoming: pkijs.CertificateRevocationList, existing?: pkijs.
   const tNew = toJSDate(incoming.thisUpdate);
   const tOld = toJSDate(existing.thisUpdate);
   if (tNew && tOld) return tNew.getTime() > tOld.getTime();
-
   console.warn("isNewerCRL: cannot determine freshness", { tNew: incoming.thisUpdate, tOld: existing?.thisUpdate });
   return false;
 }
@@ -243,38 +294,122 @@ function extractPEMBlock(pemText: string, begin: string, end: string): Uint8Arra
   return bytes;
 }
 
-/** ---------- 路由：文件 GET/HEAD（PEM 直接文本） ---------- */
-const getBinaryOrText: RouteHandler = async (req, env) => {
+/** ---------- /meta（带缓存） ---------- */
+async function getMetaJSON(env: Env, key: string) {
+  if (!/^\/(ca|crl|dcrl)\//.test(key)) throw new Error("Bad key"); // ★ 支持 dcrl
+  const r2key = key.replace(/^\/+/, "");
+  const obj = await env.STORE.get(r2key);
+  if (!obj) return { error: "Not Found" };
+
+  const isCert = r2key.endsWith(".crt") || r2key.endsWith(".crt.pem");
+  const isCRL = r2key.endsWith(".crl") || r2key.endsWith(".crl.pem");
+
+  const raw = r2key.endsWith(".pem") ? new TextEncoder().encode(await obj.text()).buffer : await obj.arrayBuffer();
+  let body: any = {};
+  try {
+    if (isCert) {
+      const der = r2key.endsWith(".pem") ? extractPEMBlock(new TextDecoder().decode(raw), "-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----").buffer : raw;
+      const cert = parseCertificate(der);
+      body = {
+        type: "certificate",
+        subject: cert.subject.typesAndValues.map(tv => ({ oid: tv.type, value: tv.value.valueBlock.value })),
+        issuer: cert.issuer.typesAndValues.map(tv => ({ oid: tv.type, value: tv.value.valueBlock.value })),
+        notBefore: toJSDate((cert as any).notBefore)?.toISOString() ?? null,
+        notAfter: toJSDate((cert as any).notAfter)?.toISOString() ?? null,
+        serialNumberHex: (cert.serialNumber.valueBlock.valueHex && toHex(cert.serialNumber.valueBlock.valueHex)) || null,
+        signatureAlg: cert.signatureAlgorithm.algorithmId,
+        publicKeyAlg: cert.subjectPublicKeyInfo.algorithm.algorithmId,
+        ski: getSKIHex(cert) || null,
+        cn: getCN(cert) || null,
+      };
+    } else if (isCRL) {
+      const der = r2key.endsWith(".pem") ? extractPEMBlock(new TextDecoder().decode(raw), "-----BEGIN X509 CRL-----", "-----END X509 CRL-----").buffer : raw;
+      const crl = parseCRL(der);
+      const baseNum = getDeltaBaseCRLNumber(crl); // ★
+      body = {
+        type: "crl",
+        issuer: crl.issuer.typesAndValues.map(tv => ({ oid: tv.type, value: tv.value.valueBlock.value })),
+        thisUpdate: toJSDate(crl.thisUpdate)?.toISOString() ?? null,
+        nextUpdate: toJSDate(crl.nextUpdate)?.toISOString() ?? null,
+        crlNumber: getCRLNumber(crl)?.toString() ?? null,
+        aki: getCRLAKIHex(crl) || null,
+        signatureAlg: crl.signatureAlgorithm.algorithmId,
+        entryCount: (crl as any).revokedCertificates?.length ?? 0,
+        isDelta: baseNum !== undefined,                        // ★ 新增
+        baseCRLNumber: baseNum !== undefined ? baseNum.toString() : null, // ★ 新增
+      };
+    } else {
+      body = { type: "binary", size: (obj as any).size ?? null };
+    }
+  } catch (e) {
+    body = { error: "parse_error", detail: String(e) };
+  }
+
+  const meta = {
+    key: r2key,
+    size: (obj as any).size ?? null,
+    uploaded: (obj as any).uploaded instanceof Date ? (obj as any).uploaded.toISOString() : null,
+    etag: (obj as any).etag ?? (obj as any).httpEtag ?? null,
+  };
+
+  return { meta, body };
+}
+
+const getMeta: RouteHandler = async (req, env) => {
   const url = new URL(req.url);
-  if (!/^\/(ca|crl)\//.test(url.pathname)) return new Response("Not Found", { status: 404 });
+  const key = url.searchParams.get("key") || "";
+  if (!key) return new Response(JSON.stringify({ error: "missing key" }), { status: 400, headers: { "Content-Type": "application/json" } });
 
-  const key = url.pathname.replace(/^\/+/, "");
-  console.log("GET", key);
+  const cache = caches.default;
+  const ck = metaCacheKey(key);
+  const cached = await cache.match(ck);
+  if (cached) return cached;
 
-  const obj = await env.STORE.get(key);
-  if (!obj) {
-    console.warn("R2 object NOT FOUND:", key);
-    return new Response("Not Found", { status: 404 });
-  }
-
-  const hdr = httpHeadersForBinaryLike(obj, key);
-
-  // 对 .pem：以文本直出（避免下载）
-  if (key.endsWith(".pem")) {
-    const text = await obj.text();
-    return new Response(text, { status: 200, headers: hdr });
-  }
-
-  // 其它按二进制直出
-  return new Response(await obj.arrayBuffer(), { status: 200, headers: hdr });
+  const data = await getMetaJSON(env, key);
+  const res = new Response(JSON.stringify(data), {
+    status: data && !(data as any).error ? 200 : (data as any).error === "Not Found" ? 404 : 500,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": `public, max-age=${META_CACHE_TTL}, s-maxage=${LIST_CACHE_SMAXAGE}, stale-while-revalidate=${LIST_CACHE_SWR}`,
+    },
+  });
+  await cache.put(ck, res.clone());
+  return res;
 };
 
-/** ---------- 路由：CRL 上传（PEM） ---------- */
+/** ---------- /file/* （新增边缘缓存命中） ---------- */
+const getBinaryOrText: RouteHandler = async (req, env) => {
+  const url = new URL(req.url);
+  if (!/^\/(ca|crl|dcrl)\//.test(url.pathname)) return new Response("Not Found", { status: 404 }); // ★ 支持 dcrl
+
+  const key = url.pathname.replace(/^\/+/, "");
+  const cache = caches.default;
+
+  // 以完整 URL 作为缓存键
+  const cacheKey = new Request(url.toString(), { method: "GET" });
+  const cached = await cache.match(cacheKey);
+  if (cached) return cached;
+
+  const obj = await env.STORE.get(key);
+  if (!obj) return new Response("Not Found", { status: 404 });
+
+  const hdr = httpHeadersForBinaryLike(obj, key);
+  const resp = key.endsWith(".pem")
+    ? new Response(await obj.text(), { status: 200, headers: hdr })
+    : new Response(await obj.arrayBuffer(), { status: 200, headers: hdr });
+
+  // 可缓存响应写入边缘缓存
+  await cache.put(cacheKey, resp.clone());
+  return resp;
+};
+
+/** ---------- /crl（上传 + 缓存失效） ---------- */
 const postCRL: RouteHandler = async (req, env) => {
-  const ct = (req.headers.get("content-type") || "").toLowerCase();
-  if (!ct.includes("pem") && !ct.includes("text") && !ct.includes("plain") && !ct.includes("x-pem-file")) {
+  const ctRaw = req.headers.get("content-type") || "";
+  const ct = ctRaw.toLowerCase();
+  if (!ct.startsWith("text/")) {
     return new Response(
-      JSON.stringify({ error: "Expect PEM CRL. Content-Type should be text/plain or application/x-pem-file" }),
+      JSON.stringify({ error: "Only text/plain PEM is accepted (CRL PEM in request body). Content-Type must be text/plain." }),
       { status: 415, headers: { "Content-Type": "application/json" } },
     );
   }
@@ -283,80 +418,69 @@ const postCRL: RouteHandler = async (req, env) => {
   try {
     pemText = await req.text();
   } catch {
-    return new Response(JSON.stringify({ error: "Bad request body" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: "Bad request body: expected CRL PEM text in request body." }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
   }
 
   let derBytes: Uint8Array;
-  try {
-    derBytes = extractPEMBlock(pemText, "-----BEGIN X509 CRL-----", "-----END X509 CRL-----");
-  } catch (e) {
+  try { derBytes = extractPEMBlock(pemText, "-----BEGIN X509 CRL-----", "-----END X509 CRL-----"); }
+  catch (e) {
     console.error("PEM parse error:", e);
-    return new Response(JSON.stringify({ error: "Invalid CRL PEM" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: "Invalid CRL PEM" }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
   }
 
   let crl: pkijs.CertificateRevocationList;
-  try {
-    crl = parseCRL(derBytes.buffer);
-  } catch (e) {
+  try { crl = parseCRL(derBytes.buffer); }
+  catch (e) {
     console.error("CRL parse error:", e);
-    return new Response(JSON.stringify({ error: "Bad CRL DER after PEM decode" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({ error: "Bad CRL DER after PEM decode" }), { status: 400, headers: { "Content-Type": "application/json" } });
   }
 
   const issuer = await findIssuerCertForCRL(env, crl);
-  if (!issuer) {
-    return new Response(JSON.stringify({ error: "Issuer certificate not found (by AKI/SKI or DN)" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
+  if (!issuer) return new Response(JSON.stringify({ error: "Issuer certificate not found (by AKI/SKI or DN)" }), { status: 400, headers: { "Content-Type": "application/json" } });
 
   const ok = await verifyCRLWithIssuer(crl, issuer.cert);
-  if (!ok) {
-    return new Response(JSON.stringify({ error: "CRL signature invalid for resolved issuer" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
+  if (!ok) return new Response(JSON.stringify({ error: "CRL signature invalid for resolved issuer" }), { status: 400, headers: { "Content-Type": "application/json" } });
 
   const friendly = friendlyNameFromCert(issuer.cert)
     .replace(/IssuingCA/gi, "IssuingCA")
     .replace(/RootCA/gi, "RootCA");
   const logicalBase = /Issuing/i.test(friendly) ? "AchaIssuingCA01" : "AchaRootCA";
 
-  const logicalDERKey = `crl/${logicalBase}.crl`;
-  const logicalPEMKey = `crl/${logicalBase}.crl.pem`;
+  // ★ 判断是否 Delta
+  const deltaBase = getDeltaBaseCRLNumber(crl);
+  const isDelta = deltaBase !== undefined;
+
+  // ★ 根据类型选择不同命名空间
+  const folder = isDelta ? "dcrl" : "crl";
+  const logicalDERKey = `${folder}/${logicalBase}.crl`;
+  const logicalPEMKey = `${folder}/${logicalBase}.crl.pem`;
   const byAkiKey = (() => {
     const aki = getCRLAKIHex(crl);
-    return aki ? `crl/by-keyid/${aki}.crl` : undefined;
+    return aki ? `${folder}/by-keyid/${aki}.crl` : undefined;
   })();
 
+  // 比较“同类最新”
   const existing = await getExistingCRL(env, logicalDERKey);
   if (!isNewerCRL(crl, existing?.parsed)) {
-    return new Response(JSON.stringify({ status: "ignored", reason: "CRL not newer" }), {
-      status: 409,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({ status: "ignored", reason: isDelta ? "Delta CRL not newer" : "CRL not newer" }), { status: 409, headers: { "Content-Type": "application/json" } });
   }
 
+  // 归档上一版（同类）
   if (existing) {
     const oldNum = getCRLNumber(existing.parsed);
     const oldTag = oldNum !== undefined ? oldNum.toString() : (await sha256Hex(existing.der)).slice(0, 16);
-    await putBinary(env, `crl/archive/${friendly}-${oldTag}.crl`, existing.der, {
+    await putBinary(env, `${folder}/archive/${friendly}-${oldTag}.crl`, existing.der, {
       issuerCN: getCN(issuer.cert) || "",
       archivedAt: new Date().toISOString(),
+      kind: isDelta ? "delta" : "full",
     });
   }
-
-  console.log("CRL times raw:", { thisUpdate: crl.thisUpdate, nextUpdate: crl.nextUpdate });
 
   const thisUpd = toJSDate(crl.thisUpdate);
   const nextUpd = toJSDate(crl.nextUpdate);
@@ -367,18 +491,35 @@ const postCRL: RouteHandler = async (req, env) => {
     crlNumber: crlNum !== undefined ? crlNum.toString() : "",
     thisUpdate: thisUpd ? thisUpd.toISOString() : "",
     nextUpdate: nextUpd ? nextUpd.toISOString() : "",
+    isDelta: String(isDelta),
+    baseCRLNumber: isDelta && deltaBase !== undefined ? deltaBase.toString() : "",
   };
 
   await putBinary(env, logicalDERKey, derBytes, meta);
   await putBinary(env, logicalPEMKey, new TextEncoder().encode(pemText), meta);
   if (byAkiKey) await putBinary(env, byAkiKey, derBytes, meta);
 
+  // ---------- 失效缓存：目录列表 + 元数据 + 文件 ----------
+  const cache = caches.default;
+  await Promise.allSettled([
+    cache.delete(LIST_CACHE_KEYS.CRL),
+    cache.delete(LIST_CACHE_KEYS.DCRL), // ★
+    cache.delete(LIST_CACHE_KEYS.CA),
+    cache.delete(metaCacheKey("/" + logicalDERKey)),
+    cache.delete(metaCacheKey("/" + logicalPEMKey)),
+    ...(byAkiKey ? [cache.delete(metaCacheKey("/" + byAkiKey))] : []),
+    cache.delete(new Request("https://r2cache.internal/api-list?prefix=crl/&delimiter=/")),
+    cache.delete(new Request("https://r2cache.internal/api-list?prefix=dcrl/&delimiter=/")), // ★
+  ]);
+
   return new Response(
     JSON.stringify({
       status: "ok",
+      kind: isDelta ? "delta" : "full",
       stored: { der: logicalDERKey, pem: logicalPEMKey },
       byAki: byAkiKey || null,
       crlNumber: meta.crlNumber || null,
+      baseCRLNumber: meta.baseCRLNumber || null,
       thisUpdate: meta.thisUpdate || null,
       nextUpdate: meta.nextUpdate || null,
     }),
@@ -386,122 +527,44 @@ const postCRL: RouteHandler = async (req, env) => {
   );
 };
 
-/** ---------- 首页（动态生成 AIA/CDP 列表） ---------- */
-function groupPairs(keys: string[]) {
-  // 将 *.crt / *.crt.pem、*.crl / *.crl.pem 成对归并
-  const map = new Map<string, { der?: string; pem?: string }>();
-  for (const k of keys) {
-    if (k.endsWith(".crt") || k.endsWith(".crl")) {
-      map.set(k, { ...(map.get(k) || {}), der: k });
-    } else if (k.endsWith(".crt.pem") || k.endsWith(".crl.pem")) {
-      const base = k.replace(/\.pem$/, ""); // *.crt.pem -> *.crt / *.crl.pem -> *.crl
-      map.set(base, { ...(map.get(base) || {}), pem: k });
-    }
-  }
-  return map;
-}
+/** ---------- /api/list （通用目录列出 + 边缘缓存） ---------- */
+const apiList: RouteHandler = async (req, env) => {
+  const url = new URL(req.url);
+  const prefix = url.searchParams.get("prefix") ?? "";
+  const delimiter = url.searchParams.get("delimiter") ?? "/";
+  const cursor = url.searchParams.get("cursor") ?? undefined;
+  const limit = url.searchParams.get("limit") ? Math.max(1, Math.min(1000, Number(url.searchParams.get("limit")))) : undefined;
 
-function shortName(key: string) {
-  return key.split("/").slice(1).join("/"); // 去掉前缀目录
-}
+  // 构造稳定的虚拟缓存键（不会跟其它路径冲突）
+  const cacheKey = new Request(`https://r2cache.internal/api-list?prefix=${encodeURIComponent(prefix)}&delimiter=${encodeURIComponent(delimiter)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}${limit ? `&limit=${limit}` : ""}`, { method: "GET" });
 
-function humanLabel(key: string) {
-  // 显示更友好的标题：去扩展名、保留算法/位数
-  return shortName(key).replace(/\.(crt|crl)(\.pem)?$/i, "");
-}
+  const cache = caches.default;
+  const hit = await cache.match(cacheKey);
+  if (hit) return hit;
 
-function indexHtml(title: string, caPairs: Map<string, { der?: string; pem?: string }>, crlPairs: Map<string, { der?: string; pem?: string }>) {
-  const css =
-    `:root{--fg:#24292f;--muted:#57606a;--link:#0969da;--link-hover:#1f6feb;--bg:#fff;--card:#f6f8fa;--border:#d0d7de;
---shadow:0 1px 0 rgba(27,31,36,0.04),0 8px 24px rgba(140,149,159,0.2);--code-bg:#f6f8fa;--kbd-bg:#f6f8fa;--kbd-border:#d0d7de;
---header-bg:#f6f8fa;--h2-bg:#eaeef2;--focus:#0969da}:root[data-theme="dark"]{--fg:#c9d1d9;--muted:#8b949e;--link:#58a6ff;
---link-hover:#79c0ff;--bg:#0d1117;--card:#161b22;--border:#30363d;--shadow:0 0 0 rgba(0,0,0,0),0 8px 24px rgba(1,4,9,0.6);
---code-bg:#0b0f14;--kbd-bg:#161b22;--kbd-border:#30363d;--focus:#58a6ff}
-@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--fg:#c9d1d9;--muted:#8b949e;--link:#58a6ff;--link-hover:#79c0ff;
---bg:#0d1117;--card:#161b22;--border:#30363d;--shadow:0 0 0 rgba(0,0,0,0),0 8px 24px rgba(1,4,9,0.6);--code-bg:#0b0f14;
---kbd-bg:#161b22;--kbd-border:#30363d;--header-bg:#21262d;--h2-bg:#2d333b;--focus:#58a6ff}}
-*{box-sizing:border-box}html,body{height:100%}body{margin:0;font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,
-"Helvetica Neue",Arial,"Noto Sans","Apple Color Emoji","Segoe UI Emoji";background:var(--bg);color:var(--fg);
--webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}header{position:sticky;top:0;z-index:10;padding:28px 16px;
-background:var(--header-bg);border-bottom:1px solid var(--border);box-shadow:0 1px 0 rgba(255,255,255,0.03) inset}
-h1{margin:0;font-size:20px;font-weight:600}h2{margin:0;font-size:16px;font-weight:600}main{max-width:900px;margin:24px auto;padding:0 16px}
-section{margin:18px 0;background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden;box-shadow:var(--shadow)}
-section>h2{padding:12px 14px;background:var(--h2-bg);border-bottom:1px solid var(--border)}
-ul.files{list-style:none;margin:0;padding:0}ul.files li{display:flex;justify-content:space-between;align-items:center;gap:12px;
-padding:12px 14px;border-top:1px solid var(--border)}ul.files li:first-child{border-top:none}ul.files strong{font-weight:600}
-.meta{color:var(--muted);font-size:12px}a{color:var(--link);text-decoration:none}a:hover{color:var(--link-hover);text-decoration:underline}
-a:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
-code,pre,kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;font-size:12.5px}
-code{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:0 6px}
-pre{margin:0;padding:12px 14px;background:var(--code-bg);border-top:1px solid var(--border)}
-kbd{background:var(--kbd-bg);border:1px solid var(--kbd-border);border-bottom-width:2px;border-radius:6px;padding:2px 6px}
-footer{max-width:900px;margin:24px auto 40px;padding:0 16px;color:var(--muted);font-size:12px}
-@media(max-width:640px){ul.files li{flex-direction:column;align-items:flex-start}}
-@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;
-transition-duration:.01ms!important;scroll-behavior:auto!important}}`;
+  const list = await env.STORE.list({ prefix, delimiter, cursor, limit });
 
-  function renderPairs(pairs: Map<string, { der?: string; pem?: string }>, kind: "crt" | "crl") {
-    const items = [...pairs.entries()].sort(([a], [b]) => a.localeCompare(b));
-    if (items.length === 0) return `<p class="meta" style="padding:12px 14px;">无可用 ${kind.toUpperCase()} 文件</p>`;
-    return `<ul class="files">` + items.map(([base, v]) => {
-      const label = humanLabel(base);
-      const left = `<strong>${label}</strong>`;
-      const right = [
-        v.der ? `<a href="/${v.der}">DER</a>` : "",
-        v.pem ? `<a href="/${v.pem}">PEM</a>` : ""
-      ].filter(Boolean).join(" | ");
-      return `<li><div>${left}</div><div>${right}</div></li>`;
-    }).join("") + `</ul>`;
-  }
+  const payload = {
+    objects: list.objects.map(o => ({
+      key: o.key,
+      size: (o as any).size ?? 0,
+      etag: (o as any).etag ?? (o as any).httpEtag ?? null,
+      uploaded: (o as any).uploaded instanceof Date ? (o as any).uploaded.toISOString() : null,
+    })),
+    commonPrefixes: list.delimitedPrefixes ?? [],
+    truncated: list.truncated,
+    cursor: list.truncated ? list.cursor : null,
+  };
 
-  return `<!doctype html><meta charset="utf-8">
-<title>${title}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>${css}</style>
-<header><h1>${title}</h1></header>
-<main>
-  <section>
-    <h2>Certificates (AIA)</h2>
-    ${renderPairs(caPairs, "crt")}
-  </section>
-  <section>
-    <h2>CRLs (CDP)</h2>
-    ${renderPairs(crlPairs, "crl")}
-  </section>
-  <section>
-    <h2>Upload CRL</h2>
-    <div style="padding:12px 14px">
-      <p>POST PEM (X509 CRL) to <code>/crl</code> , with Content-Type <code>text/plain</code> or <code>application/x-pem-file</code>.</p>
-    </div>
-  </section>
-</main>
-<footer>Generated from R2 at ${new Date().toISOString()}</footer>`;
-}
-
-const indexPage: RouteHandler = async (_req, env) => {
-  const title = env.SITE_NAME || "Acha PKI AIA/CDP";
-
-  // 动态读取 ca/ 与 crl/ 目录
-  const [caObjs, crlObjs] = await Promise.all([
-    listAllWithPrefix(env, "ca/"),
-    listAllWithPrefix(env, "crl/"),
-  ]);
-
-  const caKeys = caObjs
-    .map(o => o.key)
-    .filter(k => k.endsWith(".crt") || k.endsWith(".crt.pem"));
-
-  const crlKeys = crlObjs
-    .map(o => o.key)
-    // 首页只展示主 CRL/CRL.pem 与 archive/by-keyid 可选：这里过滤 archive 与 by-keyid，保持简洁
-    .filter(k => !k.startsWith("crl/archive/") && !k.startsWith("crl/by-keyid/"))
-    .filter(k => k.endsWith(".crl") || k.endsWith(".crl.pem"));
-
-  const html = indexHtml(title, groupPairs(caKeys), groupPairs(crlKeys));
-  return new Response(html, {
-    status: 200,
-    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=60" },
+  const headers = new Headers({
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": `public, max-age=${LIST_CACHE_TTL}, s-maxage=${LIST_CACHE_SMAXAGE}, stale-while-revalidate=${LIST_CACHE_SWR}`,
   });
+
+  const resp = new Response(JSON.stringify(payload), { headers, status: 200 });
+  // 放入边缘缓存
+  await cache.put(cacheKey, resp.clone());
+  return resp;
 };
 
 /** ---------- 主入口 ---------- */
@@ -511,21 +574,32 @@ export default {
     const url = new URL(req.url);
 
     try {
-      if (method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
-        return indexPage(req, env, ctx);
+      // 1) API —— 目录列出（带缓存）
+      if (method === "GET" && url.pathname === "/api/list") {
+        return apiList(req, env, ctx);
       }
-      if (method === "GET" && /^\/(ca|crl)\//.test(url.pathname)) {
+
+      // 2) 元数据（带缓存）
+      if (method === "GET" && url.pathname === "/meta") {
+        return getMeta(req, env, ctx);
+      }
+
+      // 3) 文件 GET/HEAD（带内容缓存）
+      if ((method === "GET" || method === "HEAD") && /^\/(ca|crl|dcrl)\//.test(url.pathname)) { // ★ 支持 dcrl
+        if (method === "HEAD") {
+          const r = await getBinaryOrText(new Request(req, { method: "GET" }), env, ctx);
+          return new Response(null, { status: r.status, headers: r.headers });
+        }
         return getBinaryOrText(req, env, ctx);
       }
+
+      // 4) CRL / Delta CRL 上传（统一入口）
       if (method === "POST" && url.pathname === "/crl") {
         return postCRL(req, env, ctx);
       }
-      if (method === "HEAD" && /^\/(ca|crl)\//.test(url.pathname)) {
-        // 复用 GET 的 header，返回空体
-        const r = await getBinaryOrText(new Request(req, { method: "GET" }), env, ctx);
-        return new Response(null, { status: r.status, headers: r.headers });
-      }
-      return new Response("Not Found", { status: 404 });
+
+      // 5) 静态资源（首页、CSS、JS）
+      return env.ASSETS.fetch(req);
     } catch (e) {
       console.error("Unhandled error:", e);
       return new Response(JSON.stringify({ error: "internal_error", detail: String(e) }), {

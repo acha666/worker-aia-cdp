@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PKI AIA/CDP</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+
+<body>
+    <header>
+        <h1>PKI AIA/CDP</h1>
+    </header>
+
+    <main>
+        <section>
+            <h2>Certificates (AIA)</h2>
+            <ul id="certs" class="files" aria-live="polite"></ul>
+        </section>
+
+        <section>
+            <h2>CRLs (CDP)</h2>
+            <ul id="crls" class="files" aria-live="polite"></ul>
+        </section>
+
+        <section>
+            <h2>Delta CRLs (Delta-CDP)</h2>
+            <ul id="dcrls" class="files" aria-live="polite"></ul>
+        </section>
+
+        <section>
+            <h2>Upload CRL</h2>
+            <p class="hint">
+                Send a <code>PEM</code> (X.509 <strong>CRL</strong> or <strong>Delta CRL</strong>) via
+                <kbd>POST</kbd> to <code>/crl</code>.
+            </p>
+        </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+</body>
+
+</html>
