@@ -516,6 +516,16 @@ function describeAuthorityKeyIdentifier(data) {
     return lines;
 }
 
+function describeExtensionPresence(entries) {
+    if (!Array.isArray(entries) || entries.length === 0) return null;
+    const items = entries.map(ext => {
+        const label = ext?.name ? `${ext.name} (${ext.oid})` : ext?.oid;
+        if (!label) return null;
+        return ext?.critical ? `${label} (critical)` : label;
+    }).filter(Boolean);
+    return items.length ? items : null;
+}
+
 function buildExtensionsSection(extensions) {
     if (!extensions) return null;
     const rows = [];
@@ -536,9 +546,8 @@ function buildExtensionsSection(extensions) {
     if (extensions.subjectKeyIdentifier) rows.push({ label: 'Subject Key Identifier', value: formatDigest(extensions.subjectKeyIdentifier) });
     const authorityKeyIdentifier = describeAuthorityKeyIdentifier(extensions.authorityKeyIdentifier);
     if (authorityKeyIdentifier) rows.push({ label: 'Authority Key Identifier', value: authorityKeyIdentifier });
-    if (Array.isArray(extensions.present) && extensions.present.length) {
-        rows.push({ label: 'Present Extensions', value: extensions.present.map(ext => `${ext.oid}${ext.critical ? ' (critical)' : ''}`) });
-    }
+    const present = describeExtensionPresence(extensions.present);
+    if (present) rows.push({ label: 'Present Extensions', value: present });
     return createSection('Extensions', rows);
 }
 
@@ -628,8 +637,10 @@ function buildCrlEntriesSection(entries) {
 
 function buildCrlExtensionsSection(extensions) {
     if (!Array.isArray(extensions) || extensions.length === 0) return null;
+    const present = describeExtensionPresence(extensions);
+    if (!present) return null;
     return createSection('Extensions', [
-        { label: 'Present', value: extensions.map(ext => `${ext.oid}${ext.critical ? ' (critical)' : ''}`) },
+        { label: 'Present', value: present },
     ]);
 }
 

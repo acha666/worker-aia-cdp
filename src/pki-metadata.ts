@@ -45,6 +45,32 @@ export const EKU_NAMES: Record<string, string> = {
   "1.3.6.1.5.5.7.3.9": "OCSPSigning",
 };
 
+export const EXTENSION_NAMES: Record<string, string> = {
+  "2.5.29.14": "Subject Key Identifier",
+  "2.5.29.15": "Key Usage",
+  "2.5.29.16": "Private Key Usage Period",
+  "2.5.29.17": "Subject Alternative Name",
+  "2.5.29.18": "Issuer Alternative Name",
+  "2.5.29.19": "Basic Constraints",
+  "2.5.29.20": "CRL Number",
+  "2.5.29.21": "CRL Reason Code",
+  "2.5.29.27": "Delta CRL Indicator",
+  "2.5.29.28": "Issuing Distribution Point",
+  "2.5.29.31": "CRL Distribution Points",
+  "2.5.29.32": "Certificate Policies",
+  "2.5.29.35": "Authority Key Identifier",
+  "2.5.29.37": "Extended Key Usage",
+  "1.3.6.1.5.5.7.1.1": "Authority Information Access",
+  "1.3.6.1.5.5.7.1.11": "Subject Information Access",
+  "1.3.6.1.5.5.7.1.12": "Logotype",
+};
+
+const describeExtensionPresence = (ext: pkijs.Extension) => ({
+  oid: ext.extnID,
+  name: EXTENSION_NAMES[ext.extnID] ?? null,
+  critical: ext.critical ?? false,
+});
+
 export const KEY_USAGE_FLAGS = [
   "digitalSignature",
   "nonRepudiation",
@@ -672,7 +698,7 @@ export async function buildCertificateDetails(cert: pkijs.Certificate, der: Arra
       certificatePolicies,
       subjectKeyIdentifier,
       authorityKeyIdentifier,
-      present: extensions.map(ext => ({ oid: ext.extnID, critical: ext.critical ?? false })),
+      present: extensions.map(ext => describeExtensionPresence(ext)),
     },
   };
 }
@@ -732,7 +758,7 @@ export async function buildCRLDetails(crl: pkijs.CertificateRevocationList, der:
       count: revoked.length,
       sample,
     },
-    extensions: (crl.crlExtensions?.extensions ?? []).map(ext => ({ oid: ext.extnID, critical: ext.critical ?? false })),
+    extensions: (crl.crlExtensions?.extensions ?? []).map(ext => describeExtensionPresence(ext)),
     isDelta,
   };
 }
