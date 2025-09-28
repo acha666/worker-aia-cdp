@@ -130,7 +130,7 @@ export const listObjects: RouteHandler = async (req, env, ctx) => {
           "https://r2cache.internal/objects?prefix=crl/&delimiter=/",
           "https://r2cache.internal/objects?prefix=dcrl/&delimiter=/",
         ];
-        targets.forEach(urlString => cacheInstance.delete(new Request(urlString)));
+        return Promise.all(targets.map(urlString => cacheInstance.delete(new Request(urlString))));
       }),
     );
   }

@@ -1,8 +1,8 @@
-import { fromBER, Sequence, Integer } from "asn1js";
+import { fromBER, Sequence, Integer, OctetString } from "asn1js";
 import * as pkijs from "pkijs";
-import { describeName, bitStringBytes, describeAlgorithm, describeExtensionPresence } from "../utils";
+import { describeName, bitStringBytes, describeAlgorithm } from "../utils";
 import { toHex, sha256Hex, sha1Hex, toJSDate } from "../format";
-import { KEY_ALG_NAMES, SIGNATURE_ALG_NAMES, CURVE_NAMES } from "../constants";
+import { KEY_ALG_NAMES, SIGNATURE_ALG_NAMES, CURVE_NAMES, EXTENSION_NAMES } from "../constants";
 import {
   parseBasicConstraints,
   parseKeyUsageExtension,
@@ -14,6 +14,7 @@ import {
   parseAuthorityKeyIdentifier,
 } from "../extensions";
 import { getSKIHex } from "../parsers";
+import type { ExtensionDetail } from "./extensions";
 
 export interface DistinguishedNameAttribute {
   oid: string;
@@ -65,18 +66,7 @@ export interface CertificateMetadata {
       sha256: string | null;
     };
   };
-  extensions: {
-    basicConstraints?: ReturnType<typeof parseBasicConstraints>;
-    keyUsage?: ReturnType<typeof parseKeyUsageExtension>;
-    extendedKeyUsage?: ReturnType<typeof parseExtendedKeyUsage>;
-    subjectAltName?: ReturnType<typeof parseSubjectAltName>;
-    authorityInfoAccess?: ReturnType<typeof parseAuthorityInfoAccess>;
-    crlDistributionPoints?: ReturnType<typeof parseCRLDistributionPoints>;
-    certificatePolicies?: ReturnType<typeof parseCertificatePolicies>;
-    subjectKeyIdentifier: string | null;
-    authorityKeyIdentifier?: ReturnType<typeof parseAuthorityKeyIdentifier>;
-    present: ReturnType<typeof describeExtensionPresence>[];
-  };
+  extensions: ExtensionDetail[];
 }
 
 export async function buildCertificateDetails(cert: pkijs.Certificate, der: ArrayBuffer): Promise<CertificateMetadata> {
@@ -128,18 +118,7 @@ export async function buildCertificateDetails(cert: pkijs.Certificate, der: Arra
   const certFingerprintSha256 = await sha256Hex(der);
   const certFingerprintSha1 = await sha1Hex(der);
 
-  const extensions = cert.extensions ?? [];
-  const findExtension = (oid: string) => extensions.find(ext => ext.extnID === oid);
-
-  const basicConstraints = parseBasicConstraints(findExtension("2.5.29.19"));
-  const keyUsage = parseKeyUsageExtension(findExtension("2.5.29.15"));
-  const extendedKeyUsage = parseExtendedKeyUsage(findExtension("2.5.29.37"));
-  const subjectAltName = parseSubjectAltName(findExtension("2.5.29.17"));
-  const authorityInfoAccess = parseAuthorityInfoAccess(findExtension("1.3.6.1.5.5.7.1.1"));
-  const crlDistributionPoints = parseCRLDistributionPoints(findExtension("2.5.29.31"));
-  const certificatePolicies = parseCertificatePolicies(findExtension("2.5.29.32"));
-  const authorityKeyIdentifier = parseAuthorityKeyIdentifier(findExtension("2.5.29.35"));
-  const subjectKeyIdentifier = getSKIHex(cert) || null;
+  const extensionEntries = buildCertificateExtensionDetails(cert);
 
   return {
     summary: {
@@ -182,17 +161,70 @@ export async function buildCertificateDetails(cert: pkijs.Certificate, der: Arra
         sha256: spkFingerprintSha256,
       },
     },
-    extensions: {
-      basicConstraints,
-      keyUsage,
-      extendedKeyUsage,
-      subjectAltName,
-      authorityInfoAccess,
-      crlDistributionPoints,
-      certificatePolicies,
-      subjectKeyIdentifier,
-      authorityKeyIdentifier,
-      present: extensions.map(extension => describeExtensionPresence(extension)),
-    },
+    extensions: extensionEntries,
   };
+}
+
+type CertificateExtensionParsers = Record<string, (extension: pkijs.Extension, certificate: pkijs.Certificate) => unknown>;
+
+function stripCritical<T extends { critical?: boolean }>(value: T | null | undefined): Omit<T, "critical"> | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const { critical: _omit, ...rest } = value as T;
+  return rest as Omit<T, "critical">;
+}
+
+function parseSubjectKeyIdentifierExtension(extension: pkijs.Extension, certificate: pkijs.Certificate) {
+  const existing = getSKIHex(certificate);
+  if (existing) return { hex: existing };
+  try {
+    const asn1 = fromBER(extension.extnValue.valueBlock.valueHex);
+    if (asn1.offset === -1) return undefined;
+    const octet = asn1.result as OctetString;
+    return { hex: toHex(octet.valueBlock.valueHex) };
+  } catch (error) {
+    console.warn("subjectKeyIdentifier parse error", error);
+    return undefined;
+  }
+}
+
+const CERTIFICATE_EXTENSION_PARSERS: CertificateExtensionParsers = {
+  "2.5.29.19": (extension) => stripCritical(parseBasicConstraints(extension)),
+  "2.5.29.15": (extension) => stripCritical(parseKeyUsageExtension(extension)),
+  "2.5.29.37": (extension) => stripCritical(parseExtendedKeyUsage(extension)),
+  "2.5.29.17": (extension) => stripCritical(parseSubjectAltName(extension)),
+  "1.3.6.1.5.5.7.1.1": (extension) => stripCritical(parseAuthorityInfoAccess(extension)),
+  "2.5.29.31": (extension) => stripCritical(parseCRLDistributionPoints(extension)),
+  "2.5.29.32": (extension) => stripCritical(parseCertificatePolicies(extension)),
+  "2.5.29.35": (extension) => stripCritical(parseAuthorityKeyIdentifier(extension)),
+  "2.5.29.14": (extension, certificate) => parseSubjectKeyIdentifierExtension(extension, certificate),
+};
+
+function buildCertificateExtensionDetails(cert: pkijs.Certificate): ExtensionDetail[] {
+  const extensions = cert.extensions ?? [];
+  return extensions.map(extension => {
+    const oid = extension.extnID;
+    const parser = CERTIFICATE_EXTENSION_PARSERS[oid];
+    const base: ExtensionDetail = {
+      oid,
+      name: EXTENSION_NAMES[oid] ?? null,
+      critical: extension.critical ?? false,
+      status: "unparsed",
+      rawHex: extension.extnValue?.valueBlock?.valueHex ? toHex(extension.extnValue.valueBlock.valueHex) : null,
+    };
+    if (!parser) return base;
+    try {
+      const value = parser(extension, cert) ?? undefined;
+      return {
+        ...base,
+        status: "parsed",
+        value,
+      };
+    } catch (error) {
+      return {
+        ...base,
+        status: "error",
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
 }

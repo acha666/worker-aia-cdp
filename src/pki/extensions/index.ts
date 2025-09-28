@@ -1,7 +1,7 @@
 import { fromBER, Sequence, BitString } from "asn1js";
 import * as pkijs from "pkijs";
 import { EKU_NAMES, KEY_USAGE_FLAGS, CRL_REASON_CODES } from "../constants";
-import { describeAlgorithm, describeExtensionPresence, describeName } from "../utils";
+import { describeAlgorithm, describeName } from "../utils";
 import { toHex } from "../format";
 
 function formatIPv6(bytes: Uint8Array) {

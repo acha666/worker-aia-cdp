@@ -1,5 +1,23 @@
 import { computeTemporalStatus, describeCertificateStatus, describeCrlStatus, renderStatusDisplay } from "./details.js";
-import { formatOpensslDate, formatDateWithRelative } from "../formatters.js";
+import { formatOpensslDate, formatDateWithRelative, formatDateSummary } from "../formatters.js";
+
+function buildMetaLines(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) return [];
+  const shareable = entries.every(entry => !entry.inlineTimezone);
+  if (shareable) {
+    const zones = [...new Set(entries.map(entry => entry.timezone).filter(Boolean))];
+    const lines = entries.map(entry => `${entry.label} ${entry.text}`);
+    if (zones.length === 1) {
+      lines[lines.length - 1] = `${lines[lines.length - 1]} (${zones[0]})`;
+    }
+    return lines;
+  }
+  return entries.map(entry => {
+    if (entry.inlineTimezone) return `${entry.label} ${entry.text}`;
+    const tz = entry.timezone ? ` ${entry.timezone}` : "";
+    return `${entry.label} ${entry.text}${tz}`;
+  });
+}
 
 function fallbackName(base) {
   return base.replace(/^[^/]+\//, "").replace(/\.(crt|crl)$/i, "");
@@ -20,40 +38,96 @@ function buildStatus(entry) {
     const expiryStatus = summary.notAfter ? computeTemporalStatus(summary.notAfter) : null;
     const descriptor = describeCertificateStatus(expiryStatus);
     const node = renderStatusDisplay(descriptor, { detailed: false });
-    const lines = [];
+    const metaEntries = [];
+    const dateOptions = { precision: "day" };
     if (summary.notBefore) {
-      const formatted = formatOpensslDate(summary.notBefore);
-      if (formatted) lines.push(`From ${formatted}`);
+      const details = formatDateSummary(summary.notBefore, null, null, dateOptions);
+      if (details) {
+        metaEntries.push({
+          label: "From",
+          text: details.relativeText ? `${details.baseText} (${details.relativeText})` : details.baseText,
+          timezone: details.timezone,
+          inlineTimezone: false,
+        });
+      } else {
+        const fallback = formatOpensslDate(summary.notBefore, dateOptions);
+        if (fallback) {
+          metaEntries.push({ label: "From", text: fallback, timezone: null, inlineTimezone: true });
+        }
+      }
     }
     if (summary.notAfter) {
-      const formatted = formatDateWithRelative(
+      const details = formatDateSummary(
         summary.notAfter,
         expiryStatus?.daysUntil,
         expiryStatus?.secondsUntil,
-      ) ?? formatOpensslDate(summary.notAfter);
-      if (formatted) lines.push(`Until ${formatted}`);
+        dateOptions,
+      );
+      if (details) {
+        const text = details.relativeText ? `${details.baseText} (${details.relativeText})` : details.baseText;
+        metaEntries.push({ label: "Until", text, timezone: details.timezone, inlineTimezone: false });
+      } else {
+        const fallback =
+          formatDateWithRelative(
+            summary.notAfter,
+            expiryStatus?.daysUntil,
+            expiryStatus?.secondsUntil,
+            dateOptions,
+          ) ?? formatOpensslDate(summary.notAfter, dateOptions);
+        if (fallback) {
+          metaEntries.push({ label: "Until", text: fallback, timezone: null, inlineTimezone: true });
+        }
+      }
     }
-    return { node, lines };
+    return { node, lines: buildMetaLines(metaEntries) };
   }
 
   if (entry.type === "crl" || entry.type === "delta-crl") {
     const nextUpdateStatus = summary.nextUpdate ? computeTemporalStatus(summary.nextUpdate) : null;
     const descriptor = describeCrlStatus(nextUpdateStatus, !!summary.isDelta);
     const node = renderStatusDisplay(descriptor, { detailed: false });
-    const lines = [];
+    const metaEntries = [];
+    const dateOptions = { precision: "day" };
     if (summary.thisUpdate) {
-      const formatted = formatOpensslDate(summary.thisUpdate);
-      if (formatted) lines.push(`Issued ${formatted}`);
+      const details = formatDateSummary(summary.thisUpdate, null, null, dateOptions);
+      if (details) {
+        metaEntries.push({
+          label: "Issued",
+          text: details.relativeText ? `${details.baseText} (${details.relativeText})` : details.baseText,
+          timezone: details.timezone,
+          inlineTimezone: false,
+        });
+      } else {
+        const fallback = formatOpensslDate(summary.thisUpdate, dateOptions);
+        if (fallback) {
+          metaEntries.push({ label: "Issued", text: fallback, timezone: null, inlineTimezone: true });
+        }
+      }
     }
     if (summary.nextUpdate) {
-      const formatted = formatDateWithRelative(
+      const details = formatDateSummary(
         summary.nextUpdate,
         nextUpdateStatus?.daysUntil,
         nextUpdateStatus?.secondsUntil,
-      ) ?? formatOpensslDate(summary.nextUpdate);
-      if (formatted) lines.push(`Next update ${formatted}`);
+        dateOptions,
+      );
+      if (details) {
+        const text = details.relativeText ? `${details.baseText} (${details.relativeText})` : details.baseText;
+        metaEntries.push({ label: "Next update", text, timezone: details.timezone, inlineTimezone: false });
+      } else {
+        const fallback =
+          formatDateWithRelative(
+            summary.nextUpdate,
+            nextUpdateStatus?.daysUntil,
+            nextUpdateStatus?.secondsUntil,
+            dateOptions,
+          ) ?? formatOpensslDate(summary.nextUpdate, dateOptions);
+        if (fallback) {
+          metaEntries.push({ label: "Next update", text: fallback, timezone: null, inlineTimezone: true });
+        }
+      }
     }
-    return { node, lines };
+    return { node, lines: buildMetaLines(metaEntries) };
   }
 
   return { node: null, lines: [] };

@@ -60,6 +60,8 @@ export const EXTENSION_NAMES: Record<string, string> = {
   "1.3.6.1.5.5.7.1.1": "Authority Information Access",
   "1.3.6.1.5.5.7.1.11": "Subject Information Access",
   "1.3.6.1.5.5.7.1.12": "Logotype",
+  "1.3.6.1.4.1.311.21.1": "Certificate Template Name",
+  "1.3.6.1.4.1.311.21.4": "Next CRL Publish",
 };
 
 export const KEY_USAGE_FLAGS = [

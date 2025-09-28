@@ -1,15 +1,60 @@
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-export function formatOpensslDate(iso) {
+function formatTimezoneOffset(date) {
+  const offsetMinutes = -date.getTimezoneOffset();
+  if (offsetMinutes === 0) return "UTC";
+  const sign = offsetMinutes > 0 ? "+" : "-";
+  const absMinutes = Math.abs(offsetMinutes);
+  const hours = Math.floor(absMinutes / 60);
+  const minutes = absMinutes % 60;
+  const hourPart = String(hours);
+  if (minutes === 0) return `UTC${sign}${hourPart}`;
+  return `UTC${sign}${hourPart}:${String(minutes).padStart(2, "0")}`;
+}
+
+export function formatOpensslDate(iso, options = {}) {
+  if (!iso) return null;
+  const summary = formatDateSummary(iso, null, null, options);
+  if (!summary) {
+    return typeof iso === "string" ? iso : String(iso);
+  }
+  return summary.timezone ? `${summary.baseText} ${summary.timezone}` : summary.baseText;
+}
+
+export function formatDateSummary(iso, days, seconds, options = {}) {
   if (!iso) return null;
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  const month = MONTH_NAMES[date.getUTCMonth()] ?? "Jan";
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const hours = String(date.getUTCHours()).padStart(2, "0");
-  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
-  const seconds = String(date.getUTCSeconds()).padStart(2, "0");
-  return `${month} ${day} ${hours}:${minutes}:${seconds} ${date.getUTCFullYear()} GMT`;
+  if (Number.isNaN(date.getTime())) return null;
+  const { precision = "second" } = options;
+  const month = MONTH_NAMES[date.getMonth()] ?? "Jan";
+  const day = String(date.getDate()).padStart(2, "0");
+  const year = date.getFullYear();
+  const baseParts = [`${month} ${day} ${year}`];
+  if (precision !== "day") {
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    if (precision === "minute") {
+      baseParts.push(`${hours}:${minutes}`);
+    } else {
+      const secondsPart = String(date.getSeconds()).padStart(2, "0");
+      baseParts.push(`${hours}:${minutes}:${secondsPart}`);
+    }
+  }
+  const baseText = baseParts.join(" ");
+  const timezone = formatTimezoneOffset(date);
+  const secondsValue = typeof seconds === "number" && Number.isFinite(seconds) ? seconds : null;
+  const daysValue = typeof days === "number" && Number.isFinite(days) ? days : null;
+  const preferSubDay = secondsValue !== null && Math.abs(secondsValue) < 86400;
+  let relativeText = null;
+  if (preferSubDay) relativeText = formatRelativeSeconds(secondsValue);
+  if (!relativeText && (daysValue !== null || secondsValue !== null)) {
+    relativeText = formatRelativeDays(daysValue) ?? formatRelativeSeconds(secondsValue);
+  }
+  return {
+    baseText,
+    timezone,
+    relativeText,
+  };
 }
 
 export function formatRelativeDays(days) {
@@ -24,6 +69,21 @@ export function formatRelativeSeconds(seconds) {
   if (typeof seconds !== "number" || !Number.isFinite(seconds)) return null;
   const abs = Math.abs(seconds);
   const sign = seconds >= 0 ? 1 : -1;
+  if (abs < 86400) {
+    if (abs === 0) return "now";
+    const totalMinutes = Math.max(1, Math.round(abs / 60));
+    let hours = Math.floor(totalMinutes / 60);
+    let minutes = totalMinutes % 60;
+    if (hours === 0 && minutes === 0) minutes = 1;
+    if (hours > 0 && minutes === 60) {
+      hours += 1;
+      minutes = 0;
+    }
+    const segments = [];
+    if (hours > 0) segments.push(`${hours}h`);
+    if (minutes > 0 || segments.length === 0) segments.push(`${minutes}m`);
+    return sign >= 0 ? `in ${segments.join(" ")}` : `${segments.join(" ")} ago`;
+  }
   const units = [
     { label: "day", value: 86400 },
     { label: "hour", value: 3600 },
@@ -254,9 +314,12 @@ export function formatSerial(serial) {
   return createInlinePairs(pairs);
 }
 
-export function formatDateWithRelative(iso, days, seconds) {
-  const base = formatOpensslDate(iso);
-  if (!base) return null;
-  const rel = formatRelativeDays(days ?? null) ?? formatRelativeSeconds(seconds ?? null);
-  return rel ? `${base} (${rel})` : base;
+export function formatDateWithRelative(iso, days, seconds, options = {}) {
+  const summary = formatDateSummary(iso, days, seconds, options);
+  if (!summary) return formatOpensslDate(iso, options);
+  const parts = [summary.baseText];
+  if (summary.timezone) parts.push(summary.timezone);
+  let text = parts.join(" ");
+  if (summary.relativeText) text += ` (${summary.relativeText})`;
+  return text;
 }

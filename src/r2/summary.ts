@@ -32,6 +32,95 @@ const SUMMARY_KEYS = {
   displayName: "summaryDisplayName",
 } as const;
 
+const PEM_MARKERS = {
+  certificate: {
+    begin: "-----BEGIN CERTIFICATE-----",
+    end: "-----END CERTIFICATE-----",
+  },
+  crl: {
+    begin: "-----BEGIN X509 CRL-----",
+    end: "-----END X509 CRL-----",
+  },
+} as const;
+
+function bufferFromMaybePem(bytes: Uint8Array, key: string, markers: { begin: string; end: string }): ArrayBuffer {
+  if (!/\.pem$/i.test(key)) {
+    return bytes.slice().buffer;
+  }
+  const pemText = new TextDecoder().decode(bytes);
+  const block = extractPEMBlock(pemText, markers.begin, markers.end);
+  const copy = block.slice();
+  return copy.buffer as ArrayBuffer;
+}
+
+function issuerCommonNameFromCertificate(cert: ReturnType<typeof parseCertificate>): string | null {
+  for (const tv of cert.issuer.typesAndValues) {
+    if (tv.type === "2.5.4.3") return tv.value.valueBlock.value;
+  }
+  return null;
+}
+
+function issuerCommonNameFromCrl(crl: ReturnType<typeof parseCRL>): string | null {
+  for (const tv of crl.issuer.typesAndValues) {
+    if (tv.type === "2.5.4.3") return tv.value.valueBlock.value;
+  }
+  return null;
+}
+
+async function createCertificateSummary(bytes: Uint8Array, key: string): Promise<ObjectSummary | null> {
+  const der = bufferFromMaybePem(bytes, key, PEM_MARKERS.certificate);
+  const cert = parseCertificate(der);
+  const subject = getCN(cert) ?? null;
+  const issuer = issuerCommonNameFromCertificate(cert);
+  const notBefore = toJSDate(cert.notBefore.value)?.toISOString() ?? null;
+  const notAfter = toJSDate(cert.notAfter.value)?.toISOString() ?? null;
+  const displayName = subject ?? issuer ?? fallbackDisplayName(key, "certificate");
+  return {
+    kind: "certificate",
+    displayName,
+    subjectCommonName: subject,
+    issuerCommonName: issuer,
+    notBefore,
+    notAfter,
+    thisUpdate: null,
+    nextUpdate: null,
+    isDelta: null,
+  };
+}
+
+async function createCrlSummary(bytes: Uint8Array, key: string): Promise<ObjectSummary | null> {
+  const der = bufferFromMaybePem(bytes, key, PEM_MARKERS.crl);
+  const crl = parseCRL(der);
+  const issuer = issuerCommonNameFromCrl(crl);
+  const thisUpdate = toJSDate(crl.thisUpdate)?.toISOString() ?? null;
+  const nextUpdate = toJSDate(crl.nextUpdate)?.toISOString() ?? null;
+  const isDelta = isDeltaCRL(crl);
+  const displayName = issuer ?? fallbackDisplayName(key, "crl");
+  return {
+    kind: "crl",
+    displayName,
+    subjectCommonName: null,
+    issuerCommonName: issuer,
+    notBefore: null,
+    notAfter: null,
+    thisUpdate,
+    nextUpdate,
+    isDelta,
+  };
+}
+
+function normalizeEtag(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  // Drop weak validators and surrounding quotes per R2 conditional write docs.
+  const withoutWeakPrefix = trimmed.startsWith("W/") ? trimmed.slice(2) : trimmed;
+  if (withoutWeakPrefix.startsWith("\"") && withoutWeakPrefix.endsWith("\"")) {
+    return withoutWeakPrefix.slice(1, -1);
+  }
+  return withoutWeakPrefix;
+}
+
 export function detectSummaryKind(key: string): SummaryKind {
   if (/\.(crt|cer)(\.pem)?$/i.test(key)) return "certificate";
   if (/\.crl(\.pem)?$/i.test(key)) return "crl";
@@ -110,10 +199,15 @@ export async function ensureSummaryMetadata(context: SummaryComputationContext):
 
     const newMetadata = buildSummaryMetadata(summary, object.customMetadata ?? context.existingMeta ?? {});
 
+    const etagMatch =
+      normalizeEtag((object as any).etag) ??
+      normalizeEtag(object.httpEtag) ??
+      normalizeEtag(context.expectedEtag);
+
     await env.STORE.put(key, buffer, {
       httpMetadata: object.httpMetadata,
       customMetadata: newMetadata,
-      onlyIf: object.httpEtag ? { etagMatches: object.httpEtag } : context.expectedEtag ? { etagMatches: context.expectedEtag } : undefined,
+      onlyIf: etagMatch ? { etagMatches: etagMatch } : undefined,
     });
 
     return summary;
@@ -145,62 +239,9 @@ export function buildSummaryMetadata(summary: ObjectSummary, base: Record<string
 async function computeSummaryFromBody(buffer: ArrayBuffer, key: string, kind: SummaryKind): Promise<ObjectSummary | null> {
   const bytes = new Uint8Array(buffer);
   if (!bytes.byteLength) return null;
-  const isPem = /\.pem$/i.test(key);
 
-  if (kind === "certificate") {
-    const der = (() => {
-      if (!isPem) return buffer;
-      const pemText = new TextDecoder().decode(bytes);
-      const block = extractPEMBlock(pemText, "-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----");
-      const copy = block.slice();
-      return copy.buffer as ArrayBuffer;
-    })();
-    const cert = parseCertificate(der);
-    const subject = getCN(cert) ?? null;
-    const issuer = cert.issuer?.typesAndValues?.find?.(tv => tv.type === "2.5.4.3")?.value.valueBlock.value ?? null;
-    const notBefore = toJSDate(cert.notBefore.value)?.toISOString() ?? null;
-    const notAfter = toJSDate(cert.notAfter.value)?.toISOString() ?? null;
-  const displayName = subject ?? issuer ?? fallbackDisplayName(key, kind);
-    return {
-      kind,
-      displayName,
-      subjectCommonName: subject,
-      issuerCommonName: issuer,
-      notBefore,
-      notAfter,
-      thisUpdate: null,
-      nextUpdate: null,
-      isDelta: null,
-    };
-  }
-
-  if (kind === "crl") {
-    const der = (() => {
-      if (!isPem) return buffer;
-      const pemText = new TextDecoder().decode(bytes);
-      const block = extractPEMBlock(pemText, "-----BEGIN X509 CRL-----", "-----END X509 CRL-----");
-      const copy = block.slice();
-      return copy.buffer as ArrayBuffer;
-    })();
-    const crl = parseCRL(der);
-    const issuer = crl.issuer?.typesAndValues?.find?.(tv => tv.type === "2.5.4.3")?.value.valueBlock.value ?? null;
-    const thisUpdate = toJSDate(crl.thisUpdate)?.toISOString() ?? null;
-    const nextUpdate = toJSDate(crl.nextUpdate)?.toISOString() ?? null;
-    const isDelta = isDeltaCRL(crl);
-  const displayName = issuer ?? fallbackDisplayName(key, kind);
-    return {
-      kind,
-      displayName,
-      subjectCommonName: null,
-      issuerCommonName: issuer,
-      notBefore: null,
-      notAfter: null,
-      thisUpdate,
-      nextUpdate,
-      isDelta,
-    };
-  }
-
+  if (kind === "certificate") return createCertificateSummary(bytes, key);
+  if (kind === "crl") return createCrlSummary(bytes, key);
   return null;
 }
 
