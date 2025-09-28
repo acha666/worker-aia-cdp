@@ -1,31 +1,51 @@
-# Acha PKI AIA/CDP Worker
+# PKI AIA/CDP Worker
 
-A Cloudflare Worker for serving PKI certificate (AIA) and CRL (CDP) files from R2 storage, with a simple web interface and REST endpoints for upload and retrieval.
+Cloudflare Worker that serves PKI CA certificates and revocation lists from R2. It ships with a minimal HTML index and a JSON API.
 
-## Features
-- Serves X.509 certificates and CRLs from R2 buckets
-- Supports both binary (DER) and text (PEM) formats
-- Dynamic index page listing available certificates and CRLs
-- RESTful endpoints for uploading CRLs in PEM format
-- Automatic archiving of previous CRLs
+## Quick start
+1. `npm install`
+2. Edit `wrangler.jsonc` so `STORE` points at your R2 bucket and set `SITE_NAME` if you want a custom title.
+3. Preview with `npm run dev`. Deploy with `npm run deploy`.
 
-## Endpoints
-- `/` or `/index.html`: Dynamic index page listing certificates and CRLs
-- `/ca/*`, `/crl/*`: GET/HEAD endpoints for retrieving certificate/CRL files
-- `/crl` (POST): Upload a new CRL in PEM format
+## API summary
+- `/` – HTML index of the latest CA and CRL objects.
+- `/ca/*`, `/crl/*`, `/dcrl/*` – direct GET/HEAD for DER or PEM content.
+- `GET /api/v1/collections/{ca|crl|dcrl}/items` – list objects (supports `prefix`, `cursor`, `limit`).
+- `GET /api/v1/objects/{objectKey}/metadata` – fetch parsed metadata for a stored object.
+- `POST /api/v1/crls` – upload a CRL PEM (`Content-Type: text/plain`).
 
-## Usage
-1. Configure your R2 bucket and environment variables in `wrangler.jsonc`.
-2. Deploy with Wrangler:
-   ```powershell
-   npm install
-   npm run deploy
-   ```
-3. Access the index page or REST endpoints as described above.
+Successful uploads respond with:
+
+```json
+{
+  "data": {
+   "kind": "full",
+   "stored": { "der": "crl/AchaRootCA.crl", "pem": "crl/AchaRootCA.crl.pem" },
+   "byAki": "crl/by-keyid/<aki>.crl",
+   "crlNumber": "42",
+   "baseCRLNumber": null,
+   "thisUpdate": "2025-09-16T00:00:00Z",
+   "nextUpdate": "2025-09-23T00:00:00Z"
+  },
+  "meta": null,
+  "error": null
+}
+```
+
+## Storage layout
+- `ca/` – CA certificates (`.crt`, optional `.crt.pem`)
+- `crl/` – base CRLs and their `archive/` history
+- `dcrl/` – delta CRLs mirroring the base layout
 
 ## Requirements
-- Cloudflare account with R2 bucket
-- Wrangler CLI
+- Cloudflare account with R2 access
+- Wrangler CLI authenticated to your account
 
-## License
-MIT
+## Windows AD CS automation
+
+Run `scripts/adcs-crl-uploader.ps1` from Task Scheduler or any job runner. The script scans the CRL in folder, uploads each valid CRL or PEM file to `/api/v1/crls`, and writes plain text logs. It may rely on AD CS events or a fixed schedule to launch it.
+
+Quick setup:
+- Update `$UploadUri`, `$SourceDir`, and `$LogPath` in the script.
+- Enable detailed CRL events: `certutil -setreg CA\LogLevel 4`.
+- Create triggers for **Microsoft-Windows-CertificationAuthority** events **68**, **69**, and **70**, plus an optional daily catch-up run.
