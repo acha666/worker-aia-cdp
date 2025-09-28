@@ -6,6 +6,7 @@ import { parseHTML } from "linkedom";
 
 import {
   createHexValue,
+  formatDateSummary,
   formatNumber,
   formatOpensslDate,
   formatRelativeSeconds,
@@ -25,6 +26,14 @@ globalThis.CustomEvent = window.CustomEvent;
 test("formatOpensslDate produces OpenSSL-style strings", () => {
   const formatted = formatOpensslDate("2024-09-15T12:34:56Z");
   assert.equal(formatted, "Sep 15 2024 12:34:56 UTC");
+});
+
+test("formatDateSummary separates timezone and relative text", () => {
+  const summary = formatDateSummary("2025-09-28T01:00:00Z", 0, 3600, { precision: "second" });
+  assert(summary);
+  assert.equal(summary.baseText, "Sep 28 2025 01:00:00");
+  assert.equal(summary.timezone, "UTC");
+  assert.equal(summary.relativeText, "in 1h");
 });
 
 test("formatRelativeSeconds returns human friendly durations", () => {

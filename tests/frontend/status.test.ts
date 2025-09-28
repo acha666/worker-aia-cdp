@@ -83,6 +83,15 @@ test("describeCrlStatus handles delta flags", () => {
     assert.equal(current.label, "Current");
     assert.equal(current.variant, "success");
 
+  const updatingSoon = describeCrlStatus(computeTemporalStatus("2025-09-28T01:30:00Z"), false);
+  assert(updatingSoon);
+  assert.equal(updatingSoon.label, "Updating soon");
+  assert.equal(updatingSoon.variant, "warning");
+
+  const outsideThreshold = describeCrlStatus(computeTemporalStatus("2025-09-28T03:30:00Z"), false);
+  assert(outsideThreshold);
+  assert.equal(outsideThreshold.label, "Current");
+
     const delta = describeCrlStatus(computeTemporalStatus("2025-10-01T00:00:00Z"), true);
     assert(delta);
     assert.equal(delta.label, "Delta current");

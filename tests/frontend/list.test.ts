@@ -58,6 +58,9 @@ test("renderCertificates builds list items with links", () => {
     const metaText = meta.textContent ?? "";
     assert(metaText.includes("From"));
     assert(metaText.includes("Until"));
+  const timezoneMatches = metaText.match(/UTC/g) ?? [];
+  assert.equal(timezoneMatches.length, 1);
+  assert.equal(/From[^·]+UTC/.test(metaText), false);
     const button = item.querySelector("button.btn-expand");
     assert(button);
     assert.equal(button.getAttribute("data-key"), "ca/leaf.crt");
@@ -108,6 +111,9 @@ test("renderCrls filters archive prefixes and renders status", () => {
     const metaText = meta.textContent ?? "";
     assert(metaText.includes("Issued"));
     assert(metaText.includes("Next update"));
+    const timezoneMatches = metaText.match(/UTC/g) ?? [];
+    assert.equal(timezoneMatches.length, 1);
+    assert.equal(/Issued[^·]+UTC/.test(metaText), false);
   } finally {
     Date.now = originalNow;
   }

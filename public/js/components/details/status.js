@@ -54,15 +54,33 @@ export function describeCertificateStatus(expiryStatus, options = {}) {
 
 export function describeCrlStatus(nextUpdateStatus, isDelta, options = {}) {
   if (!nextUpdateStatus || typeof nextUpdateStatus.isExpired !== "boolean") return null;
-  const { warningThresholdDays = 1 } = options;
+  const defaultThresholdSeconds = 2 * 60 * 60;
+  const thresholdSecondsOption =
+    typeof options.warningThresholdSeconds === "number" && Number.isFinite(options.warningThresholdSeconds)
+      ? Math.max(0, options.warningThresholdSeconds)
+      : null;
+  const thresholdDaysOption =
+    typeof options.warningThresholdDays === "number" && Number.isFinite(options.warningThresholdDays)
+      ? options.warningThresholdDays
+      : null;
+  const warningThresholdSeconds =
+    thresholdSecondsOption ?? (thresholdDaysOption !== null ? Math.max(0, thresholdDaysOption * 86400) : defaultThresholdSeconds);
   const rel = formatStatusRelative(nextUpdateStatus.daysUntil, nextUpdateStatus.secondsUntil);
   if (nextUpdateStatus.isExpired) {
     return { label: "Stale", variant: "danger", description: rel ?? "Next update overdue" };
   }
+  const secondsUntil =
+    typeof nextUpdateStatus.secondsUntil === "number" && Number.isFinite(nextUpdateStatus.secondsUntil)
+      ? nextUpdateStatus.secondsUntil
+      : null;
+  if (secondsUntil !== null && secondsUntil <= warningThresholdSeconds) {
+    return { label: "Updating soon", variant: "warning", description: rel ?? null };
+  }
   if (
+    secondsUntil === null &&
     typeof nextUpdateStatus.daysUntil === "number" &&
     Number.isFinite(nextUpdateStatus.daysUntil) &&
-    nextUpdateStatus.daysUntil <= warningThresholdDays
+    nextUpdateStatus.daysUntil <= warningThresholdSeconds / 86400
   ) {
     return { label: "Updating soon", variant: "warning", description: rel ?? null };
   }
