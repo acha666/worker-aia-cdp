@@ -13,12 +13,12 @@ async function listCollection(collection) {
 function itemLi(base, hasDer, hasPem) {
     const li = document.createElement('li');
 
-        const name = base.replace(/^([^/]+)\//, '').replace(/\.(crt|crl)$/i, '');
-        const hrefDer = hasDer ? `/${base}` : '';
-        const hrefPem = hasPem ? `/${base}.pem` : '';
-        const primaryKey = hasDer ? base : `${base}.pem`;
+    const name = base.replace(/^([^/]+)\//, '').replace(/\.(crt|crl)$/i, '');
+    const hrefDer = hasDer ? `/${base}` : '';
+    const hrefPem = hasPem ? `/${base}.pem` : '';
+    const primaryKey = hasDer ? base : `${base}.pem`;
 
-        li.innerHTML = `
+    li.innerHTML = `
         <div class="item-left">
             <div class="item-title">${name}</div>
             <div class="item-path">${base}</div>
@@ -118,12 +118,23 @@ addEventListener('click', async e => {
     const spinner = btn.parentElement.querySelector('.loading');
     if (!panel || !spinner) return;
 
+    // If panel is visible, simply hide it (no network activity)
     if (!panel.hasAttribute('hidden')) {
         panel.setAttribute('hidden', '');
         return;
     }
 
+    if (panel.getAttribute('data-loaded') === 'true') {
+        panel.removeAttribute('hidden');
+        return;
+    }
+
+    if (panel.getAttribute('data-loading') === 'true') {
+        return;
+    }
+
     spinner.removeAttribute('hidden');
+    panel.setAttribute('data-loading', 'true');
     try {
         const encodedKey = encodeURIComponent(key);
         const r = await fetch(`/api/v1/objects/${encodedKey}/metadata`);
@@ -131,12 +142,15 @@ addEventListener('click', async e => {
         if (!r.ok || payload?.error) {
             throw new Error(payload?.error?.message || 'meta error');
         }
+        // Cache the HTML in the panel itself and mark as loaded
         panel.innerHTML = '<pre>' + JSON.stringify(payload.data, null, 2) + '</pre>';
+        panel.setAttribute('data-loaded', 'true');
         panel.removeAttribute('hidden');
     } catch (err) {
         panel.innerHTML = '<div class="error">Failed to load details: ' + err.message + '</div>';
         panel.removeAttribute('hidden');
     } finally {
+        panel.removeAttribute('data-loading');
         spinner.setAttribute('hidden', '');
     }
 });
