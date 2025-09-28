@@ -32,6 +32,18 @@ const SUMMARY_KEYS = {
   displayName: "summaryDisplayName",
 } as const;
 
+function normalizeEtag(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  // Drop weak validators and surrounding quotes per R2 conditional write docs.
+  const withoutWeakPrefix = trimmed.startsWith("W/") ? trimmed.slice(2) : trimmed;
+  if (withoutWeakPrefix.startsWith("\"") && withoutWeakPrefix.endsWith("\"")) {
+    return withoutWeakPrefix.slice(1, -1);
+  }
+  return withoutWeakPrefix;
+}
+
 export function detectSummaryKind(key: string): SummaryKind {
   if (/\.(crt|cer)(\.pem)?$/i.test(key)) return "certificate";
   if (/\.crl(\.pem)?$/i.test(key)) return "crl";
@@ -110,10 +122,15 @@ export async function ensureSummaryMetadata(context: SummaryComputationContext):
 
     const newMetadata = buildSummaryMetadata(summary, object.customMetadata ?? context.existingMeta ?? {});
 
+    const etagMatch =
+      normalizeEtag((object as any).etag) ??
+      normalizeEtag(object.httpEtag) ??
+      normalizeEtag(context.expectedEtag);
+
     await env.STORE.put(key, buffer, {
       httpMetadata: object.httpMetadata,
       customMetadata: newMetadata,
-      onlyIf: object.httpEtag ? { etagMatches: object.httpEtag } : context.expectedEtag ? { etagMatches: context.expectedEtag } : undefined,
+      onlyIf: etagMatch ? { etagMatches: etagMatch } : undefined,
     });
 
     return summary;
