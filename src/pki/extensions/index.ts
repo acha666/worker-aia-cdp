@@ -42,7 +42,7 @@ export function parseKeyUsageExtension(extension?: pkijs.Extension) {
   try {
     const asn1 = fromBER(extension.extnValue.valueBlock.valueHex);
     if (asn1.offset === -1) return undefined;
-  const bitString = asn1.result as BitString;
+    const bitString = asn1.result as BitString;
     const bytes = new Uint8Array(bitString.valueBlock.valueHex);
     if (bytes.length === 0) return undefined;
     const unusedBits = bytes[0];
@@ -219,28 +219,50 @@ export function parseCRLDistributionPoints(extension?: pkijs.Extension) {
   try {
     const asn1 = fromBER(extension.extnValue.valueBlock.valueHex);
     if (asn1.offset === -1) return undefined;
-    const urls: string[] = [];
-    const directoryNames: string[] = [];
+    const urls = new Set<string>();
+    const directoryNames = new Set<string>();
+    const distributionPoints: Array<{ urls: string[]; directoryNames: string[] }> = [];
     const sequence = asn1.result as Sequence;
     for (const dp of sequence.valueBlock.value) {
-      const dpSeq = dp as Sequence;
-      for (const child of dpSeq.valueBlock.value) {
-        if (child.idBlock.tagClass === 3 && child.idBlock.tagNumber === 0) {
-          const names = new pkijs.GeneralNames({ schema: child });
-          for (const generalName of names.names) {
-            if (generalName.type === 6 && typeof generalName.value === "string") urls.push(generalName.value);
-            else if (generalName.type === 4 && generalName.value instanceof pkijs.RelativeDistinguishedNames) {
-              const description = describeName(generalName.value);
-              directoryNames.push(description.dn);
-            }
+      if (!(dp instanceof Sequence)) continue;
+      const pointUrls: string[] = [];
+      const pointDirectoryNames: string[] = [];
+      try {
+        const distribution = new pkijs.DistributionPoint({ schema: dp });
+        const handleGeneralName = (generalName: pkijs.GeneralName) => {
+          if (generalName.type === 6 && typeof generalName.value === "string") {
+            pointUrls.push(generalName.value);
+            urls.add(generalName.value);
+          } else if (generalName.type === 4 && generalName.value instanceof pkijs.RelativeDistinguishedNames) {
+            const description = describeName(generalName.value);
+            pointDirectoryNames.push(description.dn);
+            directoryNames.add(description.dn);
           }
+        };
+
+        if (Array.isArray(distribution.distributionPoint)) {
+          for (const generalName of distribution.distributionPoint) handleGeneralName(generalName);
+        } else if (distribution.distributionPoint instanceof pkijs.RelativeDistinguishedNames) {
+          const description = describeName(distribution.distributionPoint);
+          pointDirectoryNames.push(description.dn);
+          directoryNames.add(description.dn);
         }
+
+        if (Array.isArray(distribution.cRLIssuer)) {
+          for (const generalName of distribution.cRLIssuer) handleGeneralName(generalName);
+        }
+      } catch (error) {
+        console.warn("crlDistributionPoints distribution parse error", error);
+      }
+      if (pointUrls.length || pointDirectoryNames.length) {
+        distributionPoints.push({ urls: pointUrls, directoryNames: pointDirectoryNames });
       }
     }
     return {
       critical: extension.critical ?? false,
-      urls,
-      directoryNames,
+      urls: [...urls],
+      directoryNames: [...directoryNames],
+      distributionPoints: distributionPoints.length ? distributionPoints : undefined,
     };
   } catch (error) {
     console.warn("crlDistributionPoints parse error", error);
