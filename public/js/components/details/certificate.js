@@ -62,6 +62,19 @@ function createNameBlock(title, descriptor) {
   return block.childElementCount > 1 ? block : null;
 }
 
+function findExtensionByOid(extensions, oid) {
+  if (!Array.isArray(extensions) || !oid) return null;
+  return extensions.find(entry => entry && entry.oid === oid) ?? null;
+}
+
+function extractExtensionHex(entry) {
+  if (!entry || entry.value === null || entry.value === undefined) return null;
+  const { value } = entry;
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && typeof value.hex === "string") return value.hex;
+  return null;
+}
+
 export function buildIdentitySection(subject, issuer) {
   const blocks = [];
   const subjectBlock = createNameBlock("Subject", subject);
@@ -124,9 +137,9 @@ function buildCertificateCryptoSection(details) {
     });
   }
 
-  if (details.extensions?.subjectKeyIdentifier) {
-    rows.push({ label: "Subject key identifier", value: formatDigest(details.extensions.subjectKeyIdentifier) });
-  }
+  const subjectKeyExtension = findExtensionByOid(details.extensions, "2.5.29.14");
+  const subjectKeyHex = extractExtensionHex(subjectKeyExtension);
+  if (subjectKeyHex) rows.push({ label: "Subject key identifier", value: formatDigest(subjectKeyHex) ?? subjectKeyHex });
   if (details.fingerprints) {
     const pairs = Object.entries(details.fingerprints)
       .filter(([, hex]) => !!hex)

@@ -9,7 +9,7 @@ import {
   formatOpensslDate,
 } from "../../formatters.js";
 import { describeCrlStatus, renderStatusDisplay } from "./status.js";
-import { describeExtensionPresence } from "./extensions.js";
+import { buildExtensionsSection } from "./extensions.js";
 import { buildIdentitySection } from "./certificate.js";
 
 function buildCrlSummary(summary, validity, numbers, nextUpdateStatus, isDelta) {
@@ -63,13 +63,6 @@ function buildCrlEntriesSection(entries) {
   return createSection("Revoked Certificates", rows);
 }
 
-function buildCrlExtensionsSection(extensions) {
-  if (!Array.isArray(extensions) || extensions.length === 0) return null;
-  const present = describeExtensionPresence(extensions);
-  if (!present) return null;
-  return createSection("Extensions", [{ label: "Present", value: present }]);
-}
-
 export function buildCrlSections(details, nextUpdateStatus) {
   if (!details) return [];
   const sections = [];
@@ -109,7 +102,7 @@ export function buildCrlSections(details, nextUpdateStatus) {
   }
   const entriesSection = buildCrlEntriesSection(details.entries);
   if (entriesSection) sections.push(entriesSection);
-  const extensionsSection = buildCrlExtensionsSection(details.extensions);
+  const extensionsSection = buildExtensionsSection(details.extensions);
   if (extensionsSection) sections.push(extensionsSection);
   return sections;
 }

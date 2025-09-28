@@ -1,9 +1,8 @@
-import { createHexValue, createSection, formatDigest, renderValue } from "../../formatters.js";
-import { createChip } from "./status.js";
+import { createHexValue, createMuted, formatDigest, renderValue } from "../../formatters.js";
 
 function describeBasicConstraints(data) {
   if (!data) return null;
-  const lines = [data.critical ? "critical" : "not critical", `CA: ${data.isCA ? "TRUE" : "FALSE"}`];
+  const lines = [`CA: ${data.isCA ? "TRUE" : "FALSE"}`];
   if (data.pathLenConstraint !== null && data.pathLenConstraint !== undefined) {
     lines.push(`pathLenConstraint: ${data.pathLenConstraint}`);
   }
@@ -13,31 +12,31 @@ function describeBasicConstraints(data) {
 function describeKeyUsage(data) {
   if (!data) return null;
   if (Array.isArray(data)) return data.length ? data : null;
-  if (typeof data === "object") {
-    const mapping = {
-      digitalSignature: "Digital Signature",
-      nonRepudiation: "Non Repudiation",
-      keyEncipherment: "Key Encipherment",
-      dataEncipherment: "Data Encipherment",
-      keyAgreement: "Key Agreement",
-      keyCertSign: "Certificate Signing",
-      cRLSign: "CRL Signing",
-      encipherOnly: "Encipher Only",
-      decipherOnly: "Decipher Only",
-    };
-    const items = Object.entries(mapping)
-      .filter(([key]) => !!data[key])
-      .map(([, label]) => label);
-    return items.length ? items : null;
-  }
-  return null;
+  if (typeof data !== "object") return null;
+  const mapping = {
+    digitalSignature: "Digital Signature",
+    nonRepudiation: "Non Repudiation",
+    keyEncipherment: "Key Encipherment",
+    dataEncipherment: "Data Encipherment",
+    keyAgreement: "Key Agreement",
+    keyCertSign: "Certificate Signing",
+    cRLSign: "CRL Signing",
+    encipherOnly: "Encipher Only",
+    decipherOnly: "Decipher Only",
+  };
+  const enabledFlags = Array.isArray(data.enabled)
+    ? data.enabled
+    : Object.entries(data.flags ?? {})
+        .filter(([, value]) => !!value)
+        .map(([key]) => key);
+  const labels = enabledFlags.map(flag => mapping[flag] ?? flag);
+  return labels.length ? labels : null;
 }
 
 function describeExtendedKeyUsage(data) {
   if (!data) return null;
   if (Array.isArray(data)) return data.length ? data : null;
   const lines = [];
-  if (typeof data.critical === "boolean") lines.push(data.critical ? "critical" : "not critical");
   if (Array.isArray(data.usages) && data.usages.length) lines.push(`usages: ${data.usages.join(", ")}`);
   if (Array.isArray(data.oids) && data.oids.length) lines.push(`oids: ${data.oids.join(", ")}`);
   if (Array.isArray(data.other) && data.other.length) {
@@ -50,7 +49,6 @@ function describeSubjectAltName(data) {
   if (!data) return null;
   if (Array.isArray(data)) return data.length ? data : null;
   const lines = [];
-  if (typeof data.critical === "boolean") lines.push(data.critical ? "critical" : "not critical");
   const addList = (label, values) => {
     if (Array.isArray(values) && values.length) lines.push(`${label}: ${values.join(", ")}`);
   };
@@ -74,7 +72,6 @@ function describeAuthorityInfoAccess(data) {
   if (!data) return null;
   if (Array.isArray(data)) return data.length ? data : null;
   const lines = [];
-  if (typeof data.critical === "boolean") lines.push(data.critical ? "critical" : "not critical");
   if (Array.isArray(data.ocsp) && data.ocsp.length) lines.push(`OCSP: ${data.ocsp.join(", ")}`);
   if (Array.isArray(data.caIssuers) && data.caIssuers.length) lines.push(`CA Issuers: ${data.caIssuers.join(", ")}`);
   if (Array.isArray(data.other) && data.other.length) {
@@ -92,10 +89,17 @@ function describeCRLDistributionPoints(data) {
   if (!data) return null;
   if (Array.isArray(data)) return data.length ? data : null;
   const lines = [];
-  if (typeof data.critical === "boolean") lines.push(data.critical ? "critical" : "not critical");
   if (Array.isArray(data.urls) && data.urls.length) lines.push(`URLs: ${data.urls.join(", ")}`);
   if (Array.isArray(data.directoryNames) && data.directoryNames.length) {
     lines.push(`Directory Names: ${data.directoryNames.join(", ")}`);
+  }
+  if (Array.isArray(data.distributionPoints) && data.distributionPoints.length) {
+    data.distributionPoints.forEach((point, index) => {
+      const parts = [];
+      if (Array.isArray(point.urls) && point.urls.length) parts.push(`URLs: ${point.urls.join(", ")}`);
+      if (Array.isArray(point.directoryNames) && point.directoryNames.length) parts.push(`Directory Names: ${point.directoryNames.join(", ")}`);
+      if (parts.length) lines.push(`Point ${index + 1} — ${parts.join("; ")}`);
+    });
   }
   return lines.length ? lines : null;
 }
@@ -104,11 +108,10 @@ function describeCertificatePolicies(data) {
   if (!data) return null;
   if (Array.isArray(data)) return data.length ? data : null;
   const lines = [];
-  if (typeof data.critical === "boolean") lines.push(data.critical ? "critical" : "not critical");
   if (Array.isArray(data.items) && data.items.length) {
     for (const item of data.items) {
       const qualifierText = Array.isArray(item.qualifiers) && item.qualifiers.length
-        ? ` [${item.qualifiers.map(q => `${q.oid}${q.value ? `=${q.value}` : ""}`).join(", ")}]`
+        ? ` [${item.qualifiers.map(q => `${q.oid}${q.value ? `=${q.value}` : ""}`).join(", " )}]`
         : "";
       lines.push(`${item.oid}${qualifierText}`);
     }
@@ -118,9 +121,8 @@ function describeCertificatePolicies(data) {
 
 function describeAuthorityKeyIdentifier(data) {
   if (!data) return null;
-  if (typeof data === "string") return [data];
+  if (typeof data === "string") return [`keyIdentifier: ${formatDigest(data) ?? data}`];
   const lines = [];
-  if (typeof data.critical === "boolean") lines.push(data.critical ? "critical" : "not critical");
   if (data.keyIdentifier) {
     lines.push(`keyIdentifier: ${formatDigest(data.keyIdentifier) ?? data.keyIdentifier}`);
   }
@@ -133,75 +135,157 @@ function describeAuthorityKeyIdentifier(data) {
   return lines.length ? lines : null;
 }
 
-export function describeExtensionPresence(entries) {
-  if (!Array.isArray(entries) || entries.length === 0) return null;
-  const items = entries
-    .map(ext => {
-      const label = ext?.name ? `${ext.name} (${ext.oid})` : ext?.oid;
-      if (!label) return null;
-      return ext?.critical ? `${label} (critical)` : label;
-    })
-    .filter(Boolean);
-  return items.length ? items : null;
+function renderList(lines) {
+  if (!lines || !lines.length) return null;
+  return renderValue(lines, true);
 }
 
-function decorateExtensionValue(value) {
-  if (!value) return value;
-  if (Array.isArray(value) && value.length) {
-    const [first, ...rest] = value;
-    if (typeof first === "string") {
-      const normalized = first.toLowerCase();
-      if (normalized === "critical" || normalized === "not critical") {
-        const container = document.createElement("div");
-        container.className = "detail-extension";
-        const chip = createChip(normalized === "critical" ? "Critical" : "Not critical", {
-          category: "extension",
-          tone: normalized === "critical" ? "danger" : "neutral",
-        });
-        if (chip) container.append(chip);
-        if (rest.length) {
-          const remainder = renderValue(rest, true);
-          if (remainder) {
-            remainder.classList?.add?.("detail-extension__list");
-            container.append(remainder);
-          }
-        }
-        return container.childElementCount ? container : chip;
-      }
-    }
+function extractHex(value) {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && value.hex) return value.hex;
+  return null;
+}
+
+function renderKeyIdentifier(value) {
+  const hex = extractHex(value);
+  if (!hex) return null;
+  const wrapper = document.createElement("div");
+  wrapper.className = "detail-extension-card__hex";
+  const digest = formatDigest(hex);
+  if (digest) {
+    const digestSpan = document.createElement("div");
+    digestSpan.className = "detail-extension-card__digest";
+    digestSpan.textContent = digest;
+    wrapper.append(digestSpan);
   }
-  return value;
+  wrapper.append(createHexValue(hex, {
+    summary: "Show hex",
+    bytesPerRow: 16,
+    previewBytes: 18,
+    threshold: 160,
+  }));
+  return wrapper;
+}
+
+function renderGenericObject(value) {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Node) return value;
+  if (Array.isArray(value)) return renderValue(value, true);
+  if (typeof value === "object") {
+    const pre = document.createElement("pre");
+    pre.className = "detail-extension-card__raw detail-raw";
+    pre.textContent = JSON.stringify(value, null, 2);
+    return pre;
+  }
+  return renderValue(value, true);
+}
+
+function buildMessage(text, variant = "muted") {
+  const note = document.createElement("div");
+  note.className = `detail-extension-card__message detail-extension-card__message--${variant}`;
+  note.textContent = text;
+  return note;
+}
+
+function buildRawValue(hex) {
+  if (!hex) return null;
+  return createHexValue(hex, {
+    summary: "Raw value",
+    bytesPerRow: 16,
+    previewBytes: 18,
+    threshold: 200,
+  });
+}
+
+const EXTENSION_RENDERERS = {
+  "2.5.29.19": value => renderList(describeBasicConstraints(value)),
+  "2.5.29.15": value => renderList(describeKeyUsage(value)),
+  "2.5.29.37": value => renderList(describeExtendedKeyUsage(value)),
+  "2.5.29.17": value => renderList(describeSubjectAltName(value)),
+  "1.3.6.1.5.5.7.1.1": value => renderList(describeAuthorityInfoAccess(value)),
+  "2.5.29.31": value => renderList(describeCRLDistributionPoints(value)),
+  "2.5.29.32": value => renderList(describeCertificatePolicies(value)),
+  "2.5.29.35": value => renderList(describeAuthorityKeyIdentifier(value)),
+  "2.5.29.14": value => renderKeyIdentifier(value),
+};
+
+function renderExtensionContent(entry) {
+  if (!entry) return null;
+  if (entry.status === "error") {
+    const container = document.createElement("div");
+    container.className = "detail-extension-card__content";
+    container.append(buildMessage(`Error: ${entry.error ?? "Unknown error"}`, "error"));
+    const raw = buildRawValue(entry.rawHex);
+    if (raw) container.append(raw);
+    return container;
+  }
+  const renderer = EXTENSION_RENDERERS[entry.oid];
+  let node = renderer ? renderer(entry.value, entry) : null;
+  if (!node && entry.value !== undefined && entry.value !== null) {
+    node = renderGenericObject(entry.value);
+  }
+  if (node) return node;
+  const container = document.createElement("div");
+  container.className = "detail-extension-card__content";
+  const message = entry.status === "parsed" ? "No details available" : "Unparsed extension";
+  container.append(buildMessage(message, "muted"));
+  const raw = buildRawValue(entry.rawHex);
+  if (raw) container.append(raw);
+  return container;
+}
+
+function buildExtensionHeader(entry) {
+  const header = document.createElement("div");
+  header.className = "detail-extension-card__header";
+  const title = document.createElement("div");
+  title.className = "detail-extension-card__title";
+  title.textContent = entry.name ?? "Extension";
+  header.append(title);
+  const meta = document.createElement("div");
+  meta.className = "detail-extension-card__meta";
+  const oid = document.createElement("span");
+  oid.className = "detail-extension-card__oid";
+  oid.textContent = entry.oid;
+  meta.append(oid);
+  if (entry.critical) {
+    const flag = document.createElement("span");
+    flag.className = "detail-extension-flag detail-extension-flag--critical";
+    flag.textContent = "Critical";
+    meta.append(flag);
+  }
+  header.append(meta);
+  return header;
+}
+
+function buildExtensionCard(entry) {
+  if (!entry) return null;
+  const card = document.createElement("div");
+  card.className = "detail-extension-card";
+  card.append(buildExtensionHeader(entry));
+  const body = document.createElement("div");
+  body.className = "detail-extension-card__body";
+  const content = renderExtensionContent(entry);
+  if (content) body.append(content);
+  else body.append(createMuted());
+  card.append(body);
+  return card;
 }
 
 export function buildExtensionsSection(extensions) {
-  if (!extensions) return null;
-  const rows = [];
-  const addRow = (label, rawValue) => {
-    if (!rawValue) return;
-    const value = decorateExtensionValue(rawValue);
-    if (value) rows.push({ label, value });
-  };
-  addRow("Basic Constraints", describeBasicConstraints(extensions.basicConstraints));
-  addRow("Key Usage", describeKeyUsage(extensions.keyUsage));
-  addRow("Extended Key Usage", describeExtendedKeyUsage(extensions.extendedKeyUsage));
-  addRow("Subject Alternative Name", describeSubjectAltName(extensions.subjectAltName));
-  const aia = describeAuthorityInfoAccess(extensions.authorityInfoAccess);
-  addRow("Authority Information Access", aia);
-  const crldp = describeCRLDistributionPoints(extensions.crlDistributionPoints);
-  addRow("CRL Distribution Points", crldp);
-  addRow("Certificate Policies", describeCertificatePolicies(extensions.certificatePolicies));
-  if (extensions.subjectKeyIdentifier) {
-    rows.push({
-      label: "Subject Key Identifier",
-      value: createHexValue(extensions.subjectKeyIdentifier, {
-        threshold: 200,
-        previewBytes: 20,
-      }),
-    });
-  }
-  const authorityKeyIdentifier = describeAuthorityKeyIdentifier(extensions.authorityKeyIdentifier);
-  if (authorityKeyIdentifier) rows.push({ label: "Authority Key Identifier", value: decorateExtensionValue(authorityKeyIdentifier) });
-  const present = describeExtensionPresence(extensions.present);
-  if (present) rows.push({ label: "Present Extensions", value: present });
-  return rows.length ? createSection("Extensions", rows) : null;
+  if (!Array.isArray(extensions) || extensions.length === 0) return null;
+  const section = document.createElement("div");
+  section.className = "detail-section detail-section--extensions";
+  const heading = document.createElement("h3");
+  heading.textContent = "Extensions";
+  section.append(heading);
+  const list = document.createElement("div");
+  list.className = "detail-extensions";
+  extensions
+    .map(entry => buildExtensionCard(entry))
+    .filter(Boolean)
+    .forEach(card => list.append(card));
+  if (!list.childElementCount) return null;
+  section.append(list);
+  return section;
 }

@@ -676,13 +676,122 @@ footer {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
 
-.detail-extension {
+.detail-section--extensions {
+    padding: 18px 20px;
+}
+
+.detail-extensions {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.detail-extension-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+}
+
+.detail-extension-card__header {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+@media (min-width: 560px) {
+    .detail-extension-card__header {
+        flex-direction: row;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+    }
+}
+
+.detail-extension-card__title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--fg);
+}
+
+.detail-extension-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.detail-extension-card__oid {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 6px;
+}
+
+.detail-extension-flag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid transparent;
+}
+
+.detail-extension-flag--critical {
+    background: rgba(209, 36, 47, 0.12);
+    border-color: rgba(209, 36, 47, 0.25);
+    color: #d1242f;
+}
+
+.detail-extension-card__body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--fg);
+}
+
+.detail-extension-card__content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.detail-extension-card__message {
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.detail-extension-card__message--muted {
+    color: var(--muted);
+}
+
+.detail-extension-card__message--error {
+    color: #d1242f;
+}
+
+.detail-extension-card__hex {
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
-.detail-extension__list {
+.detail-extension-card__digest {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.detail-extension-card__raw {
     margin: 0;
 }
 

@@ -1,9 +1,10 @@
 import * as pkijs from "pkijs";
-import { describeName, bitStringBytes, describeAlgorithm, describeExtensionPresence } from "../utils";
+import { describeName, bitStringBytes, describeAlgorithm } from "../utils";
 import { toHex, sha1Hex, sha256Hex, toJSDate } from "../format";
-import { SIGNATURE_ALG_NAMES } from "../constants";
+import { SIGNATURE_ALG_NAMES, EXTENSION_NAMES } from "../constants";
 import { getCRLNumber, getDeltaBaseCRLNumber, getCRLAKIHex } from "../parsers";
-import { parseCRLReason } from "../extensions";
+import { parseAuthorityKeyIdentifier, parseCRLReason } from "../extensions";
+import type { ExtensionDetail } from "./extensions";
 
 export interface CrlEntrySummary {
   serialNumberHex: string | null;
@@ -43,7 +44,7 @@ export interface CrlMetadata {
     count: number;
     sample: CrlEntrySummary[];
   };
-  extensions: ReturnType<typeof describeExtensionPresence>[];
+  extensions: ExtensionDetail[];
   isDelta: boolean;
 }
 
@@ -100,7 +101,57 @@ export async function buildCRLDetails(crl: pkijs.CertificateRevocationList, der:
       count: revoked.length,
       sample,
     },
-    extensions: (crl.crlExtensions?.extensions ?? []).map(ext => describeExtensionPresence(ext)),
+    extensions: buildCrlExtensionDetails(crl),
     isDelta,
   };
+}
+
+type CrlExtensionParsers = Record<string, (extension: pkijs.Extension, crl: pkijs.CertificateRevocationList) => unknown>;
+
+function stripCritical<T extends { critical?: boolean }>(value: T | null | undefined): Omit<T, "critical"> | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const { critical: _omit, ...rest } = value as T;
+  return rest as Omit<T, "critical">;
+}
+
+const CRL_EXTENSION_PARSERS: CrlExtensionParsers = {
+  "2.5.29.35": (extension) => stripCritical(parseAuthorityKeyIdentifier(extension)),
+  "2.5.29.20": (_extension, crl) => {
+    const number = getCRLNumber(crl);
+    return typeof number === "bigint" ? number.toString(10) : undefined;
+  },
+  "2.5.29.27": (_extension, crl) => {
+    const base = getDeltaBaseCRLNumber(crl);
+    return typeof base === "bigint" ? base.toString(10) : undefined;
+  },
+};
+
+function buildCrlExtensionDetails(crl: pkijs.CertificateRevocationList): ExtensionDetail[] {
+  const extensions = crl.crlExtensions?.extensions ?? [];
+  return extensions.map(extension => {
+    const oid = extension.extnID;
+    const parser = CRL_EXTENSION_PARSERS[oid];
+    const base: ExtensionDetail = {
+      oid,
+      name: EXTENSION_NAMES[oid] ?? null,
+      critical: extension.critical ?? false,
+      status: "unparsed",
+      rawHex: extension.extnValue?.valueBlock?.valueHex ? toHex(extension.extnValue.valueBlock.valueHex) : null,
+    };
+    if (!parser) return base;
+    try {
+      const value = parser(extension, crl) ?? undefined;
+      return {
+        ...base,
+        status: "parsed",
+        value,
+      };
+    } catch (error) {
+      return {
+        ...base,
+        status: "error",
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
 }
