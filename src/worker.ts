@@ -1,6 +1,19 @@
 /* eslint-disable no-constant-condition */
-import { fromBER, OctetString, Integer, Sequence } from "asn1js";
 import * as pkijs from "pkijs";
+import {
+  buildCertificateDetails,
+  buildCRLDetails,
+  friendlyNameFromCert,
+  getCN,
+  getCRLAKIHex,
+  getCRLNumber,
+  getDeltaBaseCRLNumber,
+  getSKIHex,
+  parseCertificate,
+  parseCRL,
+  sha256Hex,
+  toJSDate,
+} from "./pki-metadata";
 
 /** ---------- Env / Types ---------- */
 interface Env {
@@ -30,6 +43,10 @@ const LIST_CACHE_KEYS = {
 
 function metaCacheKey(key: string) {
   return new Request(`https://r2cache.internal/meta?key=${encodeURIComponent(key)}`);
+}
+
+function edgeCache() {
+  return (caches as unknown as { default: Cache }).default;
 }
 
 /** ---------- API helpers ---------- */
@@ -87,107 +104,6 @@ function jsonError(status: number, code: string, message: string, options: Error
   });
 }
 
-/** ---------- Utility helpers ---------- */
-const b2ab = (b: ArrayBuffer | Uint8Array) => (b instanceof Uint8Array ? b.buffer : b);
-const toHex = (buf: ArrayBuffer | Uint8Array) =>
-  [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
-
-async function sha256Hex(data: ArrayBuffer | Uint8Array) {
-  const d = await crypto.subtle.digest("SHA-256", b2ab(data));
-  return toHex(d);
-}
-
-function toJSDate(maybeTime: any): Date | undefined {
-  try {
-    if (!maybeTime) return undefined;
-    if (maybeTime instanceof Date) return maybeTime;
-    if (typeof maybeTime.toDate === "function") return maybeTime.toDate();
-    if ((maybeTime as any).value instanceof Date) return (maybeTime as any).value;
-    if ((maybeTime as any).valueBlock?.value instanceof Date) return (maybeTime as any).valueBlock.value;
-    const s = typeof maybeTime === "string" ? maybeTime : (maybeTime as any)?.value;
-    if (typeof s === "string") {
-      const d = new Date(s);
-      if (!isNaN(d.getTime())) return d;
-    }
-  } catch (e) {
-    console.warn("toJSDate error:", e, "input:", maybeTime);
-  }
-  console.warn("toJSDate could not normalize input:", maybeTime);
-  return undefined;
-}
-
-/** ---------- ASN.1 / X.509 ---------- */
-function parseCertificate(der: ArrayBuffer) {
-  const asn1 = fromBER(der);
-  if (asn1.offset === -1) throw new Error("Bad certificate DER");
-  return new pkijs.Certificate({ schema: asn1.result });
-}
-
-function parseCRL(der: ArrayBuffer) {
-  const asn1 = fromBER(der);
-  if (asn1.offset === -1) throw new Error("Bad CRL DER");
-  return new pkijs.CertificateRevocationList({ schema: asn1.result });
-}
-
-function getCN(cert: pkijs.Certificate): string | undefined {
-  for (const rdn of cert.subject.typesAndValues) {
-    if (rdn.type === "2.5.4.3") return rdn.value.valueBlock.value;
-  }
-  return undefined;
-}
-
-function getSKIHex(cert: pkijs.Certificate): string | undefined {
-  const ext = cert.extensions?.find(e => e.extnID === "2.5.29.14");
-  if (!ext) return undefined;
-  const asn1 = fromBER(ext.extnValue.valueBlock.valueHex);
-  const raw = asn1.result as OctetString;
-  return toHex(raw.valueBlock.valueHex);
-}
-
-function getCRLAKIHex(crl: pkijs.CertificateRevocationList): string | undefined {
-  const ext = crl.crlExtensions?.extensions.find(e => e.extnID === "2.5.29.35");
-  if (!ext) return undefined;
-  const asn1 = fromBER(ext.extnValue.valueBlock.valueHex);
-  const seq = asn1.result as Sequence;
-  const first = seq.valueBlock.value[0];
-  if (!first || first.idBlock.tagClass !== 3 || first.idBlock.tagNumber !== 0) return undefined;
-  // @ts-ignore implicit [0] OCTET STRING has valueHex
-  return toHex(first.valueBlock.valueHex);
-}
-
-function getCRLNumber(crl: pkijs.CertificateRevocationList): bigint | undefined {
-  const ext = crl.crlExtensions?.extensions.find(e => e.extnID === "2.5.29.20");
-  if (!ext) return undefined;
-  const asn1 = fromBER(ext.extnValue.valueBlock.valueHex);
-  const int = asn1.result as Integer;
-  const bytes = new Uint8Array(int.valueBlock.valueHex);
-  let n = 0n;
-  for (const b of bytes) n = (n << 8n) + BigInt(b);
-  return n;
-}
-
-/** Delta CRL detection and BaseCRLNumber parsing (2.5.29.27). */
-function getDeltaBaseCRLNumber(crl: pkijs.CertificateRevocationList): bigint | undefined {
-  const ext = crl.crlExtensions?.extensions.find(e => e.extnID === "2.5.29.27");
-  if (!ext) return undefined;
-  const asn1 = fromBER(ext.extnValue.valueBlock.valueHex);
-  const int = asn1.result as Integer;
-  const bytes = new Uint8Array(int.valueBlock.valueHex);
-  let n = 0n;
-  for (const b of bytes) n = (n << 8n) + BigInt(b);
-  return n;
-}
-function isDeltaCRL(crl: pkijs.CertificateRevocationList): boolean {
-  return getDeltaBaseCRLNumber(crl) !== undefined;
-}
-
-function friendlyNameFromCert(cert: pkijs.Certificate): string {
-  const cn = getCN(cert);
-  if (cn) return cn.replace(/[^\w.-]+/g, "").replace(/\s+/g, "");
-  const ski = getSKIHex(cert);
-  return ski ? `CA-${ski.slice(0, 16)}` : `CA-${Date.now()}`;
-}
-
 /** ---------- Content-Type and caching ---------- */
 function contentTypeByKey(key: string) {
   if (key.endsWith(".pem") || key.endsWith(".crt.pem") || key.endsWith(".crl.pem"))
@@ -230,7 +146,7 @@ async function listAllWithPrefix(env: Env, prefix: string) {
 
 // Extend support to the "dcrl/" namespace
 async function cachedListAllWithPrefix(env: Env, prefix: "ca/" | "crl/" | "dcrl/"): Promise<R2Object[]> {
-  const cache = caches.default;
+  const cache = edgeCache();
   const key =
     prefix === "ca/" ? LIST_CACHE_KEYS.CA :
       prefix === "crl/" ? LIST_CACHE_KEYS.CRL :
@@ -238,7 +154,7 @@ async function cachedListAllWithPrefix(env: Env, prefix: "ca/" | "crl/" | "dcrl/
 
   const hit = await cache.match(key);
   if (hit) {
-    const j = await hit.json();
+    const j: any = await hit.json();
     return (j.items as Array<{ key: string; size: number; uploaded?: string }>).map(x => ({
       key: x.key,
       size: x.size,
@@ -380,34 +296,32 @@ async function getMetaJSON(env: Env, key: string): Promise<ObjectMetadata | unde
   try {
     const decoder = new TextDecoder();
     if (isCert) {
-      const raw = r2key.endsWith(".pem") ? extractPEMBlock(decoder.decode(await obj.arrayBuffer()), "-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----").buffer : await obj.arrayBuffer();
-      const cert = parseCertificate(raw);
-      base.details = {
-        subject: cert.subject.typesAndValues.map(tv => ({ oid: tv.type, value: tv.value.valueBlock.value })),
-        issuer: cert.issuer.typesAndValues.map(tv => ({ oid: tv.type, value: tv.value.valueBlock.value })),
-        notBefore: toJSDate((cert as any).notBefore)?.toISOString() ?? null,
-        notAfter: toJSDate((cert as any).notAfter)?.toISOString() ?? null,
-        serialNumberHex: (cert.serialNumber.valueBlock.valueHex && toHex(cert.serialNumber.valueBlock.valueHex)) || null,
-        signatureAlgorithm: cert.signatureAlgorithm.algorithmId,
-        publicKeyAlgorithm: cert.subjectPublicKeyInfo.algorithm.algorithmId,
-        subjectKeyIdentifier: getSKIHex(cert) || null,
-        commonName: getCN(cert) || null,
-      };
+      let der: ArrayBuffer;
+      if (r2key.endsWith(".pem")) {
+        const pemText = decoder.decode(await obj.arrayBuffer());
+        const block = extractPEMBlock(pemText, "-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----");
+        const copy = block.slice();
+        der = copy.buffer;
+      } else {
+        der = await obj.arrayBuffer();
+      }
+      const cert = parseCertificate(der);
+      base.details = await buildCertificateDetails(cert, der);
+      base.type = "certificate";
+      (base.details as any).commonName = (base.details as any).summary?.subjectCN ?? null;
     } else if (isCRL) {
-      const raw = r2key.endsWith(".pem") ? extractPEMBlock(decoder.decode(await obj.arrayBuffer()), "-----BEGIN X509 CRL-----", "-----END X509 CRL-----").buffer : await obj.arrayBuffer();
-      const crl = parseCRL(raw);
-      const baseNumber = getDeltaBaseCRLNumber(crl);
-      base.details = {
-        issuer: crl.issuer.typesAndValues.map(tv => ({ oid: tv.type, value: tv.value.valueBlock.value })),
-        thisUpdate: toJSDate(crl.thisUpdate)?.toISOString() ?? null,
-        nextUpdate: toJSDate(crl.nextUpdate)?.toISOString() ?? null,
-        crlNumber: getCRLNumber(crl)?.toString() ?? null,
-        authorityKeyIdentifier: getCRLAKIHex(crl) || null,
-        signatureAlgorithm: crl.signatureAlgorithm.algorithmId,
-        entryCount: (crl as any).revokedCertificates?.length ?? 0,
-        isDelta: baseNumber !== undefined,
-        baseCRLNumber: baseNumber !== undefined ? baseNumber.toString() : null,
-      };
+      let der: ArrayBuffer;
+      if (r2key.endsWith(".pem")) {
+        const pemText = decoder.decode(await obj.arrayBuffer());
+        const block = extractPEMBlock(pemText, "-----BEGIN X509 CRL-----", "-----END X509 CRL-----");
+        const copy = block.slice();
+        der = copy.buffer;
+      } else {
+        der = await obj.arrayBuffer();
+      }
+      const crl = parseCRL(der);
+      base.details = await buildCRLDetails(crl, der);
+      base.type = "crl";
     } else {
       base.details = { size: base.size };
     }
@@ -435,7 +349,7 @@ const getObjectMetadata: RouteHandler = async (req, env) => {
   }
 
   const normalizedKey = decodedKey.startsWith("/") ? decodedKey : `/${decodedKey}`;
-  const cache = caches.default;
+  const cache = edgeCache();
   const ck = metaCacheKey(normalizedKey);
   const cached = await cache.match(ck);
   if (cached) return cached;
@@ -480,7 +394,7 @@ const getBinaryOrText: RouteHandler = async (req, env) => {
   if (!/^\/(ca|crl|dcrl)\//.test(url.pathname)) return new Response("Not Found", { status: 404 }); // allow delta CRL namespace
 
   const key = url.pathname.replace(/^\/+/, "");
-  const cache = caches.default;
+  const cache = edgeCache();
 
   // Use the full request URL as the cache key
   const cacheKey = new Request(url.toString(), { method: "GET" });
@@ -590,7 +504,7 @@ const createCRL: RouteHandler = async (req, env) => {
   await putBinary(env, logicalPEMKey, new TextEncoder().encode(pemText), meta);
   if (byAkiKey) await putBinary(env, byAkiKey, derBytes, meta);
 
-  const cache = caches.default;
+  const cache = edgeCache();
   await Promise.allSettled([
     cache.delete(LIST_CACHE_KEYS.CRL),
     cache.delete(LIST_CACHE_KEYS.DCRL),
@@ -647,7 +561,7 @@ const listObjects: RouteHandler = async (req, env) => {
   cacheUrl.search = cacheParams.toString();
   const cacheKey = new Request(cacheUrl.toString(), { method: "GET" });
 
-  const cache = caches.default;
+  const cache = edgeCache();
   const hit = await cache.match(cacheKey);
   if (hit) return hit;
 
