@@ -1,7 +1,11 @@
-async function list(prefix) {
-    const res = await fetch(`/api/list?prefix=${encodeURIComponent(prefix)}&delimiter=/`);
-    if (!res.ok) throw new Error(`list ${prefix} failed: ${res.status}`);
-    return res.json();
+async function listCollection(collection) {
+    const res = await fetch(`/api/v1/collections/${collection}/items`);
+    if (!res.ok) throw new Error(`list ${collection} failed: ${res.status}`);
+    const payload = await res.json();
+    if (payload?.error) {
+        throw new Error(payload.error.message || `list ${collection} failed`);
+    }
+    return payload.data ?? { items: [], prefixes: [] };
 }
 
 /** Build a row for a cert/crl.
@@ -9,25 +13,26 @@ async function list(prefix) {
 function itemLi(base, hasDer, hasPem) {
     const li = document.createElement('li');
 
-    const name = base.replace(/^([^/]+)\//, '').replace(/\.(crt|crl)$/i, '');
-    const hrefDer = hasDer ? `/${base}` : '';
-    const hrefPem = hasPem ? `/${base}.pem` : '';
+        const name = base.replace(/^([^/]+)\//, '').replace(/\.(crt|crl)$/i, '');
+        const hrefDer = hasDer ? `/${base}` : '';
+        const hrefPem = hasPem ? `/${base}.pem` : '';
+        const primaryKey = hasDer ? base : `${base}.pem`;
 
-    li.innerHTML = `
-    <div class="item-left">
-      <div class="item-title">${name}</div>
-      <div class="item-path">${base}</div>
-      <div class="actions">
-        <button class="btn btn-detail" data-key="${hasDer ? hrefDer : hrefPem}">Details</button>
-        <span class="loading" hidden><span class="spinner" aria-hidden="true"></span></span>
-      </div>
-      <div class="details" data-panel="${hasDer ? hrefDer : hrefPem}" hidden></div>
-    </div>
-    <div class="item-right">
-      ${hasDer ? `<a href="${hrefDer}">DER</a>` : ''}
-      ${hasPem ? `<a href="${hrefPem}">PEM</a>` : ''}
-    </div>
-  `;
+        li.innerHTML = `
+        <div class="item-left">
+            <div class="item-title">${name}</div>
+            <div class="item-path">${base}</div>
+            <div class="actions">
+                <button class="btn btn-detail" data-key="${primaryKey}">Details</button>
+                <span class="loading" hidden><span class="spinner" aria-hidden="true"></span></span>
+            </div>
+            <div class="details" data-panel="${primaryKey}" hidden></div>
+        </div>
+        <div class="item-right">
+            ${hasDer ? `<a href="${hrefDer}">DER</a>` : ''}
+            ${hasPem ? `<a href="${hrefPem}">PEM</a>` : ''}
+        </div>
+    `;
     return li;
 }
 
@@ -37,14 +42,14 @@ async function render() {
     const dcrlUL = document.getElementById('dcrls');
 
     const [certs, crls, dcrls] = await Promise.all([
-        list('ca/'),
-        list('crl/'),
-        list('dcrl/'),
+        listCollection('ca'),
+        listCollection('crl'),
+        listCollection('dcrl'),
     ]);
 
     // ---- Certs
     const certMap = new Map();
-    certs.objects.forEach(o => {
+    certs.items.forEach(o => {
         if (o.key.endsWith('.crt')) {
             const prev = certMap.get(o.key) || {};
             certMap.set(o.key, { ...prev, der: true });
@@ -63,7 +68,7 @@ async function render() {
 
     // ---- Full CRLs
     const crlMap = new Map();
-    crls.objects
+    crls.items
         .filter(o => !o.key.startsWith('crl/archive/') && !o.key.startsWith('crl/by-keyid/'))
         .forEach(o => {
             if (o.key.endsWith('.crl')) {
@@ -84,7 +89,7 @@ async function render() {
 
     // ---- Delta CRLs
     const dcrlMap = new Map();
-    dcrls.objects
+    dcrls.items
         .filter(o => !o.key.startsWith('dcrl/archive/') && !o.key.startsWith('dcrl/by-keyid/'))
         .forEach(o => {
             if (o.key.endsWith('.crl')) {
@@ -120,10 +125,13 @@ addEventListener('click', async e => {
 
     spinner.removeAttribute('hidden');
     try {
-        const r = await fetch('/meta?key=' + encodeURIComponent(key));
-        const j = await r.json();
-        if (!r.ok) throw new Error(j?.error || 'meta error');
-        panel.innerHTML = '<pre>' + JSON.stringify(j, null, 2) + '</pre>';
+        const encodedKey = encodeURIComponent(key);
+        const r = await fetch(`/api/v1/objects/${encodedKey}/metadata`);
+        const payload = await r.json();
+        if (!r.ok || payload?.error) {
+            throw new Error(payload?.error?.message || 'meta error');
+        }
+        panel.innerHTML = '<pre>' + JSON.stringify(payload.data, null, 2) + '</pre>';
         panel.removeAttribute('hidden');
     } catch (err) {
         panel.innerHTML = '<div class="error">Failed to load details: ' + err.message + '</div>';

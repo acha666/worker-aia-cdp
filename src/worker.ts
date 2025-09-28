@@ -6,33 +6,88 @@ import * as pkijs from "pkijs";
 interface Env {
   STORE: R2Bucket;
   SITE_NAME?: string;
-  ASSETS: Fetcher;          // ★ 新增：Assets 绑定
+  ASSETS: Fetcher; // Workers Sites/Static asset binding
 }
 type RouteHandler = (req: Request, env: Env, ctx: ExecutionContext) => Promise<Response>;
 
-/** ---------- PKIjs 引擎 ---------- */
+/** ---------- PKIjs engine ---------- */
 pkijs.setEngine(
   "cloudflare",
   new pkijs.CryptoEngine({ name: "cloudflare", crypto, subtle: crypto.subtle }),
 );
 
-/** ---------- 缓存参数 ---------- */
-const LIST_CACHE_TTL = 60;                   // 秒：/api/list 的客户端强缓存
-const LIST_CACHE_SMAXAGE = 300;              // 秒：边缘缓存
-const LIST_CACHE_SWR = 86400;                // 秒：陈旧可用
-const META_CACHE_TTL = 60;
+/** ---------- Cache parameters ---------- */
+const LIST_CACHE_TTL = 60; // seconds: client cache for /api/v1/objects responses
+const LIST_CACHE_SMAXAGE = 300; // seconds: edge cache duration
+const LIST_CACHE_SWR = 86400; // seconds: stale-while-revalidate window
+const META_CACHE_TTL = 60; // seconds: metadata cache TTL
 
 const LIST_CACHE_KEYS = {
   CA: new Request("https://r2cache.internal/list?prefix=ca/&delimiter=/"),
   CRL: new Request("https://r2cache.internal/list?prefix=crl/&delimiter=/"),
-  DCRL: new Request("https://r2cache.internal/list?prefix=dcrl/&delimiter=/"), // ★ 新增
+  DCRL: new Request("https://r2cache.internal/list?prefix=dcrl/&delimiter=/"),
 };
 
 function metaCacheKey(key: string) {
   return new Request(`https://r2cache.internal/meta?key=${encodeURIComponent(key)}`);
 }
 
-/** ---------- 小工具 ---------- */
+/** ---------- API helpers ---------- */
+const DEFAULT_JSON_HEADERS = {
+  "Content-Type": "application/json; charset=utf-8",
+};
+
+type JsonHeaders = Headers | Record<string, string> | [string, string][];
+
+interface SuccessOptions {
+  status?: number;
+  meta?: Record<string, unknown> | null;
+  headers?: JsonHeaders;
+}
+
+interface ErrorOptions {
+  headers?: JsonHeaders;
+  details?: unknown;
+}
+
+function mergeJsonHeaders(extra?: JsonHeaders) {
+  const headers = new Headers(DEFAULT_JSON_HEADERS);
+  if (extra) {
+    const additional = new Headers(extra);
+    additional.forEach((value, key) => headers.set(key, value));
+  }
+  return headers;
+}
+
+function jsonSuccess<T>(data: T, options: SuccessOptions = {}) {
+  const { status = 200, meta = null, headers } = options;
+  const payload = {
+    data,
+    meta,
+    error: null as null,
+  };
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: mergeJsonHeaders(headers),
+  });
+}
+
+function jsonError(status: number, code: string, message: string, options: ErrorOptions = {}) {
+  const { headers, details } = options;
+  const errorPayload: Record<string, unknown> = { code, message };
+  if (details !== undefined) errorPayload.details = details;
+  const payload = {
+    data: null,
+    meta: null,
+    error: errorPayload,
+  };
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: mergeJsonHeaders(headers),
+  });
+}
+
+/** ---------- Utility helpers ---------- */
 const b2ab = (b: ArrayBuffer | Uint8Array) => (b instanceof Uint8Array ? b.buffer : b);
 const toHex = (buf: ArrayBuffer | Uint8Array) =>
   [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
@@ -111,7 +166,7 @@ function getCRLNumber(crl: pkijs.CertificateRevocationList): bigint | undefined 
   return n;
 }
 
-/** ★ 新增：Delta CRL 识别与 BaseCRLNumber 解析（2.5.29.27） */
+/** Delta CRL detection and BaseCRLNumber parsing (2.5.29.27). */
 function getDeltaBaseCRLNumber(crl: pkijs.CertificateRevocationList): bigint | undefined {
   const ext = crl.crlExtensions?.extensions.find(e => e.extnID === "2.5.29.27");
   if (!ext) return undefined;
@@ -133,7 +188,7 @@ function friendlyNameFromCert(cert: pkijs.Certificate): string {
   return ski ? `CA-${ski.slice(0, 16)}` : `CA-${Date.now()}`;
 }
 
-/** ---------- Content-Type 与缓存 ---------- */
+/** ---------- Content-Type and caching ---------- */
 function contentTypeByKey(key: string) {
   if (key.endsWith(".pem") || key.endsWith(".crt.pem") || key.endsWith(".crl.pem"))
     return "text/plain; charset=utf-8";
@@ -152,7 +207,7 @@ function httpHeadersForBinaryLike(obj: R2ObjectBody | R2Object, key: string) {
   const uploaded: unknown = anyObj?.uploaded;
   if (uploaded instanceof Date) h.set("Last-Modified", uploaded.toUTCString());
 
-  // 缓存策略：DER 长缓存、CRL 短缓存、PEM 参照对应类型
+  // Cache strategy: long cache for DER, shorter for CRL, PEM follows matching type
   if (key.endsWith(".crt") || key.endsWith(".crt.pem"))
     h.set("Cache-Control", "public, max-age=31536000, immutable, s-maxage=31536000, stale-while-revalidate=604800");
   else if (key.endsWith(".crl") || key.endsWith(".crl.pem"))
@@ -161,7 +216,7 @@ function httpHeadersForBinaryLike(obj: R2ObjectBody | R2Object, key: string) {
   return h;
 }
 
-/** ---------- R2 列表/读写 + 列表缓存 ---------- */
+/** ---------- R2 list/read helpers + caching ---------- */
 async function listAllWithPrefix(env: Env, prefix: string) {
   const out: R2Object[] = [];
   let cursor: string | undefined;
@@ -173,7 +228,7 @@ async function listAllWithPrefix(env: Env, prefix: string) {
   return out;
 }
 
-// ★ 扩展：支持 "dcrl/"
+// Extend support to the "dcrl/" namespace
 async function cachedListAllWithPrefix(env: Env, prefix: "ca/" | "crl/" | "dcrl/"): Promise<R2Object[]> {
   const cache = caches.default;
   const key =
@@ -211,7 +266,7 @@ async function cachedListAllWithPrefix(env: Env, prefix: "ca/" | "crl/" | "dcrl/
   return objs;
 }
 
-/** ---------- 证书候选（沿用你的解析逻辑） ---------- */
+/** ---------- Certificate candidates (reuse existing parsing logic) ---------- */
 async function listCACandidates(env: Env): Promise<Array<{ key: string; der: ArrayBuffer; cert: pkijs.Certificate }>> {
   const out: Array<{ key: string; der: ArrayBuffer; cert: pkijs.Certificate }> = [];
   const caObjs = await cachedListAllWithPrefix(env, "ca/");
@@ -235,7 +290,7 @@ async function putBinary(env: Env, key: string, data: ArrayBuffer | Uint8Array, 
   return env.STORE.put(key, data, { httpMetadata: {}, customMetadata: meta });
 }
 
-/** ---------- CRL 关联/校验 ---------- */
+/** ---------- CRL association/verification ---------- */
 async function findIssuerCertForCRL(env: Env, crl: pkijs.CertificateRevocationList) {
   const akiHex = getCRLAKIHex(crl);
   const candidates = await listCACandidates(env);
@@ -281,7 +336,7 @@ function isNewerCRL(incoming: pkijs.CertificateRevocationList, existing?: pkijs.
   return false;
 }
 
-/** ---------- PEM 解析（POST 用） ---------- */
+/** ---------- PEM parsing helpers (for POST uploads) ---------- */
 function extractPEMBlock(pemText: string, begin: string, end: string): Uint8Array {
   const re = new RegExp(`${begin}[\\s\\S]*?${end}`, "g");
   const match = pemText.match(re);
@@ -294,98 +349,140 @@ function extractPEMBlock(pemText: string, begin: string, end: string): Uint8Arra
   return bytes;
 }
 
-/** ---------- /meta（带缓存） ---------- */
-async function getMetaJSON(env: Env, key: string) {
-  if (!/^\/(ca|crl|dcrl)\//.test(key)) throw new Error("Bad key"); // ★ 支持 dcrl
+/** ---------- Object metadata (cached) ---------- */
+interface ObjectMetadata {
+  key: string;
+  size: number | null;
+  uploaded: string | null;
+  etag: string | null;
+  type: "certificate" | "crl" | "binary" | "unknown";
+  details: Record<string, unknown>;
+}
+
+async function getMetaJSON(env: Env, key: string): Promise<ObjectMetadata | undefined> {
+  if (!/^\/(ca|crl|dcrl)\//.test(key)) throw new Error("Unsupported key prefix");
   const r2key = key.replace(/^\/+/, "");
   const obj = await env.STORE.get(r2key);
-  if (!obj) return { error: "Not Found" };
+  if (!obj) return undefined;
 
   const isCert = r2key.endsWith(".crt") || r2key.endsWith(".crt.pem");
   const isCRL = r2key.endsWith(".crl") || r2key.endsWith(".crl.pem");
 
-  const raw = r2key.endsWith(".pem") ? new TextEncoder().encode(await obj.text()).buffer : await obj.arrayBuffer();
-  let body: any = {};
+  const base: ObjectMetadata = {
+    key: r2key,
+    size: (obj as any).size ?? null,
+    uploaded: (obj as any).uploaded instanceof Date ? (obj as any).uploaded.toISOString() : null,
+    etag: (obj as any).etag ?? (obj as any).httpEtag ?? null,
+    type: isCert ? "certificate" : isCRL ? "crl" : "binary",
+    details: {},
+  };
+
   try {
+    const decoder = new TextDecoder();
     if (isCert) {
-      const der = r2key.endsWith(".pem") ? extractPEMBlock(new TextDecoder().decode(raw), "-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----").buffer : raw;
-      const cert = parseCertificate(der);
-      body = {
-        type: "certificate",
+      const raw = r2key.endsWith(".pem") ? extractPEMBlock(decoder.decode(await obj.arrayBuffer()), "-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----").buffer : await obj.arrayBuffer();
+      const cert = parseCertificate(raw);
+      base.details = {
         subject: cert.subject.typesAndValues.map(tv => ({ oid: tv.type, value: tv.value.valueBlock.value })),
         issuer: cert.issuer.typesAndValues.map(tv => ({ oid: tv.type, value: tv.value.valueBlock.value })),
         notBefore: toJSDate((cert as any).notBefore)?.toISOString() ?? null,
         notAfter: toJSDate((cert as any).notAfter)?.toISOString() ?? null,
         serialNumberHex: (cert.serialNumber.valueBlock.valueHex && toHex(cert.serialNumber.valueBlock.valueHex)) || null,
-        signatureAlg: cert.signatureAlgorithm.algorithmId,
-        publicKeyAlg: cert.subjectPublicKeyInfo.algorithm.algorithmId,
-        ski: getSKIHex(cert) || null,
-        cn: getCN(cert) || null,
+        signatureAlgorithm: cert.signatureAlgorithm.algorithmId,
+        publicKeyAlgorithm: cert.subjectPublicKeyInfo.algorithm.algorithmId,
+        subjectKeyIdentifier: getSKIHex(cert) || null,
+        commonName: getCN(cert) || null,
       };
     } else if (isCRL) {
-      const der = r2key.endsWith(".pem") ? extractPEMBlock(new TextDecoder().decode(raw), "-----BEGIN X509 CRL-----", "-----END X509 CRL-----").buffer : raw;
-      const crl = parseCRL(der);
-      const baseNum = getDeltaBaseCRLNumber(crl); // ★
-      body = {
-        type: "crl",
+      const raw = r2key.endsWith(".pem") ? extractPEMBlock(decoder.decode(await obj.arrayBuffer()), "-----BEGIN X509 CRL-----", "-----END X509 CRL-----").buffer : await obj.arrayBuffer();
+      const crl = parseCRL(raw);
+      const baseNumber = getDeltaBaseCRLNumber(crl);
+      base.details = {
         issuer: crl.issuer.typesAndValues.map(tv => ({ oid: tv.type, value: tv.value.valueBlock.value })),
         thisUpdate: toJSDate(crl.thisUpdate)?.toISOString() ?? null,
         nextUpdate: toJSDate(crl.nextUpdate)?.toISOString() ?? null,
         crlNumber: getCRLNumber(crl)?.toString() ?? null,
-        aki: getCRLAKIHex(crl) || null,
-        signatureAlg: crl.signatureAlgorithm.algorithmId,
+        authorityKeyIdentifier: getCRLAKIHex(crl) || null,
+        signatureAlgorithm: crl.signatureAlgorithm.algorithmId,
         entryCount: (crl as any).revokedCertificates?.length ?? 0,
-        isDelta: baseNum !== undefined,                        // ★ 新增
-        baseCRLNumber: baseNum !== undefined ? baseNum.toString() : null, // ★ 新增
+        isDelta: baseNumber !== undefined,
+        baseCRLNumber: baseNumber !== undefined ? baseNumber.toString() : null,
       };
     } else {
-      body = { type: "binary", size: (obj as any).size ?? null };
+      base.details = { size: base.size };
     }
-  } catch (e) {
-    body = { error: "parse_error", detail: String(e) };
+  } catch (err) {
+    base.type = "unknown";
+    base.details = {
+      parseError: true,
+      message: err instanceof Error ? err.message : String(err),
+    };
   }
 
-  const meta = {
-    key: r2key,
-    size: (obj as any).size ?? null,
-    uploaded: (obj as any).uploaded instanceof Date ? (obj as any).uploaded.toISOString() : null,
-    etag: (obj as any).etag ?? (obj as any).httpEtag ?? null,
-  };
-
-  return { meta, body };
+  return base;
 }
 
-const getMeta: RouteHandler = async (req, env) => {
+const getObjectMetadata: RouteHandler = async (req, env) => {
   const url = new URL(req.url);
-  const key = url.searchParams.get("key") || "";
-  if (!key) return new Response(JSON.stringify({ error: "missing key" }), { status: 400, headers: { "Content-Type": "application/json" } });
+  const match = url.pathname.match(/^\/api\/v1\/objects\/(.+)\/metadata$/);
+  if (!match) return jsonError(400, "invalid_path", "Metadata endpoint path is invalid.");
 
+  let decodedKey: string;
+  try {
+    decodedKey = decodeURIComponent(match[1]);
+  } catch (err) {
+    return jsonError(400, "invalid_key", "Object key must be URL-encoded.", { details: { message: err instanceof Error ? err.message : String(err) } });
+  }
+
+  const normalizedKey = decodedKey.startsWith("/") ? decodedKey : `/${decodedKey}`;
   const cache = caches.default;
-  const ck = metaCacheKey(key);
+  const ck = metaCacheKey(normalizedKey);
   const cached = await cache.match(ck);
   if (cached) return cached;
 
-  const data = await getMetaJSON(env, key);
-  const res = new Response(JSON.stringify(data), {
-    status: data && !(data as any).error ? 200 : (data as any).error === "Not Found" ? 404 : 500,
+  let metadata: ObjectMetadata | undefined;
+  try {
+    metadata = await getMetaJSON(env, normalizedKey);
+  } catch (err) {
+    return jsonError(400, "unsupported_key", "The provided key prefix is not supported.", {
+      details: { key: normalizedKey, message: err instanceof Error ? err.message : String(err) },
+    });
+  }
+
+  if (!metadata) {
+    const notFound = jsonError(404, "not_found", "Object not found.", {
+      headers: {
+        "Cache-Control": `public, max-age=${META_CACHE_TTL}, s-maxage=${LIST_CACHE_SMAXAGE}, stale-while-revalidate=${LIST_CACHE_SWR}`,
+      },
+      details: { key: normalizedKey },
+    });
+    await cache.put(ck, notFound.clone());
+    return notFound;
+  }
+
+  const response = jsonSuccess(metadata, {
+    meta: {
+      key: metadata.key,
+      cachedAt: new Date().toISOString(),
+    },
     headers: {
-      "Content-Type": "application/json",
       "Cache-Control": `public, max-age=${META_CACHE_TTL}, s-maxage=${LIST_CACHE_SMAXAGE}, stale-while-revalidate=${LIST_CACHE_SWR}`,
     },
   });
-  await cache.put(ck, res.clone());
-  return res;
+
+  await cache.put(ck, response.clone());
+  return response;
 };
 
-/** ---------- /file/* （新增边缘缓存命中） ---------- */
+/** ---------- /file/* (serves binary/text with edge caching) ---------- */
 const getBinaryOrText: RouteHandler = async (req, env) => {
   const url = new URL(req.url);
-  if (!/^\/(ca|crl|dcrl)\//.test(url.pathname)) return new Response("Not Found", { status: 404 }); // ★ 支持 dcrl
+  if (!/^\/(ca|crl|dcrl)\//.test(url.pathname)) return new Response("Not Found", { status: 404 }); // allow delta CRL namespace
 
   const key = url.pathname.replace(/^\/+/, "");
   const cache = caches.default;
 
-  // 以完整 URL 作为缓存键
+  // Use the full request URL as the cache key
   const cacheKey = new Request(url.toString(), { method: "GET" });
   const cached = await cache.match(cacheKey);
   if (cached) return cached;
@@ -398,65 +495,61 @@ const getBinaryOrText: RouteHandler = async (req, env) => {
     ? new Response(await obj.text(), { status: 200, headers: hdr })
     : new Response(await obj.arrayBuffer(), { status: 200, headers: hdr });
 
-  // 可缓存响应写入边缘缓存
+  // Store cacheable responses in the edge cache
   await cache.put(cacheKey, resp.clone());
   return resp;
 };
 
-/** ---------- /crl（上传 + 缓存失效） ---------- */
-const postCRL: RouteHandler = async (req, env) => {
-  const ctRaw = req.headers.get("content-type") || "";
-  const ct = ctRaw.toLowerCase();
-  if (!ct.startsWith("text/")) {
-    return new Response(
-      JSON.stringify({ error: "Only text/plain PEM is accepted (CRL PEM in request body). Content-Type must be text/plain." }),
-      { status: 415, headers: { "Content-Type": "application/json" } },
-    );
+/** ---------- CRL upload (creates or updates) ---------- */
+const createCRL: RouteHandler = async (req, env) => {
+  const contentType = (req.headers.get("content-type") || "").toLowerCase();
+  if (!contentType.startsWith("text/")) {
+    return jsonError(415, "unsupported_media_type", "Only text/plain PEM is accepted for CRL uploads.", {
+      details: { received: contentType || null },
+    });
   }
 
   let pemText = "";
   try {
     pemText = await req.text();
-  } catch {
-    return new Response(
-      JSON.stringify({ error: "Bad request body: expected CRL PEM text in request body." }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
-    );
+  } catch (err) {
+    return jsonError(400, "invalid_body", "Failed to read request body as text.", {
+      details: { message: err instanceof Error ? err.message : String(err) },
+    });
   }
 
   let derBytes: Uint8Array;
-  try { derBytes = extractPEMBlock(pemText, "-----BEGIN X509 CRL-----", "-----END X509 CRL-----"); }
-  catch (e) {
-    console.error("PEM parse error:", e);
-    return new Response(
-      JSON.stringify({ error: "Invalid CRL PEM" }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
-    );
+  try {
+    derBytes = extractPEMBlock(pemText, "-----BEGIN X509 CRL-----", "-----END X509 CRL-----");
+  } catch (err) {
+    console.error("PEM parse error:", err);
+    return jsonError(400, "invalid_pem", "Request body must contain a valid X.509 CRL PEM block.");
   }
 
   let crl: pkijs.CertificateRevocationList;
-  try { crl = parseCRL(derBytes.buffer); }
-  catch (e) {
-    console.error("CRL parse error:", e);
-    return new Response(JSON.stringify({ error: "Bad CRL DER after PEM decode" }), { status: 400, headers: { "Content-Type": "application/json" } });
+  try {
+    crl = parseCRL(derBytes.buffer as ArrayBuffer);
+  } catch (err) {
+    console.error("CRL parse error:", err);
+    return jsonError(400, "invalid_der", "Failed to parse CRL after PEM decode.", {
+      details: { message: err instanceof Error ? err.message : String(err) },
+    });
   }
 
   const issuer = await findIssuerCertForCRL(env, crl);
-  if (!issuer) return new Response(JSON.stringify({ error: "Issuer certificate not found (by AKI/SKI or DN)" }), { status: 400, headers: { "Content-Type": "application/json" } });
+  if (!issuer) return jsonError(400, "issuer_not_found", "Issuer certificate could not be resolved for this CRL.");
 
-  const ok = await verifyCRLWithIssuer(crl, issuer.cert);
-  if (!ok) return new Response(JSON.stringify({ error: "CRL signature invalid for resolved issuer" }), { status: 400, headers: { "Content-Type": "application/json" } });
+  const signatureOk = await verifyCRLWithIssuer(crl, issuer.cert);
+  if (!signatureOk) return jsonError(400, "invalid_signature", "CRL signature validation failed for resolved issuer.");
 
   const friendly = friendlyNameFromCert(issuer.cert)
     .replace(/IssuingCA/gi, "IssuingCA")
     .replace(/RootCA/gi, "RootCA");
   const logicalBase = /Issuing/i.test(friendly) ? "AchaIssuingCA01" : "AchaRootCA";
 
-  // ★ 判断是否 Delta
   const deltaBase = getDeltaBaseCRLNumber(crl);
   const isDelta = deltaBase !== undefined;
 
-  // ★ 根据类型选择不同命名空间
   const folder = isDelta ? "dcrl" : "crl";
   const logicalDERKey = `${folder}/${logicalBase}.crl`;
   const logicalPEMKey = `${folder}/${logicalBase}.crl.pem`;
@@ -465,13 +558,11 @@ const postCRL: RouteHandler = async (req, env) => {
     return aki ? `${folder}/by-keyid/${aki}.crl` : undefined;
   })();
 
-  // 比较“同类最新”
   const existing = await getExistingCRL(env, logicalDERKey);
   if (!isNewerCRL(crl, existing?.parsed)) {
-    return new Response(JSON.stringify({ status: "ignored", reason: isDelta ? "Delta CRL not newer" : "CRL not newer" }), { status: 409, headers: { "Content-Type": "application/json" } });
+    return jsonError(409, "stale_crl", isDelta ? "Delta CRL is not newer than the stored version." : "CRL is not newer than the stored version.");
   }
 
-  // 归档上一版（同类）
   if (existing) {
     const oldNum = getCRLNumber(existing.parsed);
     const oldTag = oldNum !== undefined ? oldNum.toString() : (await sha256Hex(existing.der)).slice(0, 16);
@@ -482,15 +573,15 @@ const postCRL: RouteHandler = async (req, env) => {
     });
   }
 
-  const thisUpd = toJSDate(crl.thisUpdate);
-  const nextUpd = toJSDate(crl.nextUpdate);
-  const crlNum = getCRLNumber(crl);
+  const thisUpdate = toJSDate(crl.thisUpdate);
+  const nextUpdate = toJSDate(crl.nextUpdate);
+  const crlNumber = getCRLNumber(crl);
   const meta: Record<string, string> = {
     issuerCN: getCN(issuer.cert) || "",
     issuerKeyId: getSKIHex(issuer.cert) || "",
-    crlNumber: crlNum !== undefined ? crlNum.toString() : "",
-    thisUpdate: thisUpd ? thisUpd.toISOString() : "",
-    nextUpdate: nextUpd ? nextUpd.toISOString() : "",
+    crlNumber: crlNumber !== undefined ? crlNumber.toString() : "",
+    thisUpdate: thisUpdate ? thisUpdate.toISOString() : "",
+    nextUpdate: nextUpdate ? nextUpdate.toISOString() : "",
     isDelta: String(isDelta),
     baseCRLNumber: isDelta && deltaBase !== undefined ? deltaBase.toString() : "",
   };
@@ -499,44 +590,62 @@ const postCRL: RouteHandler = async (req, env) => {
   await putBinary(env, logicalPEMKey, new TextEncoder().encode(pemText), meta);
   if (byAkiKey) await putBinary(env, byAkiKey, derBytes, meta);
 
-  // ---------- 失效缓存：目录列表 + 元数据 + 文件 ----------
   const cache = caches.default;
   await Promise.allSettled([
     cache.delete(LIST_CACHE_KEYS.CRL),
-    cache.delete(LIST_CACHE_KEYS.DCRL), // ★
+    cache.delete(LIST_CACHE_KEYS.DCRL),
     cache.delete(LIST_CACHE_KEYS.CA),
-    cache.delete(metaCacheKey("/" + logicalDERKey)),
-    cache.delete(metaCacheKey("/" + logicalPEMKey)),
-    ...(byAkiKey ? [cache.delete(metaCacheKey("/" + byAkiKey))] : []),
-    cache.delete(new Request("https://r2cache.internal/api-list?prefix=crl/&delimiter=/")),
-    cache.delete(new Request("https://r2cache.internal/api-list?prefix=dcrl/&delimiter=/")), // ★
+    cache.delete(metaCacheKey(`/${logicalDERKey}`)),
+    cache.delete(metaCacheKey(`/${logicalPEMKey}`)),
+    ...(byAkiKey ? [cache.delete(metaCacheKey(`/${byAkiKey}`))] : []),
+  cache.delete(new Request("https://r2cache.internal/collections/crl/items?prefix=crl/&delimiter=/")),
+  cache.delete(new Request("https://r2cache.internal/collections/dcrl/items?prefix=dcrl/&delimiter=/")),
+  cache.delete(new Request("https://r2cache.internal/collections/ca/items?prefix=ca/&delimiter=/")),
+  cache.delete(new Request("https://r2cache.internal/objects?prefix=crl/&delimiter=/")),
+  cache.delete(new Request("https://r2cache.internal/objects?prefix=dcrl/&delimiter=/")),
   ]);
 
-  return new Response(
-    JSON.stringify({
-      status: "ok",
-      kind: isDelta ? "delta" : "full",
-      stored: { der: logicalDERKey, pem: logicalPEMKey },
-      byAki: byAkiKey || null,
-      crlNumber: meta.crlNumber || null,
-      baseCRLNumber: meta.baseCRLNumber || null,
-      thisUpdate: meta.thisUpdate || null,
-      nextUpdate: meta.nextUpdate || null,
-    }),
-    { status: 201, headers: { "Content-Type": "application/json" } },
-  );
+  const responsePayload = {
+    kind: isDelta ? "delta" : "full",
+    stored: { der: logicalDERKey, pem: logicalPEMKey },
+    byAki: byAkiKey || null,
+    crlNumber: meta.crlNumber || null,
+    baseCRLNumber: meta.baseCRLNumber || null,
+    thisUpdate: meta.thisUpdate || null,
+    nextUpdate: meta.nextUpdate || null,
+  };
+
+  return jsonSuccess(responsePayload, { status: 201 });
 };
 
-/** ---------- /api/list （通用目录列出 + 边缘缓存） ---------- */
-const apiList: RouteHandler = async (req, env) => {
+/** ---------- Object listing (REST + edge cache) ---------- */
+const listObjects: RouteHandler = async (req, env) => {
   const url = new URL(req.url);
-  const prefix = url.searchParams.get("prefix") ?? "";
+  const pathname = url.pathname;
+  const collectionMatch = pathname.match(/^\/api\/v1\/collections\/(ca|crl|dcrl)\/items$/);
+
+  let prefix = url.searchParams.get("prefix") ?? "";
+  let collection: string | null = null;
+  if (collectionMatch) {
+    collection = collectionMatch[1];
+    prefix = `${collection}/`;
+  } else if (pathname !== "/api/v1/objects") {
+    return jsonError(404, "not_found", "Endpoint not found.");
+  }
+
   const delimiter = url.searchParams.get("delimiter") ?? "/";
   const cursor = url.searchParams.get("cursor") ?? undefined;
-  const limit = url.searchParams.get("limit") ? Math.max(1, Math.min(1000, Number(url.searchParams.get("limit")))) : undefined;
+  const limitParam = url.searchParams.get("limit");
+  const limit = limitParam ? Math.max(1, Math.min(1000, Number(limitParam))) : undefined;
 
-  // 构造稳定的虚拟缓存键（不会跟其它路径冲突）
-  const cacheKey = new Request(`https://r2cache.internal/api-list?prefix=${encodeURIComponent(prefix)}&delimiter=${encodeURIComponent(delimiter)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}${limit ? `&limit=${limit}` : ""}`, { method: "GET" });
+  const cacheUrl = new URL(`https://r2cache.internal${collection ? `/collections/${collection}/items` : "/objects"}`);
+  const cacheParams = new URLSearchParams();
+  if (prefix) cacheParams.set("prefix", prefix);
+  if (delimiter) cacheParams.set("delimiter", delimiter);
+  if (cursor) cacheParams.set("cursor", cursor);
+  if (limit) cacheParams.set("limit", String(limit));
+  cacheUrl.search = cacheParams.toString();
+  const cacheKey = new Request(cacheUrl.toString(), { method: "GET" });
 
   const cache = caches.default;
   const hit = await cache.match(cacheKey);
@@ -544,48 +653,69 @@ const apiList: RouteHandler = async (req, env) => {
 
   const list = await env.STORE.list({ prefix, delimiter, cursor, limit });
 
-  const payload = {
-    objects: list.objects.map(o => ({
-      key: o.key,
-      size: (o as any).size ?? 0,
-      etag: (o as any).etag ?? (o as any).httpEtag ?? null,
-      uploaded: (o as any).uploaded instanceof Date ? (o as any).uploaded.toISOString() : null,
-    })),
-    commonPrefixes: list.delimitedPrefixes ?? [],
-    truncated: list.truncated,
-    cursor: list.truncated ? list.cursor : null,
+  const items = list.objects.map(o => ({
+    key: o.key,
+    size: (o as any).size ?? 0,
+    etag: (o as any).etag ?? (o as any).httpEtag ?? null,
+    uploaded: (o as any).uploaded instanceof Date ? (o as any).uploaded.toISOString() : null,
+  }));
+
+  const nextCursor = list.truncated ? list.cursor ?? null : null;
+  const links: Record<string, string> = {
+    self: url.origin + pathname + (url.search ? url.search : ""),
   };
+  if (nextCursor) {
+    const nextParams = new URLSearchParams(url.searchParams);
+    nextParams.set("cursor", nextCursor);
+    if (collectionMatch) nextParams.delete("prefix");
+    else if (!nextParams.has("prefix") && prefix) nextParams.set("prefix", prefix);
+    links.next = url.origin + pathname + `?${nextParams.toString()}`;
+  }
 
-  const headers = new Headers({
-    "content-type": "application/json; charset=utf-8",
-    "cache-control": `public, max-age=${LIST_CACHE_TTL}, s-maxage=${LIST_CACHE_SMAXAGE}, stale-while-revalidate=${LIST_CACHE_SWR}`,
-  });
+  const response = jsonSuccess(
+    {
+      items,
+      prefixes: list.delimitedPrefixes ?? [],
+    },
+    {
+      meta: {
+        prefix,
+        delimiter,
+        truncated: list.truncated,
+        cursor: nextCursor,
+        collection,
+        count: items.length,
+        links,
+      },
+      headers: {
+        "Cache-Control": `public, max-age=${LIST_CACHE_TTL}, s-maxage=${LIST_CACHE_SMAXAGE}, stale-while-revalidate=${LIST_CACHE_SWR}`,
+      },
+    },
+  );
 
-  const resp = new Response(JSON.stringify(payload), { headers, status: 200 });
-  // 放入边缘缓存
-  await cache.put(cacheKey, resp.clone());
-  return resp;
+  await cache.put(cacheKey, response.clone());
+  return response;
 };
 
-/** ---------- 主入口 ---------- */
+/** ---------- Entry point ---------- */
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const { method } = req;
     const url = new URL(req.url);
 
     try {
-      // 1) API —— 目录列出（带缓存）
-      if (method === "GET" && url.pathname === "/api/list") {
-        return apiList(req, env, ctx);
+      // REST: object listing
+      if (method === "GET" && (url.pathname === "/api/v1/objects" || /^\/api\/v1\/collections\/(ca|crl|dcrl)\/items$/.test(url.pathname))) {
+        return listObjects(req, env, ctx);
       }
 
-      // 2) 元数据（带缓存）
-      if (method === "GET" && url.pathname === "/meta") {
-        return getMeta(req, env, ctx);
+      // REST: object metadata
+      if (method === "GET" && /^\/api\/v1\/objects\/.+\/metadata$/.test(url.pathname)) {
+        return getObjectMetadata(req, env, ctx);
       }
 
-      // 3) 文件 GET/HEAD（带内容缓存）
-      if ((method === "GET" || method === "HEAD") && /^\/(ca|crl|dcrl)\//.test(url.pathname)) { // ★ 支持 dcrl
+      // Binary file GET/HEAD (edge cached)
+  if ((method === "GET" || method === "HEAD") && /^\/(ca|crl|dcrl)\//.test(url.pathname)) {
         if (method === "HEAD") {
           const r = await getBinaryOrText(new Request(req, { method: "GET" }), env, ctx);
           return new Response(null, { status: r.status, headers: r.headers });
@@ -593,12 +723,24 @@ export default {
         return getBinaryOrText(req, env, ctx);
       }
 
-      // 4) CRL / Delta CRL 上传（统一入口）
-      if (method === "POST" && url.pathname === "/crl") {
-        return postCRL(req, env, ctx);
+      // REST: CRL / delta CRL upload
+      if (method === "POST" && url.pathname === "/api/v1/crls") {
+        return createCRL(req, env, ctx);
       }
 
-      // 5) 静态资源（首页、CSS、JS）
+      // Legacy endpoints -> helpful error
+      if (url.pathname === "/api/list" || url.pathname === "/meta" || url.pathname === "/crl") {
+        return jsonError(410, "deprecated_endpoint", "This endpoint has moved. Use /api/v1/* equivalents instead.", {
+          details: {
+            list: "/api/v1/objects",
+            collections: "/api/v1/collections/{ca|crl|dcrl}/items",
+            metadata: "/api/v1/objects/{objectKey}/metadata",
+            upload: "/api/v1/crls",
+          },
+        });
+      }
+
+  // Static assets (HTML, CSS, JS)
       return env.ASSETS.fetch(req);
     } catch (e) {
       console.error("Unhandled error:", e);
