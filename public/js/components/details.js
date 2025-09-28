@@ -28,37 +28,38 @@ function computeTemporalStatus(iso) {
   };
 }
 
-function buildMetaSection(meta) {
-  if (!meta) return null;
+function buildMetaSection(resource) {
+  if (!resource || typeof resource !== "object") return null;
+  const attrs = resource.attributes ?? {};
   let sizeValue = null;
-  if (typeof meta.size === "number" && Number.isFinite(meta.size)) {
-    const human = formatBytes(meta.size);
-    const bytes = formatNumber(meta.size);
+  if (typeof attrs.size === "number" && Number.isFinite(attrs.size)) {
+    const human = formatBytes(attrs.size);
+    const bytes = formatNumber(attrs.size);
     sizeValue = human ? `${human} (${bytes} bytes)` : `${bytes} bytes`;
-  } else if (meta.size !== null && meta.size !== undefined) {
-    sizeValue = String(meta.size);
+  } else if (attrs.size !== null && attrs.size !== undefined) {
+    sizeValue = String(attrs.size);
   }
   let uploadedValue = null;
-  if (meta.uploaded) {
-    const when = formatOpensslDate(meta.uploaded);
-    const rel = formatRelativeSeconds((new Date(meta.uploaded).getTime() - Date.now()) / 1000);
+  if (attrs.uploadedAt) {
+    const when = formatOpensslDate(attrs.uploadedAt);
+    const rel = formatRelativeSeconds((new Date(attrs.uploadedAt).getTime() - Date.now()) / 1000);
     uploadedValue = rel ? `${when} (${rel})` : when;
   }
   return createSection("Object", [
-    { label: "Path", value: meta.key ? `/${meta.key}` : null },
-    { label: "Type", value: meta.type },
+    { label: "Path", value: attrs.path ?? (resource.id ? `/${resource.id}` : null) },
+    { label: "Type", value: attrs.objectType },
     { label: "Size", value: sizeValue },
     { label: "Uploaded", value: uploadedValue },
-    { label: "ETag", value: meta.etag },
+    { label: "ETag", value: attrs.etag },
   ]);
 }
 
-function buildCertificateSummary(summary, expiryStatus) {
+function buildCertificateSummary(summary, serialNumberHex, expiryStatus) {
   if (!summary) return null;
   const rows = [
-    { label: "Subject CN", value: summary.subjectCN, skipEmpty: true },
-    { label: "Issuer CN", value: summary.issuerCN, skipEmpty: true },
-    { label: "Serial", value: summary.serialNumberHex ? `0x${summary.serialNumberHex.toUpperCase()}` : null },
+    { label: "Subject CN", value: summary.subjectCommonName, skipEmpty: true },
+    { label: "Issuer CN", value: summary.issuerCommonName, skipEmpty: true },
+    { label: "Serial", value: serialNumberHex ? `0x${serialNumberHex.toUpperCase()}` : null },
     { label: "Not Before", value: formatOpensslDate(summary.notBefore) },
     { label: "Not After", value: formatDateWithRelative(summary.notAfter, expiryStatus?.daysUntil, expiryStatus?.secondsUntil) },
     { label: "Expired", value: typeof expiryStatus?.isExpired === "boolean" ? (expiryStatus.isExpired ? "Yes" : "No") : null },
@@ -67,10 +68,14 @@ function buildCertificateSummary(summary, expiryStatus) {
 }
 
 function buildNameSection(title, name) {
-  if (!name) return null;
+  if (!name || !Array.isArray(name.attributes)) return null;
+  const dn = name.attributes
+    .map(attr => `${attr.shortName ?? attr.oid}=${attr.value}`)
+    .join(", ");
+  const attrs = name.attributes.map(attr => `${attr.shortName ?? attr.oid}=${attr.value}`);
   const rows = [
-    { label: "Distinguished Name", value: name.dn },
-    { label: "Attributes", value: Array.isArray(name.rdns) ? name.rdns.map(r => `${r.shortName ?? r.oid}=${r.value}`) : null },
+    { label: "Distinguished Name", value: dn || null },
+    { label: "Attributes", value: attrs.length ? attrs : null },
   ];
   return createSection(title, rows);
 }
@@ -264,11 +269,11 @@ function buildCertificateSections(details) {
   const sections = [];
   const expirySource = details.validity?.notAfter ?? details.summary?.notAfter ?? null;
   const expiryStatus = computeTemporalStatus(expirySource);
-  const summarySection = buildCertificateSummary(details.summary, expiryStatus);
+  const summarySection = buildCertificateSummary(details.summary, details.serialNumberHex, expiryStatus);
   if (summarySection) sections.push(summarySection);
   const dataSection = createSection("Data", [
     { label: "Version", value: details.version ? `Version ${details.version} (0x${Math.max(0, details.version - 1).toString(16)})` : null },
-    { label: "Serial Number", value: formatSerial(details.serialNumber) },
+    { label: "Serial Number", value: formatSerial(details.serialNumberHex) },
     { label: "Signature Algorithm", value: formatAlgorithm(details.signature?.algorithm) },
   ]);
   if (dataSection) sections.push(dataSection);
@@ -292,7 +297,7 @@ function buildCertificateSections(details) {
 function buildCrlSummary(summary) {
   if (!summary) return null;
   return createSection("Summary", [
-    { label: "Issuer CN", value: summary.issuerCN, skipEmpty: true },
+    { label: "Issuer CN", value: summary.issuerCommonName, skipEmpty: true },
     { label: "CRL Number", value: summary.crlNumber },
     { label: "Entries", value: typeof summary.entryCount === "number" ? formatNumber(summary.entryCount) : summary.entryCount },
     { label: "Delta CRL", value: typeof summary.isDelta === "boolean" ? (summary.isDelta ? "Yes" : "No") : null },
@@ -330,12 +335,19 @@ function buildCrlEntriesSection(entries) {
   } else if (Array.isArray(entries.sample) && entries.sample.length) {
     const lines = entries.sample.map(entry => {
       const serialParts = [];
-      if (entry.serialNumber?.decimal) serialParts.push(entry.serialNumber.decimal);
-      if (entry.serialNumber?.hex) serialParts.push(`0x${entry.serialNumber.hex.toUpperCase()}`);
+      if (entry.serialNumberHex) {
+        try {
+          const decimal = BigInt(`0x${entry.serialNumberHex}`).toString(10);
+          serialParts.push(decimal);
+        } catch (error) {
+          console.warn("serialNumber decimal conversion failed", error);
+        }
+        serialParts.push(`0x${entry.serialNumberHex.toUpperCase()}`);
+      }
       const when = formatOpensslDate(entry.revocationDate);
       const reason = entry.reason ? `reason: ${entry.reason}` : null;
       return [
-        `Serial: ${serialParts.join(" / ")}`,
+        serialParts.length ? `Serial: ${serialParts.join(" / ")}` : null,
         when ? `Revoked: ${when}` : null,
         reason,
       ].filter(Boolean).join(" — ");
@@ -380,58 +392,62 @@ function buildCrlSections(details) {
   return sections;
 }
 
-function buildUnknownSection(details) {
+function buildUnknownSection(payload) {
   const pre = document.createElement("pre");
   pre.className = "detail-raw";
-  pre.textContent = JSON.stringify(details, null, 2);
+  pre.textContent = JSON.stringify(payload, null, 2);
   return pre;
 }
 
-export function buildDetailView(meta) {
+export function buildDetailView(resource) {
   const article = document.createElement("article");
   article.className = "detail-view";
-  if (meta?.type) article.dataset.type = meta.type;
+  const attrs = resource?.attributes ?? {};
+  if (attrs.objectType) article.dataset.type = attrs.objectType;
 
   const header = document.createElement("div");
   header.className = "detail-header";
   const title = document.createElement("div");
   title.className = "detail-title";
-  title.textContent = meta?.type === "certificate"
+  title.textContent = attrs.objectType === "certificate"
     ? "Certificate"
-    : meta?.type === "crl"
+    : attrs.objectType === "crl"
       ? "Certificate Revocation List"
       : "Object";
   header.append(title);
-  if (meta?.details?.summary?.subjectCN) {
+  let highlightValue = null;
+  if (attrs.objectType === "certificate") highlightValue = attrs.certificate?.summary?.subjectCommonName ?? null;
+  else if (attrs.objectType === "crl") highlightValue = attrs.crl?.summary?.issuerCommonName ?? null;
+  if (highlightValue) {
     const highlight = document.createElement("div");
     highlight.className = "detail-highlight";
-    highlight.textContent = meta.details.summary.subjectCN;
-    header.append(highlight);
-  } else if (meta?.details?.summary?.issuerCN && meta.type === "crl") {
-    const highlight = document.createElement("div");
-    highlight.className = "detail-highlight";
-    highlight.textContent = meta.details.summary.issuerCN;
+    highlight.textContent = highlightValue;
     header.append(highlight);
   }
-  if (meta?.key) {
+  const pathValue = attrs.path ?? (resource?.id ? `/${resource.id}` : null);
+  if (pathValue) {
     const path = document.createElement("div");
     path.className = "detail-subtitle";
-    path.textContent = `/${meta.key}`;
+    path.textContent = pathValue;
     header.append(path);
   }
   article.append(header);
 
-  const metaSection = buildMetaSection(meta);
+  const metaSection = buildMetaSection(resource);
   if (metaSection) article.append(metaSection);
 
-  if (meta?.type === "certificate") {
-    const certSections = buildCertificateSections(meta.details);
+  if (attrs.objectType === "certificate") {
+    const certSections = buildCertificateSections(attrs.certificate);
     certSections.forEach(section => article.append(section));
-  } else if (meta?.type === "crl") {
-    const crlSections = buildCrlSections(meta.details);
+  } else if (attrs.objectType === "crl") {
+    const crlSections = buildCrlSections(attrs.crl);
     crlSections.forEach(section => article.append(section));
-  } else if (meta?.details) {
-    article.append(buildUnknownSection(meta.details));
+  } else if (attrs.parseError) {
+    article.append(createSection("Parse Error", [
+      { label: "Message", value: attrs.parseError.message },
+    ]) ?? buildUnknownSection(attrs.parseError));
+  } else {
+    article.append(buildUnknownSection(attrs));
   }
 
   return article;

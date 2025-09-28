@@ -1,12 +1,54 @@
 import * as pkijs from "pkijs";
 import { describeName, bitStringBytes, describeAlgorithm, describeExtensionPresence } from "../utils";
-import { toHex, sha1Hex, sha256Hex, toJSDate, decimalFromHex } from "../format";
+import { toHex, sha1Hex, sha256Hex, toJSDate } from "../format";
 import { SIGNATURE_ALG_NAMES } from "../constants";
 import { getCRLNumber, getDeltaBaseCRLNumber, getCRLAKIHex } from "../parsers";
 import { parseCRLReason } from "../extensions";
 
-export async function buildCRLDetails(crl: pkijs.CertificateRevocationList, der: ArrayBuffer) {
-  const issuer = describeName(crl.issuer);
+export interface CrlEntrySummary {
+  serialNumberHex: string | null;
+  revocationDate: string | null;
+  reason?: string;
+}
+
+export interface CrlMetadata {
+  summary: {
+    issuerCommonName: string | null;
+    crlNumber: string | null;
+    entryCount: number;
+    isDelta: boolean;
+  };
+  issuer: {
+    attributes: ReturnType<typeof describeName>["rdns"];
+  };
+  numbers: {
+    crlNumber: string | null;
+    baseCRLNumber: string | null;
+  };
+  validity: {
+    thisUpdate: string | null;
+    nextUpdate: string | null;
+  };
+  signature: {
+    algorithm: ReturnType<typeof describeAlgorithm>;
+    valueHex: string | null;
+    bitLength: number | null;
+  };
+  fingerprints: {
+    sha1: string | null;
+    sha256: string | null;
+  };
+  authorityKeyIdentifier: string | null;
+  entries: {
+    count: number;
+    sample: CrlEntrySummary[];
+  };
+  extensions: ReturnType<typeof describeExtensionPresence>[];
+  isDelta: boolean;
+}
+
+export async function buildCRLDetails(crl: pkijs.CertificateRevocationList, der: ArrayBuffer): Promise<CrlMetadata> {
+  const issuerDescription = describeName(crl.issuer);
   const thisUpdate = toJSDate(crl.thisUpdate);
   const nextUpdate = toJSDate(crl.nextUpdate);
   const crlNumber = getCRLNumber(crl)?.toString() ?? null;
@@ -15,6 +57,7 @@ export async function buildCRLDetails(crl: pkijs.CertificateRevocationList, der:
   const authorityKeyIdentifier = getCRLAKIHex(crl) || null;
   const signatureAlgorithm = describeAlgorithm(crl.signatureAlgorithm.algorithmId, SIGNATURE_ALG_NAMES);
   const signatureBytes = bitStringBytes(crl.signatureValue);
+  const signatureHex = signatureBytes.length ? toHex(signatureBytes) : null;
   const fingerprints = {
     sha1: await sha1Hex(der),
     sha256: await sha256Hex(der),
@@ -23,22 +66,21 @@ export async function buildCRLDetails(crl: pkijs.CertificateRevocationList, der:
   const sample = revoked.slice(0, 5).map(entry => {
     const serialHex = entry.userCertificate.valueBlock.valueHex ? toHex(entry.userCertificate.valueBlock.valueHex) : null;
     return {
-      serialNumber: {
-        hex: serialHex,
-        decimal: decimalFromHex(serialHex),
-      },
+      serialNumberHex: serialHex,
       revocationDate: toJSDate(entry.revocationDate)?.toISOString() ?? null,
       reason: parseCRLReason(entry.crlEntryExtensions),
     };
   });
   return {
     summary: {
-      issuerCN: issuer.commonName,
+      issuerCommonName: issuerDescription.commonName,
       crlNumber,
       entryCount: revoked.length,
       isDelta,
     },
-    issuer,
+    issuer: {
+      attributes: issuerDescription.rdns,
+    },
     numbers: {
       crlNumber,
       baseCRLNumber,
@@ -49,8 +91,8 @@ export async function buildCRLDetails(crl: pkijs.CertificateRevocationList, der:
     },
     signature: {
       algorithm: signatureAlgorithm,
-      valueHex: toHex(signatureBytes),
-      bitLength: signatureBytes.length * 8,
+      valueHex: signatureHex,
+      bitLength: signatureHex ? signatureBytes.length * 8 : null,
     },
     fingerprints,
     authorityKeyIdentifier,

@@ -1,7 +1,7 @@
 import { fromBER, Sequence, Integer } from "asn1js";
 import * as pkijs from "pkijs";
 import { describeName, bitStringBytes, describeAlgorithm, describeExtensionPresence } from "../utils";
-import { toHex, sha256Hex, sha1Hex, toJSDate, decimalFromHex } from "../format";
+import { toHex, sha256Hex, sha1Hex, toJSDate } from "../format";
 import { KEY_ALG_NAMES, SIGNATURE_ALG_NAMES, CURVE_NAMES } from "../constants";
 import {
   parseBasicConstraints,
@@ -15,20 +15,79 @@ import {
 } from "../extensions";
 import { getSKIHex } from "../parsers";
 
-export async function buildCertificateDetails(cert: pkijs.Certificate, der: ArrayBuffer) {
-  const subject = describeName(cert.subject);
-  const issuer = describeName(cert.issuer);
+export interface DistinguishedNameAttribute {
+  oid: string;
+  name: string;
+  shortName: string | null;
+  value: string;
+}
+
+export interface DistinguishedNameDescriptor {
+  attributes: DistinguishedNameAttribute[];
+}
+
+export interface CertificateSummary {
+  subjectCommonName: string | null;
+  issuerCommonName: string | null;
+  notBefore: string | null;
+  notAfter: string | null;
+}
+
+export interface CertificateMetadata {
+  summary: CertificateSummary;
+  version: number | null;
+  serialNumberHex: string | null;
+  validity: {
+    notBefore: string | null;
+    notAfter: string | null;
+  };
+  subject: DistinguishedNameDescriptor;
+  issuer: DistinguishedNameDescriptor;
+  signature: {
+    algorithm: ReturnType<typeof describeAlgorithm>;
+    valueHex: string | null;
+    bitLength: number | null;
+  };
+  fingerprints: {
+    sha1: string | null;
+    sha256: string | null;
+  };
+  publicKey: {
+    algorithm: ReturnType<typeof describeAlgorithm>;
+    sizeBits: number | null;
+    exponent: number | null;
+    modulusHex: string | null;
+    curveOid: string | null;
+    curveName: string | null;
+    subjectPublicKeyHex: string | null;
+    fingerprints: {
+      sha1: string | null;
+      sha256: string | null;
+    };
+  };
+  extensions: {
+    basicConstraints?: ReturnType<typeof parseBasicConstraints>;
+    keyUsage?: ReturnType<typeof parseKeyUsageExtension>;
+    extendedKeyUsage?: ReturnType<typeof parseExtendedKeyUsage>;
+    subjectAltName?: ReturnType<typeof parseSubjectAltName>;
+    authorityInfoAccess?: ReturnType<typeof parseAuthorityInfoAccess>;
+    crlDistributionPoints?: ReturnType<typeof parseCRLDistributionPoints>;
+    certificatePolicies?: ReturnType<typeof parseCertificatePolicies>;
+    subjectKeyIdentifier: string | null;
+    authorityKeyIdentifier?: ReturnType<typeof parseAuthorityKeyIdentifier>;
+    present: ReturnType<typeof describeExtensionPresence>[];
+  };
+}
+
+export async function buildCertificateDetails(cert: pkijs.Certificate, der: ArrayBuffer): Promise<CertificateMetadata> {
+  const subjectDescription = describeName(cert.subject);
+  const issuerDescription = describeName(cert.issuer);
   const notBefore = toJSDate((cert as any).notBefore);
   const notAfter = toJSDate((cert as any).notAfter);
   const serialHex = cert.serialNumber.valueBlock.valueHex ? toHex(cert.serialNumber.valueBlock.valueHex) : null;
-  const serialDecimal = decimalFromHex(serialHex);
   const signatureAlgorithm = describeAlgorithm(cert.signatureAlgorithm.algorithmId, SIGNATURE_ALG_NAMES);
   const signatureBytes = bitStringBytes(cert.signatureValue);
-  const signature = {
-    algorithm: signatureAlgorithm,
-    valueHex: toHex(signatureBytes),
-    bitLength: signatureBytes.length * 8,
-  };
+  const signatureHex = signatureBytes.length ? toHex(signatureBytes) : null;
 
   const spki = cert.subjectPublicKeyInfo;
   const publicKeyAlgorithm = describeAlgorithm(spki.algorithm.algorithmId, KEY_ALG_NAMES);
@@ -84,24 +143,28 @@ export async function buildCertificateDetails(cert: pkijs.Certificate, der: Arra
 
   return {
     summary: {
-      subjectCN: subject.commonName,
-      issuerCN: issuer.commonName,
-      serialNumberHex: serialHex,
+      subjectCommonName: subjectDescription.commonName,
+      issuerCommonName: issuerDescription.commonName,
       notBefore: notBefore?.toISOString() ?? null,
       notAfter: notAfter?.toISOString() ?? null,
     },
-    version: (cert.version ?? 0) + 1,
-    subject,
-    issuer,
-    serialNumber: {
-      hex: serialHex,
-      decimal: serialDecimal,
-    },
+    version: typeof cert.version === "number" ? cert.version + 1 : null,
+    serialNumberHex: serialHex,
     validity: {
       notBefore: notBefore?.toISOString() ?? null,
       notAfter: notAfter?.toISOString() ?? null,
     },
-    signature,
+    subject: {
+      attributes: subjectDescription.rdns,
+    },
+    issuer: {
+      attributes: issuerDescription.rdns,
+    },
+    signature: {
+      algorithm: signatureAlgorithm,
+      valueHex: signatureHex,
+      bitLength: signatureHex ? signatureBytes.length * 8 : null,
+    },
     fingerprints: {
       sha1: certFingerprintSha1,
       sha256: certFingerprintSha256,
@@ -113,7 +176,7 @@ export async function buildCertificateDetails(cert: pkijs.Certificate, der: Arra
       modulusHex,
       curveOid,
       curveName,
-      subjectPublicKeyHex: toHex(spkBytes),
+      subjectPublicKeyHex: spkBytes.length ? toHex(spkBytes) : null,
       fingerprints: {
         sha1: spkFingerprintSha1,
         sha256: spkFingerprintSha256,
@@ -129,7 +192,7 @@ export async function buildCertificateDetails(cert: pkijs.Certificate, der: Arra
       certificatePolicies,
       subjectKeyIdentifier,
       authorityKeyIdentifier,
-  present: extensions.map(extension => describeExtensionPresence(extension)),
+      present: extensions.map(extension => describeExtensionPresence(extension)),
     },
   };
 }

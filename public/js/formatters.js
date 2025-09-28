@@ -198,9 +198,21 @@ export function createSection(title, rows) {
 
 export function formatSerial(serial) {
   if (!serial) return null;
+  let hex = null;
+  if (typeof serial === "string") hex = serial.replace(/^0x/i, "");
+  else if (typeof serial === "object") {
+    if (typeof serial.hex === "string") hex = serial.hex.replace(/^0x/i, "");
+    else if (typeof serial.value === "string") hex = serial.value.replace(/^0x/i, "");
+  }
+  if (!hex) return null;
   const parts = [];
-  if (serial.decimal) parts.push(`decimal: ${serial.decimal}`);
-  if (serial.hex) parts.push(`hex: 0x${serial.hex.toUpperCase()}`);
+  try {
+    const decimal = BigInt(`0x${hex}`).toString(10);
+    parts.push(`decimal: ${decimal}`);
+  } catch (error) {
+    console.warn("serial decimal conversion failed", error);
+  }
+  parts.push(`hex: 0x${hex.toUpperCase()}`);
   return parts;
 }
 

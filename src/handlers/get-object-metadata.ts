@@ -1,6 +1,6 @@
 import type { RouteHandler } from "../env";
 import { jsonError, jsonSuccess } from "../http/json-response";
-import { getMetaJSON } from "../crl/metadata";
+import { getMetaJSON, type ObjectMetadataResource } from "../crl/metadata";
 import { createMetaCacheKey, getEdgeCache, cacheDurations } from "../config/cache";
 
 export const getObjectMetadata: RouteHandler = async (req, env) => {
@@ -23,7 +23,7 @@ export const getObjectMetadata: RouteHandler = async (req, env) => {
   const cached = await cache.match(cacheKey);
   if (cached) return cached;
 
-  let metadata;
+  let metadata: ObjectMetadataResource | undefined;
   try {
     metadata = await getMetaJSON(env, normalizedKey);
   } catch (error) {
@@ -45,7 +45,8 @@ export const getObjectMetadata: RouteHandler = async (req, env) => {
 
   const response = jsonSuccess(metadata, {
     meta: {
-      key: metadata.key,
+      id: metadata.id,
+      objectType: metadata.attributes.objectType,
       cachedAt: new Date().toISOString(),
     },
     headers: {
