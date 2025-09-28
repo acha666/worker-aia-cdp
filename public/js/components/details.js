@@ -29,6 +29,17 @@ export function computeTemporalStatus(iso) {
   };
 }
 
+function formatStatusRelative(days, seconds) {
+  const secondsValue = typeof seconds === "number" && Number.isFinite(seconds) ? seconds : null;
+  const daysValue = typeof days === "number" && Number.isFinite(days) ? days : null;
+  const preferSubDay = secondsValue !== null && Math.abs(secondsValue) < 86400;
+  if (preferSubDay) {
+    const relSeconds = formatRelativeSeconds(secondsValue);
+    if (relSeconds) return relSeconds;
+  }
+  return formatRelativeDays(daysValue) ?? formatRelativeSeconds(secondsValue);
+}
+
 function createChip(text, { category = "status", tone = "neutral" } = {}) {
   if (!text) return null;
   const span = document.createElement("span");
@@ -59,7 +70,7 @@ function createMetric(label, value) {
 export function describeCertificateStatus(expiryStatus, options = {}) {
   if (!expiryStatus || typeof expiryStatus.isExpired !== "boolean") return null;
   const { soonThresholdDays = 30 } = options;
-  const rel = formatRelativeDays(expiryStatus.daysUntil) ?? formatRelativeSeconds(expiryStatus.secondsUntil);
+  const rel = formatStatusRelative(expiryStatus.daysUntil, expiryStatus.secondsUntil);
   if (expiryStatus.isExpired) {
     return { label: "Expired", variant: "danger", description: rel ?? "Expired" };
   }
@@ -72,7 +83,7 @@ export function describeCertificateStatus(expiryStatus, options = {}) {
 export function describeCrlStatus(nextUpdateStatus, isDelta, options = {}) {
   if (!nextUpdateStatus || typeof nextUpdateStatus.isExpired !== "boolean") return null;
   const { warningThresholdDays = 1 } = options;
-  const rel = formatRelativeDays(nextUpdateStatus.daysUntil) ?? formatRelativeSeconds(nextUpdateStatus.secondsUntil);
+  const rel = formatStatusRelative(nextUpdateStatus.daysUntil, nextUpdateStatus.secondsUntil);
   if (nextUpdateStatus.isExpired) {
     return { label: "Stale", variant: "danger", description: rel ?? "Next update overdue" };
   }

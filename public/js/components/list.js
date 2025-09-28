@@ -21,8 +21,9 @@ function buildStatus(entry) {
     const descriptor = describeCertificateStatus(expiryStatus);
     const node = renderStatusDisplay(descriptor, { detailed: false });
     const lines = [];
+    const dateOptions = { precision: "day" };
     if (summary.notBefore) {
-      const formatted = formatOpensslDate(summary.notBefore);
+      const formatted = formatOpensslDate(summary.notBefore, dateOptions);
       if (formatted) lines.push(`From ${formatted}`);
     }
     if (summary.notAfter) {
@@ -30,7 +31,8 @@ function buildStatus(entry) {
         summary.notAfter,
         expiryStatus?.daysUntil,
         expiryStatus?.secondsUntil,
-      ) ?? formatOpensslDate(summary.notAfter);
+        dateOptions,
+      ) ?? formatOpensslDate(summary.notAfter, dateOptions);
       if (formatted) lines.push(`Until ${formatted}`);
     }
     return { node, lines };
@@ -41,8 +43,9 @@ function buildStatus(entry) {
     const descriptor = describeCrlStatus(nextUpdateStatus, !!summary.isDelta);
     const node = renderStatusDisplay(descriptor, { detailed: false });
     const lines = [];
+    const dateOptions = { precision: "day" };
     if (summary.thisUpdate) {
-      const formatted = formatOpensslDate(summary.thisUpdate);
+      const formatted = formatOpensslDate(summary.thisUpdate, dateOptions);
       if (formatted) lines.push(`Issued ${formatted}`);
     }
     if (summary.nextUpdate) {
@@ -50,7 +53,8 @@ function buildStatus(entry) {
         summary.nextUpdate,
         nextUpdateStatus?.daysUntil,
         nextUpdateStatus?.secondsUntil,
-      ) ?? formatOpensslDate(summary.nextUpdate);
+        dateOptions,
+      ) ?? formatOpensslDate(summary.nextUpdate, dateOptions);
       if (formatted) lines.push(`Next update ${formatted}`);
     }
     return { node, lines };
