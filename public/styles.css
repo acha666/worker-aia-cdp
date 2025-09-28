@@ -235,7 +235,7 @@ pre {
     margin: 0;
     padding: 12px 14px;
     background: var(--code-bg);
-    border-top: 1px solid var(--border)
+    border-top: 1px var(--border)
 }
 
 kbd {
