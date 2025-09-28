@@ -1,5 +1,5 @@
 import type { RouteHandler } from "../env";
-import { getEdgeCache } from "../config/cache";
+import { cacheDurations, createBinaryCacheKey, getEdgeCache } from "../config/cache";
 import { buildHeadersForObject } from "../http/content";
 
 export const getBinaryOrText: RouteHandler = async (req, env) => {
@@ -8,13 +8,22 @@ export const getBinaryOrText: RouteHandler = async (req, env) => {
 
   const key = url.pathname.replace(/^\/+/, "");
   const cache = getEdgeCache();
-  const cacheKey = new Request(url.toString(), { method: "GET" });
+  const cacheKey = createBinaryCacheKey(key, req.method ?? "GET");
 
-  const cached = await cache.match(cacheKey);
-  if (cached) return cached;
+  const cachedResponse = await cache.match(cacheKey);
+  if (cachedResponse) return cachedResponse;
 
   const object = await env.STORE.get(key);
-  if (!object) return new Response("Not Found", { status: 404 });
+  if (!object) {
+    const notFound = new Response("Not Found", {
+      status: 404,
+      headers: {
+        "Cache-Control": `public, max-age=${cacheDurations.META_CACHE_TTL}, s-maxage=${cacheDurations.LIST_CACHE_SMAXAGE}, stale-while-revalidate=${cacheDurations.LIST_CACHE_SWR}`,
+      },
+    });
+    await cache.put(cacheKey, notFound.clone());
+    return notFound;
+  }
 
   const headers = buildHeadersForObject(object, key);
   const response = key.endsWith(".pem")

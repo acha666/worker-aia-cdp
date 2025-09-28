@@ -1,6 +1,6 @@
 import type { RouteHandler } from "../env";
 import { jsonSuccess, jsonError } from "../http/json-response";
-import { getEdgeCache, cacheDurations } from "../config/cache";
+import { cacheDurations, createListCacheKey, getEdgeCache } from "../config/cache";
 import {
   detectSummaryKind,
   readSummaryFromMetadata,
@@ -28,18 +28,12 @@ export const listObjects: RouteHandler = async (req, env, ctx) => {
   const limitParam = url.searchParams.get("limit");
   const limit = limitParam ? Math.max(1, Math.min(1000, Number(limitParam))) : undefined;
 
-  const cacheUrl = new URL(`https://r2cache.internal${collection ? `/collections/${collection}/items` : "/objects"}`);
-  const cacheParams = new URLSearchParams();
-  if (prefix) cacheParams.set("prefix", prefix);
-  if (delimiter) cacheParams.set("delimiter", delimiter);
-  if (cursor) cacheParams.set("cursor", cursor);
-  if (limit) cacheParams.set("limit", String(limit));
-  cacheUrl.search = cacheParams.toString();
-  const cacheKey = new Request(cacheUrl.toString(), { method: "GET" });
-
+  const collectionKey = (collection ?? null) as "ca" | "crl" | "dcrl" | null;
   const cache = getEdgeCache();
-  const hit = await cache.match(cacheKey);
-  if (hit) return hit;
+  const cacheKey = createListCacheKey({ collection: collectionKey, prefix: prefix || undefined, delimiter, cursor, limit });
+
+  const cachedResponse = await cache.match(cacheKey);
+  if (cachedResponse) return cachedResponse;
 
   const list = await env.STORE.list({ prefix, delimiter, cursor, limit, include: ["customMetadata"] } as any);
 
@@ -123,14 +117,14 @@ export const listObjects: RouteHandler = async (req, env, ctx) => {
         if (!shouldFlushCaches) return;
         const cacheInstance = getEdgeCache();
         const targets = [
-          "https://r2cache.internal/collections/ca/items?prefix=ca/&delimiter=/",
-          "https://r2cache.internal/collections/crl/items?prefix=crl/&delimiter=/",
-          "https://r2cache.internal/collections/dcrl/items?prefix=dcrl/&delimiter=/",
-          "https://r2cache.internal/objects?prefix=ca/&delimiter=/",
-          "https://r2cache.internal/objects?prefix=crl/&delimiter=/",
-          "https://r2cache.internal/objects?prefix=dcrl/&delimiter=/",
+          createListCacheKey({ collection: "ca", prefix: "ca/", delimiter: "/" }),
+          createListCacheKey({ collection: "crl", prefix: "crl/", delimiter: "/" }),
+          createListCacheKey({ collection: "dcrl", prefix: "dcrl/", delimiter: "/" }),
+          createListCacheKey({ prefix: "ca/", delimiter: "/" }),
+          createListCacheKey({ prefix: "crl/", delimiter: "/" }),
+          createListCacheKey({ prefix: "dcrl/", delimiter: "/" }),
         ];
-        return Promise.all(targets.map(urlString => cacheInstance.delete(new Request(urlString))));
+        return Promise.all(targets.map(request => cacheInstance.delete(request)));
       }),
     );
   }

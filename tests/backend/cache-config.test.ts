@@ -3,7 +3,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { cacheDurations, createMetaCacheKey, getEdgeCache, listCacheKeys } from "../../src/config/cache";
+import {
+  cacheDurations,
+  createBinaryCacheKey,
+  createListCacheKey,
+  createMetaCacheKey,
+  getEdgeCache,
+  listCacheKeys,
+} from "../../src/config/cache";
 
 class MemoryCache {
   readonly store = new Map<string, Response>();
@@ -47,4 +54,30 @@ test("predefined list cache keys point at expected URLs", () => {
   assert.equal(listCacheKeys.CA.url, "https://r2cache.internal/list?prefix=ca/&delimiter=/");
   assert.equal(listCacheKeys.CRL.url, "https://r2cache.internal/list?prefix=crl/&delimiter=/");
   assert.equal(listCacheKeys.DCRL.url, "https://r2cache.internal/list?prefix=dcrl/&delimiter=/");
+});
+
+test("createBinaryCacheKey normalizes leading slashes and encodes method", () => {
+  const request = createBinaryCacheKey("/ca/root.pem", "head");
+  const url = new URL(request.url);
+  assert.equal(`${url.origin}${url.pathname}`, "https://r2cache.internal/binary");
+  assert.equal(url.searchParams.get("key"), "ca/root.pem");
+  assert.equal(url.searchParams.get("method"), "HEAD");
+  assert.equal(request.method, "GET");
+});
+
+test("createListCacheKey composes cache key for collections and options", () => {
+  const request = createListCacheKey({
+    collection: "crl",
+    prefix: "crl/",
+    delimiter: "/",
+    cursor: "opaque",
+    limit: 25,
+  });
+  const url = new URL(request.url);
+  assert.equal(`${url.origin}${url.pathname}`, "https://r2cache.internal/collections/crl/items");
+  assert.equal(url.searchParams.get("prefix"), "crl/");
+  assert.equal(url.searchParams.get("delimiter"), "/");
+  assert.equal(url.searchParams.get("cursor"), "opaque");
+  assert.equal(url.searchParams.get("limit"), "25");
+  assert.equal(request.method, "GET");
 });

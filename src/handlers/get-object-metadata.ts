@@ -20,8 +20,9 @@ export const getObjectMetadata: RouteHandler = async (req, env) => {
   const normalizedKey = decodedKey.startsWith("/") ? decodedKey : `/${decodedKey}`;
   const cache = getEdgeCache();
   const cacheKey = createMetaCacheKey(normalizedKey);
-  const cached = await cache.match(cacheKey);
-  if (cached) return cached;
+
+  const cachedResponse = await cache.match(cacheKey);
+  if (cachedResponse) return cachedResponse;
 
   let metadata: ObjectMetadataResource | undefined;
   try {
