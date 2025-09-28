@@ -746,9 +746,9 @@ footer {
 }
 
 .detail-extension-flag--critical {
-    background: rgba(209, 36, 47, 0.12);
-    border-color: rgba(209, 36, 47, 0.25);
-    color: #d1242f;
+    background: rgba(154, 103, 0, 0.12);
+    border-color: rgba(154, 103, 0, 0.25);
+    color: #9a6700;
 }
 
 .detail-extension-card__body {
@@ -812,7 +812,7 @@ footer {
 .hex-toggle {
     display: block;
     margin: 0;
-    padding: 4px 0;
+    padding: 0 0;
 }
 
 .hex-toggle summary {
