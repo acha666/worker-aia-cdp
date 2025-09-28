@@ -65,7 +65,9 @@ body {
     background: var(--bg);
     color: var(--fg);
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale
+    -moz-osx-font-smoothing: grayscale;
+    overflow-y: scroll;
+    scrollbar-gutter: stable both-edges
 }
 
 header {
@@ -93,7 +95,7 @@ h2 {
 main {
     max-width: 900px;
     margin: 24px auto;
-    padding: 0 16px
+    padding: 0 16px 64px
 }
 
 section {
@@ -268,16 +270,19 @@ ul.files li:first-child {
 }
 
 .btn-expand-icon {
-    width: 0.55em;
-    height: 0.55em;
+    display: inline-block;
+    width: 0.7em;
+    height: 0.7em;
     border-right: 2px solid currentColor;
     border-bottom: 2px solid currentColor;
-    transform: rotate(45deg);
-    transition: transform .2s ease
+    transform: rotate(-45deg);
+    transform-origin: center;
+    transition: transform .2s ease;
+    flex-shrink: 0
 }
 
 .btn-expand.is-open .btn-expand-icon {
-    transform: rotate(135deg)
+    transform: rotate(45deg)
 }
 
 .loading {
@@ -536,10 +541,10 @@ footer {
 }
 
 .detail-section h3 {
-    margin: 0 0 8px;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
+    margin: 0 0 13px;
+    font-size: 16px;
+    font-weight: 650;
+    letter-spacing: 0.015em;
     text-transform: uppercase;
     color: var(--muted);
 }
@@ -697,30 +702,48 @@ footer {
 
 .hex-toggle {
     display: block;
-    padding: 6px 0;
+    margin: 0;
+    padding: 4px 0;
 }
 
 .hex-toggle summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     cursor: pointer;
     color: var(--link);
     font-weight: 600;
     outline: none;
+    list-style: none;
+    line-height: 1.4;
+    padding: 2px 0;
 }
 
 .hex-toggle summary::marker {
-    font-size: 11px;
-    color: var(--muted);
-    content: '▶ ';
-    transition: transform .2s ease;
+    content: "";
 }
 
-.hex-toggle[open] summary::marker {
-    content: '▼ ';
+.hex-toggle summary::before {
+    content: "";
+    flex-shrink: 0;
+    width: 0.45em;
+    height: 0.45em;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(-45deg);
+    transform-origin: center;
+    transition: transform .2s ease;
+    margin-right: 6px;
+}
+
+.hex-toggle[open] summary::before {
+    transform: rotate(45deg);
 }
 
 .hex-toggle summary:focus-visible {
     outline: 2px solid var(--focus);
     border-radius: 4px;
+    outline-offset: 2px;
 }
 
 .hex-content {

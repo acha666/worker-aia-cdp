@@ -1,4 +1,4 @@
-import { createSection, formatDigest, renderValue } from "../../formatters.js";
+import { createHexValue, createSection, formatDigest, renderValue } from "../../formatters.js";
 import { createChip } from "./status.js";
 
 function describeBasicConstraints(data) {
@@ -191,7 +191,13 @@ export function buildExtensionsSection(extensions) {
   addRow("CRL Distribution Points", crldp);
   addRow("Certificate Policies", describeCertificatePolicies(extensions.certificatePolicies));
   if (extensions.subjectKeyIdentifier) {
-    rows.push({ label: "Subject Key Identifier", value: formatDigest(extensions.subjectKeyIdentifier) });
+    rows.push({
+      label: "Subject Key Identifier",
+      value: createHexValue(extensions.subjectKeyIdentifier, {
+        threshold: 200,
+        previewBytes: 20,
+      }),
+    });
   }
   const authorityKeyIdentifier = describeAuthorityKeyIdentifier(extensions.authorityKeyIdentifier);
   if (authorityKeyIdentifier) rows.push({ label: "Authority Key Identifier", value: decorateExtensionValue(authorityKeyIdentifier) });
