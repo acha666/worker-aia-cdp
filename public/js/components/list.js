@@ -1,24 +1,37 @@
-function createListItem(base, hasDer, hasPem) {
+function createListItem(base, options = {}) {
+  const { hasDer, hasPem, type, label } = options;
   const li = document.createElement("li");
-  const name = base.replace(/^([^/]+)\//, "").replace(/\.(crt|crl)$/i, "");
+  const name = base.replace(/^[^/]+\//, "").replace(/\.(crt|crl)$/i, "");
   const hrefDer = hasDer ? `/${base}` : "";
   const hrefPem = hasPem ? `/${base}.pem` : "";
   const primaryKey = hasDer ? base : `${base}.pem`;
+  const badgeLabel = label ?? (type ? type.toUpperCase() : "Object");
+  const typeClass = type ? ` file-item--${type}` : "";
 
+  li.className = `file-item${typeClass}`;
   li.innerHTML = `
-    <div class="item-left">
-      <div class="item-title">${name}</div>
-      <div class="item-path">${base}</div>
-      <div class="actions">
-        <button class="btn btn-detail" data-key="${primaryKey}">Details</button>
-        <span class="loading" hidden><span class="spinner" aria-hidden="true"></span></span>
+    <div class="file-main">
+      <div class="file-heading">
+        <span class="file-badge">${badgeLabel}</span>
+        <span class="file-name">${name}</span>
       </div>
-      <div class="details" data-panel="${primaryKey}" hidden></div>
+      <div class="file-path">${base}</div>
     </div>
-    <div class="item-right">
-      ${hasDer ? `<a href="${hrefDer}">DER</a>` : ""}
-      ${hasPem ? `<a href="${hrefPem}">PEM</a>` : ""}
+    <div class="file-actions">
+      <div class="file-links" aria-label="Available downloads">
+        ${hasDer ? `<a class="file-link" href="${hrefDer}">DER</a>` : ""}
+        ${hasPem ? `<a class="file-link" href="${hrefPem}">PEM</a>` : ""}
+      </div>
+      <button class="btn btn-expand" data-key="${primaryKey}" aria-expanded="false">
+        <span class="btn-expand-icon" aria-hidden="true"></span>
+        <span class="btn-expand-label">View details</span>
+      </button>
+      <span class="loading" hidden aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        <span class="sr-only">Loading…</span>
+      </span>
     </div>
+    <div class="details detail-container" data-panel="${primaryKey}" hidden></div>
   `;
   return li;
 }
@@ -42,15 +55,36 @@ function createArtifactMap(items, baseExtension, skipPrefixes = []) {
 
 export function renderCertificates(target, items) {
   const entries = createArtifactMap(items, ".crt");
-  entries.forEach(([base, value]) => target.appendChild(createListItem(base, !!value.der, !!value.pem)));
+  entries.forEach(([base, value]) => {
+    target.appendChild(createListItem(base, {
+      hasDer: !!value.der,
+      hasPem: !!value.pem,
+      type: "certificate",
+      label: "Certificate",
+    }));
+  });
 }
 
 export function renderCrls(target, items) {
   const entries = createArtifactMap(items, ".crl", ["crl/archive/", "crl/by-keyid/"]);
-  entries.forEach(([base, value]) => target.appendChild(createListItem(base, !!value.der, !!value.pem)));
+  entries.forEach(([base, value]) => {
+    target.appendChild(createListItem(base, {
+      hasDer: !!value.der,
+      hasPem: !!value.pem,
+      type: "crl",
+      label: "CRL",
+    }));
+  });
 }
 
 export function renderDeltaCrls(target, items) {
   const entries = createArtifactMap(items, ".crl", ["dcrl/archive/", "dcrl/by-keyid/"]);
-  entries.forEach(([base, value]) => target.appendChild(createListItem(base, !!value.der, !!value.pem)));
+  entries.forEach(([base, value]) => {
+    target.appendChild(createListItem(base, {
+      hasDer: !!value.der,
+      hasPem: !!value.pem,
+      type: "delta-crl",
+      label: "Delta CRL",
+    }));
+  });
 }

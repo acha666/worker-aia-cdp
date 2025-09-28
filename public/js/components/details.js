@@ -8,6 +8,7 @@ import {
   createMuted,
   formatDigest,
   createHexValue,
+  createInlinePairs,
   renderValue,
   createSection,
   formatSerial,
@@ -28,117 +29,173 @@ function computeTemporalStatus(iso) {
   };
 }
 
+function createChip(text, { category = "status", tone = "neutral" } = {}) {
+  if (!text) return null;
+  const span = document.createElement("span");
+  const safeCategory = category.replace(/[^a-z0-9-]/gi, "").toLowerCase() || "status";
+  const safeTone = tone.replace(/[^a-z0-9-]/gi, "").toLowerCase() || "neutral";
+  span.className = `detail-chip detail-chip--${safeCategory} detail-chip--${safeCategory}-${safeTone}`;
+  span.textContent = text;
+  return span;
+}
+
+function createMetric(label, value) {
+  if (!label) return null;
+  if (value === null || value === undefined || value === "") return null;
+  const metric = document.createElement("div");
+  metric.className = "detail-metric";
+  const name = document.createElement("span");
+  name.className = "detail-metric__label";
+  name.textContent = label;
+  metric.append(name);
+  const content = document.createElement("span");
+  content.className = "detail-metric__value";
+  if (value instanceof Node) content.append(value);
+  else content.textContent = typeof value === "string" ? value : String(value);
+  metric.append(content);
+  return metric;
+}
+
+function describeCertificateStatus(expiryStatus, options = {}) {
+  if (!expiryStatus || typeof expiryStatus.isExpired !== "boolean") return null;
+  const { soonThresholdDays = 30 } = options;
+  const rel = formatRelativeDays(expiryStatus.daysUntil) ?? formatRelativeSeconds(expiryStatus.secondsUntil);
+  if (expiryStatus.isExpired) {
+    return { label: "Expired", variant: "danger", description: rel ?? "Expired" };
+  }
+  if (typeof expiryStatus.daysUntil === "number" && Number.isFinite(expiryStatus.daysUntil) && expiryStatus.daysUntil <= soonThresholdDays) {
+    return { label: "Expiring soon", variant: "warning", description: rel ?? null };
+  }
+  return { label: "Active", variant: "success", description: rel ?? null };
+}
+
+function describeCrlStatus(nextUpdateStatus, isDelta, options = {}) {
+  if (!nextUpdateStatus || typeof nextUpdateStatus.isExpired !== "boolean") return null;
+  const { warningThresholdDays = 1 } = options;
+  const rel = formatRelativeDays(nextUpdateStatus.daysUntil) ?? formatRelativeSeconds(nextUpdateStatus.secondsUntil);
+  if (nextUpdateStatus.isExpired) {
+    return { label: "Stale", variant: "danger", description: rel ?? "Next update overdue" };
+  }
+  if (typeof nextUpdateStatus.daysUntil === "number" && Number.isFinite(nextUpdateStatus.daysUntil) && nextUpdateStatus.daysUntil <= warningThresholdDays) {
+    return { label: "Updating soon", variant: "warning", description: rel ?? null };
+  }
+  return { label: isDelta ? "Delta current" : "Current", variant: "success", description: rel ?? null };
+}
+
+function renderStatusDisplay(descriptor, { detailed = false } = {}) {
+  if (!descriptor) return null;
+  if (!detailed) return createChip(descriptor.label, { category: "status", tone: descriptor.variant ?? "neutral" });
+  const wrapper = document.createElement("div");
+  wrapper.className = "detail-status";
+  const chip = createChip(descriptor.label, { category: "status", tone: descriptor.variant ?? "neutral" });
+  if (chip) wrapper.append(chip);
+  if (descriptor.description) {
+    const meta = document.createElement("span");
+    meta.className = "detail-status__note";
+    meta.textContent = descriptor.description;
+    wrapper.append(meta);
+  }
+  return wrapper.childElementCount ? wrapper : chip;
+}
+
 function buildMetaSection(resource) {
   if (!resource || typeof resource !== "object") return null;
   const attrs = resource.attributes ?? {};
-  let sizeValue = null;
+  const metrics = [];
   if (typeof attrs.size === "number" && Number.isFinite(attrs.size)) {
     const human = formatBytes(attrs.size);
     const bytes = formatNumber(attrs.size);
-    sizeValue = human ? `${human} (${bytes} bytes)` : `${bytes} bytes`;
+    const value = human ? `${human} (${bytes} bytes)` : `${bytes} bytes`;
+    const metric = createMetric("Size", value);
+    if (metric) metrics.push(metric);
   } else if (attrs.size !== null && attrs.size !== undefined) {
-    sizeValue = String(attrs.size);
+    const metric = createMetric("Size", String(attrs.size));
+    if (metric) metrics.push(metric);
   }
-  let uploadedValue = null;
   if (attrs.uploadedAt) {
     const when = formatOpensslDate(attrs.uploadedAt);
     const rel = formatRelativeSeconds((new Date(attrs.uploadedAt).getTime() - Date.now()) / 1000);
-    uploadedValue = rel ? `${when} (${rel})` : when;
+    const metric = createMetric("Uploaded", rel ? `${when} (${rel})` : when);
+    if (metric) metrics.push(metric);
   }
-  return createSection("Object", [
-    { label: "Path", value: attrs.path ?? (resource.id ? `/${resource.id}` : null) },
-    { label: "Type", value: attrs.objectType },
-    { label: "Size", value: sizeValue },
-    { label: "Uploaded", value: uploadedValue },
-    { label: "ETag", value: attrs.etag },
-  ]);
-}
-
-function buildCertificateSummary(summary, serialNumberHex, expiryStatus) {
-  if (!summary) return null;
-  const rows = [
-    { label: "Subject CN", value: summary.subjectCommonName, skipEmpty: true },
-    { label: "Issuer CN", value: summary.issuerCommonName, skipEmpty: true },
-    { label: "Serial", value: serialNumberHex ? `0x${serialNumberHex.toUpperCase()}` : null },
-    { label: "Not Before", value: formatOpensslDate(summary.notBefore) },
-    { label: "Not After", value: formatDateWithRelative(summary.notAfter, expiryStatus?.daysUntil, expiryStatus?.secondsUntil) },
-    { label: "Expired", value: typeof expiryStatus?.isExpired === "boolean" ? (expiryStatus.isExpired ? "Yes" : "No") : null },
-  ];
-  return createSection("Summary", rows);
-}
-
-function buildNameSection(title, name) {
-  if (!name || !Array.isArray(name.attributes)) return null;
-  const dn = name.attributes
-    .map(attr => `${attr.shortName ?? attr.oid}=${attr.value}`)
-    .join(", ");
-  const attrs = name.attributes.map(attr => `${attr.shortName ?? attr.oid}=${attr.value}`);
-  const rows = [
-    { label: "Distinguished Name", value: dn || null },
-    { label: "Attributes", value: attrs.length ? attrs : null },
-  ];
-  return createSection(title, rows);
-}
-
-function buildValiditySection(validity, expiryStatus) {
-  if (!validity) return null;
-  const rows = [
-    { label: "Not Before", value: formatOpensslDate(validity.notBefore) },
-    { label: "Not After", value: formatDateWithRelative(validity.notAfter, expiryStatus?.daysUntil, expiryStatus?.secondsUntil) },
-    { label: "Days Until Expiry", value: typeof expiryStatus?.daysUntil === "number" && Number.isFinite(expiryStatus.daysUntil) ? expiryStatus.daysUntil : null, skipEmpty: true },
-    { label: "Seconds Until Expiry", value: typeof expiryStatus?.secondsUntil === "number" && Number.isFinite(expiryStatus.secondsUntil) ? expiryStatus.secondsUntil : null, skipEmpty: true },
-    { label: "Expired", value: typeof expiryStatus?.isExpired === "boolean" ? (expiryStatus.isExpired ? "Yes" : "No") : null },
-  ];
-  return createSection("Validity", rows);
-}
-
-function buildFingerprintsSection(fingerprints, title) {
-  if (!fingerprints) return null;
-  const rows = Object.entries(fingerprints).map(([algo, hex]) => ({
-    label: algo.toUpperCase(),
-    value: formatDigest(hex),
-  }));
-  return createSection(title, rows);
-}
-
-function buildSignatureSection(signature) {
-  if (!signature) return null;
-  return createSection("Signature", [
-    { label: "Algorithm", value: formatAlgorithm(signature.algorithm) },
-    { label: "Bit Length", value: signature.bitLength ? `${signature.bitLength} bits` : null },
-    { label: "Signature Value", value: createHexValue(signature.valueHex, { summary: "Signature", bitLength: signature.bitLength, bytesPerRow: 18 }) },
-  ]);
-}
-
-function buildPublicKeySection(publicKey, extensions) {
-  if (!publicKey) return null;
-  const rows = [
-    { label: "Algorithm", value: formatAlgorithm(publicKey.algorithm) },
-    { label: "Key Size", value: typeof publicKey.sizeBits === "number" ? `${publicKey.sizeBits} bits` : null },
-  ];
-  if (publicKey.exponent) rows.push({ label: "Exponent", value: publicKey.exponent });
-  if (publicKey.curveName || publicKey.curveOid) {
-    const curve = publicKey.curveName && publicKey.curveOid && publicKey.curveName !== publicKey.curveOid
-      ? `${publicKey.curveName} (${publicKey.curveOid})`
-      : publicKey.curveName ?? publicKey.curveOid;
-    rows.push({ label: "Curve", value: curve });
+  if (attrs.etag) {
+    const metric = createMetric("ETag", attrs.etag);
+    if (metric) metrics.push(metric);
   }
-  if (extensions?.subjectKeyIdentifier) {
-    rows.push({ label: "Subject Key Identifier", value: formatDigest(extensions.subjectKeyIdentifier) });
-  }
-  if (publicKey.fingerprints) {
-    rows.push({
-      label: "Fingerprints",
-      value: Object.entries(publicKey.fingerprints).map(([algo, hex]) => `${algo.toUpperCase()}: ${formatDigest(hex)}`),
+  if (!metrics.length) return null;
+  const container = document.createElement("div");
+  container.className = "detail-metrics";
+  metrics.forEach(metric => container.append(metric));
+  return container;
+}
+
+function buildCertificateSummary(summary, validity, serialNumberHex, expiryStatus) {
+  if (!summary && !validity) return null;
+  const rows = [];
+  if (summary?.subjectCommonName) rows.push({ label: "Subject", value: summary.subjectCommonName });
+  if (summary?.issuerCommonName) rows.push({ label: "Issuer", value: summary.issuerCommonName });
+  if (serialNumberHex) rows.push({ label: "Serial (hex)", value: `0x${serialNumberHex.toUpperCase()}` });
+  const notBefore = validity?.notBefore ?? summary?.notBefore ?? null;
+  const notAfter = validity?.notAfter ?? summary?.notAfter ?? null;
+  rows.push({ label: "Valid from", value: formatOpensslDate(notBefore) });
+  rows.push({ label: "Valid until", value: formatDateWithRelative(notAfter, expiryStatus?.daysUntil, expiryStatus?.secondsUntil) });
+  const statusDescriptor = describeCertificateStatus(expiryStatus);
+  if (statusDescriptor) rows.push({ label: "Status", value: renderStatusDisplay(statusDescriptor, { detailed: true }) });
+  return createSection("Overview", rows);
+}
+
+function createNameBlock(title, descriptor) {
+  if (!descriptor) return null;
+  const attributes = Array.isArray(descriptor.attributes) ? descriptor.attributes : [];
+  const block = document.createElement("div");
+  block.className = "detail-card";
+  const heading = document.createElement("div");
+  heading.className = "detail-card__title";
+  heading.textContent = title;
+  block.append(heading);
+  if (attributes.length) {
+    const list = document.createElement("dl");
+    list.className = "detail-card__pairs";
+    const formatLabel = (attr) => {
+      if (attr?.name) {
+        return attr.name
+          .replace(/([A-Z])/g, " $1")
+          .replace(/^./, char => char.toUpperCase())
+          .replace(/\bOf\b/g, "of")
+          .replace(/\bOr\b/g, "or");
+      }
+      if (attr?.shortName) return attr.shortName;
+      return attr?.oid ?? "";
+    };
+    attributes.forEach(attr => {
+      const dt = document.createElement("dt");
+      dt.textContent = formatLabel(attr);
+      const dd = document.createElement("dd");
+      dd.textContent = attr.value;
+      list.append(dt, dd);
     });
+    block.append(list);
   }
-  if (publicKey.modulusHex) {
-    rows.push({ label: "Modulus", value: createHexValue(publicKey.modulusHex, { summary: "Modulus", bitLength: publicKey.sizeBits, bytesPerRow: 16 }) });
-  }
-  if (publicKey.subjectPublicKeyHex) {
-    rows.push({ label: "Subject Public Key", value: createHexValue(publicKey.subjectPublicKeyHex, { summary: "Subject Public Key", bitLength: publicKey.sizeBits, bytesPerRow: 16 }) });
-  }
-  return createSection("Subject Public Key Info", rows);
+  return block.childElementCount > 1 ? block : null;
+}
+
+function buildIdentitySection(subject, issuer) {
+  const blocks = [];
+  const subjectBlock = createNameBlock("Subject", subject);
+  if (subjectBlock) blocks.push(subjectBlock);
+  const issuerBlock = createNameBlock("Issuer", issuer);
+  if (issuerBlock) blocks.push(issuerBlock);
+  if (!blocks.length) return null;
+  const section = document.createElement("div");
+  section.className = "detail-section detail-section--composite";
+  const heading = document.createElement("h3");
+  heading.textContent = blocks.length === 2 ? "Identity" : (subjectBlock ? "Subject" : "Issuer");
+  section.append(heading);
+  const grid = document.createElement("div");
+  grid.className = "detail-composite-grid";
+  blocks.forEach(block => grid.append(block));
+  section.append(grid);
+  return section;
 }
 
 function describeBasicConstraints(data) {
@@ -152,61 +209,97 @@ function describeBasicConstraints(data) {
 
 function describeKeyUsage(data) {
   if (!data) return null;
-  const lines = [data.critical ? "critical" : "not critical"];
-  if (Array.isArray(data.enabled) && data.enabled.length) lines.push(`enabled: ${data.enabled.join(", ")}`);
-  if (data.rawHex) lines.push(createHexValue(data.rawHex, { summary: "Raw Bits", threshold: 80, bytesPerRow: 8 }));
-  return lines;
+  // If it's already an array of usages, return it directly
+  if (Array.isArray(data)) return data.length ? data : null;
+
+  // If it's an object of boolean flags, map to human-friendly labels
+  if (typeof data === "object") {
+    const mapping = {
+      digitalSignature: "Digital Signature",
+      nonRepudiation: "Non Repudiation",
+      keyEncipherment: "Key Encipherment",
+      dataEncipherment: "Data Encipherment",
+      keyAgreement: "Key Agreement",
+      keyCertSign: "Certificate Signing",
+      cRLSign: "CRL Signing",
+      encipherOnly: "Encipher Only",
+      decipherOnly: "Decipher Only",
+    };
+    const items = Object.entries(mapping)
+      .filter(([key]) => !!data[key])
+      .map(([, label]) => label);
+    return items.length ? items : null;
+  }
+
+  return null;
 }
 
 function describeExtendedKeyUsage(data) {
   if (!data) return null;
-  const lines = [data.critical ? "critical" : "not critical"];
+  if (Array.isArray(data)) return data.length ? data : null;
+  const lines = [];
+  if (typeof data.critical === "boolean") lines.push(data.critical ? "critical" : "not critical");
   if (Array.isArray(data.usages) && data.usages.length) lines.push(`usages: ${data.usages.join(", ")}`);
   if (Array.isArray(data.oids) && data.oids.length) lines.push(`oids: ${data.oids.join(", ")}`);
-  return lines;
+  if (Array.isArray(data.other) && data.other.length) lines.push(...data.other.map(item => `${item.oid ?? "other"}: ${item.value ?? ""}`.trim()));
+  return lines.length ? lines : null;
 }
 
 function describeSubjectAltName(data) {
   if (!data) return null;
-  const lines = [data.critical ? "critical" : "not critical"];
-  if (Array.isArray(data.dnsNames) && data.dnsNames.length) lines.push(`DNS: ${data.dnsNames.join(", ")}`);
-  if (Array.isArray(data.emailAddresses) && data.emailAddresses.length) lines.push(`Email: ${data.emailAddresses.join(", ")}`);
-  if (Array.isArray(data.ipAddresses) && data.ipAddresses.length) lines.push(`IP: ${data.ipAddresses.join(", ")}`);
-  if (Array.isArray(data.uris) && data.uris.length) lines.push(`URI: ${data.uris.join(", ")}`);
+  if (Array.isArray(data)) return data.length ? data : null;
+  const lines = [];
+  if (typeof data.critical === "boolean") lines.push(data.critical ? "critical" : "not critical");
+  const addList = (label, values) => {
+    if (Array.isArray(values) && values.length) lines.push(`${label}: ${values.join(", ")}`);
+  };
+  addList("DNS", data.dnsNames);
+  addList("Email", data.emailAddresses);
+  addList("IP", data.ipAddresses);
+  addList("URI", data.uris);
   if (Array.isArray(data.directoryNames) && data.directoryNames.length) {
-    lines.push(...data.directoryNames.map(entry => `DirName: ${entry.dn}`));
+    lines.push(...data.directoryNames.map(entry => `DirName: ${entry.dn ?? entry}`));
   }
   if (Array.isArray(data.registeredIds) && data.registeredIds.length) lines.push(`Registered IDs: ${data.registeredIds.join(", ")}`);
   if (Array.isArray(data.otherNames) && data.otherNames.length) {
-    lines.push(...data.otherNames.map(entry => `OtherName ${entry.oid}: ${formatDigest(entry.valueHex) ?? entry.valueHex}`));
+    lines.push(...data.otherNames.map(entry => `OtherName ${entry.oid}: ${formatDigest(entry.valueHex) ?? entry.valueHex ?? ""}`.trim()));
   }
-  return lines;
+  return lines.length ? lines : null;
 }
 
 function describeAuthorityInfoAccess(data) {
   if (!data) return null;
-  const lines = [data.critical ? "critical" : "not critical"];
+  if (Array.isArray(data)) return data.length ? data : null;
+  const lines = [];
+  if (typeof data.critical === "boolean") lines.push(data.critical ? "critical" : "not critical");
   if (Array.isArray(data.ocsp) && data.ocsp.length) lines.push(`OCSP: ${data.ocsp.join(", ")}`);
   if (Array.isArray(data.caIssuers) && data.caIssuers.length) lines.push(`CA Issuers: ${data.caIssuers.join(", ")}`);
   if (Array.isArray(data.other) && data.other.length) {
     for (const entry of data.other) {
-      lines.push(`${entry.method}: ${entry.locations.join(", ")}`);
+      const method = entry.method ?? "method";
+      if (Array.isArray(entry.locations) && entry.locations.length) {
+        lines.push(`${method}: ${entry.locations.join(", ")}`);
+      }
     }
   }
-  return lines;
+  return lines.length ? lines : null;
 }
 
 function describeCRLDP(data) {
   if (!data) return null;
-  const lines = [data.critical ? "critical" : "not critical"];
+  if (Array.isArray(data)) return data.length ? data : null;
+  const lines = [];
+  if (typeof data.critical === "boolean") lines.push(data.critical ? "critical" : "not critical");
   if (Array.isArray(data.urls) && data.urls.length) lines.push(`URLs: ${data.urls.join(", ")}`);
   if (Array.isArray(data.directoryNames) && data.directoryNames.length) lines.push(`Directory Names: ${data.directoryNames.join(", ")}`);
-  return lines;
+  return lines.length ? lines : null;
 }
 
 function describeCertificatePolicies(data) {
   if (!data) return null;
-  const lines = [data.critical ? "critical" : "not critical"];
+  if (Array.isArray(data)) return data.length ? data : null;
+  const lines = [];
+  if (typeof data.critical === "boolean") lines.push(data.critical ? "critical" : "not critical");
   if (Array.isArray(data.items) && data.items.length) {
     for (const item of data.items) {
       const qualifierText = Array.isArray(item.qualifiers) && item.qualifiers.length
@@ -215,16 +308,84 @@ function describeCertificatePolicies(data) {
       lines.push(`${item.oid}${qualifierText}`);
     }
   }
-  return lines;
+  return lines.length ? lines : null;
 }
 
 function describeAuthorityKeyIdentifier(data) {
   if (!data) return null;
-  const lines = [data.critical ? "critical" : "not critical"];
+  if (typeof data === "string") return [data];
+  const lines = [];
+  if (typeof data.critical === "boolean") lines.push(data.critical ? "critical" : "not critical");
   if (data.keyIdentifier) lines.push(`keyIdentifier: ${formatDigest(data.keyIdentifier) ?? data.keyIdentifier}`);
   if (Array.isArray(data.authorityCertIssuer) && data.authorityCertIssuer.length) lines.push(`authorityCertIssuer: ${data.authorityCertIssuer.join(", ")}`);
-  if (data.authorityCertSerialNumber) lines.push(`authorityCertSerialNumber: 0x${data.authorityCertSerialNumber.toUpperCase()}`);
-  return lines;
+  if (data.authorityCertSerialNumber) lines.push(`authorityCertSerialNumber: 0x${String(data.authorityCertSerialNumber).toUpperCase()}`);
+  return lines.length ? lines : null;
+}
+
+function buildCertificateCryptoSection(details) {
+  if (!details) return null;
+  const rows = [];
+  const publicKey = details.publicKey ?? {};
+
+  if (publicKey.algorithm) rows.push({ label: "Public key algorithm", value: formatAlgorithm(publicKey.algorithm) });
+  if (typeof publicKey.sizeBits === "number" && Number.isFinite(publicKey.sizeBits)) {
+    rows.push({ label: "Key size", value: `${publicKey.sizeBits} bits` });
+  }
+  if (typeof publicKey.exponent === "number" && Number.isFinite(publicKey.exponent)) {
+    rows.push({ label: "Exponent", value: publicKey.exponent });
+  }
+  if (publicKey.curveName || publicKey.curveOid) {
+    const curve = publicKey.curveName && publicKey.curveOid && publicKey.curveName !== publicKey.curveOid
+      ? `${publicKey.curveName} (${publicKey.curveOid})`
+      : publicKey.curveName ?? publicKey.curveOid;
+    rows.push({ label: "Curve", value: curve });
+  }
+  if (publicKey.fingerprints) {
+    const pairs = Object.entries(publicKey.fingerprints)
+      .filter(([, hex]) => !!hex)
+      .map(([algo, hex]) => ({
+        label: algo.toUpperCase(),
+        value: formatDigest(hex) ?? hex,
+        valueClass: "detail-inline-pair__value--mono",
+      }));
+    const fingerprintNode = createInlinePairs(pairs);
+    if (fingerprintNode) rows.push({ label: "Public key fingerprints", value: fingerprintNode });
+  }
+  if (publicKey.modulusHex) {
+    rows.push({
+      label: "Modulus",
+      value: createHexValue(publicKey.modulusHex, { summary: "Modulus", bitLength: publicKey.sizeBits, bytesPerRow: 16 }),
+    });
+  }
+  if (publicKey.subjectPublicKeyHex) {
+    rows.push({
+      label: "Subject public key",
+      value: createHexValue(publicKey.subjectPublicKeyHex, { summary: "Subject public key", bitLength: publicKey.sizeBits, bytesPerRow: 16 }),
+    });
+  }
+
+  if (details.extensions?.subjectKeyIdentifier) {
+    rows.push({ label: "Subject key identifier", value: formatDigest(details.extensions.subjectKeyIdentifier) });
+  }
+  if (details.fingerprints) {
+    const pairs = Object.entries(details.fingerprints)
+      .filter(([, hex]) => !!hex)
+      .map(([algo, hex]) => ({
+        label: algo.toUpperCase(),
+        value: formatDigest(hex) ?? hex,
+        valueClass: "detail-inline-pair__value--mono",
+      }));
+    const certificateFingerprints = createInlinePairs(pairs);
+    if (certificateFingerprints) rows.push({ label: "Certificate fingerprints", value: certificateFingerprints });
+  }
+  if (details.signature) {
+    rows.push({ label: "Signature algorithm", value: formatAlgorithm(details.signature.algorithm) });
+    rows.push({
+      label: "Signature",
+      value: createHexValue(details.signature.valueHex, { summary: "Signature", bitLength: details.signature.bitLength, bytesPerRow: 18 }),
+    });
+  }
+  return rows.length ? createSection("Cryptography", rows) : null;
 }
 
 function describeExtensionPresence(entries) {
@@ -239,90 +400,97 @@ function describeExtensionPresence(entries) {
   return items.length ? items : null;
 }
 
+function decorateExtensionValue(value) {
+  if (!value) return value;
+  if (Array.isArray(value) && value.length) {
+    const [first, ...rest] = value;
+    if (typeof first === "string") {
+      const normalized = first.toLowerCase();
+      if (normalized === "critical" || normalized === "not critical") {
+        const container = document.createElement("div");
+        container.className = "detail-extension";
+        const chip = createChip(normalized === "critical" ? "Critical" : "Not critical", {
+          category: "extension",
+          tone: normalized === "critical" ? "danger" : "neutral",
+        });
+        if (chip) container.append(chip);
+        if (rest.length) {
+          const remainder = renderValue(rest, true);
+          if (remainder) {
+            remainder.classList?.add?.("detail-extension__list");
+            container.append(remainder);
+          }
+        }
+        return container.childElementCount ? container : chip;
+      }
+    }
+  }
+  return value;
+}
+
 function buildExtensionsSection(extensions) {
   if (!extensions) return null;
   const rows = [];
-  const basicConstraints = describeBasicConstraints(extensions.basicConstraints);
-  if (basicConstraints) rows.push({ label: "Basic Constraints", value: basicConstraints });
-  const keyUsage = describeKeyUsage(extensions.keyUsage);
-  if (keyUsage) rows.push({ label: "Key Usage", value: keyUsage });
-  const eku = describeExtendedKeyUsage(extensions.extendedKeyUsage);
-  if (eku) rows.push({ label: "Extended Key Usage", value: eku });
-  const san = describeSubjectAltName(extensions.subjectAltName);
-  if (san) rows.push({ label: "Subject Alternative Name", value: san });
+  const addRow = (label, rawValue) => {
+    if (!rawValue) return;
+    const value = decorateExtensionValue(rawValue);
+    if (value) rows.push({ label, value });
+  };
+  addRow("Basic Constraints", describeBasicConstraints(extensions.basicConstraints));
+  addRow("Key Usage", describeKeyUsage(extensions.keyUsage));
+  addRow("Extended Key Usage", describeExtendedKeyUsage(extensions.extendedKeyUsage));
+  addRow("Subject Alternative Name", describeSubjectAltName(extensions.subjectAltName));
   const aia = describeAuthorityInfoAccess(extensions.authorityInfoAccess);
-  if (aia) rows.push({ label: "Authority Information Access", value: aia });
+  addRow("Authority Information Access", aia);
   const crldp = describeCRLDP(extensions.crlDistributionPoints);
-  if (crldp) rows.push({ label: "CRL Distribution Points", value: crldp });
-  const policies = describeCertificatePolicies(extensions.certificatePolicies);
-  if (policies) rows.push({ label: "Certificate Policies", value: policies });
-  if (extensions.subjectKeyIdentifier) rows.push({ label: "Subject Key Identifier", value: formatDigest(extensions.subjectKeyIdentifier) });
+  addRow("CRL Distribution Points", crldp);
+  addRow("Certificate Policies", describeCertificatePolicies(extensions.certificatePolicies));
+  if (extensions.subjectKeyIdentifier) {
+    rows.push({ label: "Subject Key Identifier", value: formatDigest(extensions.subjectKeyIdentifier) });
+  }
   const authorityKeyIdentifier = describeAuthorityKeyIdentifier(extensions.authorityKeyIdentifier);
-  if (authorityKeyIdentifier) rows.push({ label: "Authority Key Identifier", value: authorityKeyIdentifier });
+  if (authorityKeyIdentifier) rows.push({ label: "Authority Key Identifier", value: decorateExtensionValue(authorityKeyIdentifier) });
   const present = describeExtensionPresence(extensions.present);
   if (present) rows.push({ label: "Present Extensions", value: present });
   return rows.length ? createSection("Extensions", rows) : null;
 }
 
-function buildCertificateSections(details) {
+function buildCertificateSections(details, expiryStatus) {
   if (!details) return [];
   const sections = [];
-  const expirySource = details.validity?.notAfter ?? details.summary?.notAfter ?? null;
-  const expiryStatus = computeTemporalStatus(expirySource);
-  const summarySection = buildCertificateSummary(details.summary, details.serialNumberHex, expiryStatus);
+  const summarySection = buildCertificateSummary(details.summary, details.validity, details.serialNumberHex, expiryStatus);
   if (summarySection) sections.push(summarySection);
-  const dataSection = createSection("Data", [
+  const identitySection = buildIdentitySection(details.subject, details.issuer);
+  if (identitySection) sections.push(identitySection);
+  const dataSection = createSection("Details", [
     { label: "Version", value: details.version ? `Version ${details.version} (0x${Math.max(0, details.version - 1).toString(16)})` : null },
-    { label: "Serial Number", value: formatSerial(details.serialNumberHex) },
-    { label: "Signature Algorithm", value: formatAlgorithm(details.signature?.algorithm) },
+    { label: "Serial number", value: formatSerial(details.serialNumberHex) },
   ]);
   if (dataSection) sections.push(dataSection);
-  const validitySection = buildValiditySection(details.validity, expiryStatus);
-  if (validitySection) sections.push(validitySection);
-  const issuerSection = buildNameSection("Issuer", details.issuer);
-  if (issuerSection) sections.push(issuerSection);
-  const subjectSection = buildNameSection("Subject", details.subject);
-  if (subjectSection) sections.push(subjectSection);
-  const publicKeySection = buildPublicKeySection(details.publicKey, details.extensions);
-  if (publicKeySection) sections.push(publicKeySection);
-  const fingerprintsSection = buildFingerprintsSection(details.fingerprints, "Certificate Fingerprints");
-  if (fingerprintsSection) sections.push(fingerprintsSection);
-  const signatureSection = buildSignatureSection(details.signature);
-  if (signatureSection) sections.push(signatureSection);
+  const cryptoSection = buildCertificateCryptoSection(details);
+  if (cryptoSection) sections.push(cryptoSection);
   const extensionsSection = buildExtensionsSection(details.extensions);
   if (extensionsSection) sections.push(extensionsSection);
   return sections;
 }
 
-function buildCrlSummary(summary) {
-  if (!summary) return null;
-  return createSection("Summary", [
-    { label: "Issuer CN", value: summary.issuerCommonName, skipEmpty: true },
-    { label: "CRL Number", value: summary.crlNumber },
-    { label: "Entries", value: typeof summary.entryCount === "number" ? formatNumber(summary.entryCount) : summary.entryCount },
-    { label: "Delta CRL", value: typeof summary.isDelta === "boolean" ? (summary.isDelta ? "Yes" : "No") : null },
-  ]);
-}
-
-function buildCrlValiditySection(validity, nextUpdateStatus) {
-  if (!validity) return null;
-  const rows = [
-    { label: "This Update", value: formatOpensslDate(validity.thisUpdate) },
-    { label: "Next Update", value: formatDateWithRelative(validity.nextUpdate, nextUpdateStatus?.daysUntil, nextUpdateStatus?.secondsUntil) },
-    { label: "Seconds Until Next Update", value: typeof nextUpdateStatus?.secondsUntil === "number" && Number.isFinite(nextUpdateStatus.secondsUntil) ? nextUpdateStatus.secondsUntil : null, skipEmpty: true },
-    { label: "Expired", value: typeof nextUpdateStatus?.isExpired === "boolean" ? (nextUpdateStatus.isExpired ? "Yes" : "No") : null },
-  ];
-  return createSection("Validity", rows);
-}
-
-function buildCrlNumbersSection(numbers, isDelta) {
-  if (!numbers) return null;
-  const rows = [
-    { label: "CRL Number", value: numbers.crlNumber },
-    { label: "Base CRL Number", value: numbers.baseCRLNumber, skipEmpty: true },
-    { label: "Delta CRL", value: typeof isDelta === "boolean" ? (isDelta ? "Yes" : "No") : null },
-  ];
-  return createSection("Numbers", rows);
+function buildCrlSummary(summary, validity, numbers, nextUpdateStatus, isDelta) {
+  if (!summary && !validity) return null;
+  const rows = [];
+  if (summary?.issuerCommonName) rows.push({ label: "Issuer", value: summary.issuerCommonName });
+  const crlNumber = numbers?.crlNumber ?? summary?.crlNumber ?? null;
+  if (crlNumber) rows.push({ label: "CRL number", value: crlNumber });
+  if (numbers?.baseCRLNumber) rows.push({ label: "Base CRL number", value: numbers.baseCRLNumber });
+  const thisUpdate = validity?.thisUpdate ?? null;
+  const nextUpdate = validity?.nextUpdate ?? null;
+  rows.push({ label: "This update", value: formatOpensslDate(thisUpdate) });
+  rows.push({ label: "Next update", value: formatDateWithRelative(nextUpdate, nextUpdateStatus?.daysUntil, nextUpdateStatus?.secondsUntil) });
+  const entryCount = typeof summary?.entryCount === "number" ? formatNumber(summary.entryCount) : summary?.entryCount;
+  if (entryCount !== undefined && entryCount !== null) rows.push({ label: "Entries", value: entryCount });
+  if (typeof isDelta === "boolean") rows.push({ label: "Type", value: isDelta ? "Delta" : "Base" });
+  const statusDescriptor = describeCrlStatus(nextUpdateStatus, isDelta);
+  if (statusDescriptor) rows.push({ label: "Status", value: renderStatusDisplay(statusDescriptor, { detailed: true }) });
+  return createSection("Overview", rows);
 }
 
 function buildCrlEntriesSection(entries) {
@@ -364,27 +532,45 @@ function buildCrlExtensionsSection(extensions) {
   return createSection("Extensions", [{ label: "Present", value: present }]);
 }
 
-function buildCrlSections(details) {
+function buildCrlSections(details, nextUpdateStatus) {
   if (!details) return [];
   const sections = [];
-  const summarySection = buildCrlSummary(details.summary);
+  const summarySection = buildCrlSummary(details.summary, details.validity, details.numbers, nextUpdateStatus, details.isDelta);
   if (summarySection) sections.push(summarySection);
-  const issuerSection = buildNameSection("Issuer", details.issuer);
-  if (issuerSection) sections.push(issuerSection);
-  const numbersSection = buildCrlNumbersSection(details.numbers, details.isDelta);
-  if (numbersSection) sections.push(numbersSection);
-  const nextUpdateStatus = computeTemporalStatus(details.validity?.nextUpdate ?? null);
-  const validitySection = buildCrlValiditySection(details.validity, nextUpdateStatus);
-  if (validitySection) sections.push(validitySection);
+  const identitySection = buildIdentitySection(null, details.issuer);
+  if (identitySection) sections.push(identitySection);
   if (details.authorityKeyIdentifier) {
-    sections.push(createSection("Authority Key Identifier", [
-      { label: "Key Identifier", value: formatDigest(details.authorityKeyIdentifier) ?? details.authorityKeyIdentifier },
-    ]));
+    const akiSection = createSection("Authority key identifier", [
+      { label: "Key identifier", value: formatDigest(details.authorityKeyIdentifier) ?? details.authorityKeyIdentifier },
+    ]);
+    if (akiSection) sections.push(akiSection);
   }
-  const fingerprintsSection = buildFingerprintsSection(details.fingerprints, "CRL Fingerprints");
-  if (fingerprintsSection) sections.push(fingerprintsSection);
-  const signatureSection = buildSignatureSection(details.signature);
-  if (signatureSection) sections.push(signatureSection);
+  if (details.fingerprints) {
+    const fingerprintPairs = Object.entries(details.fingerprints)
+      .filter(([, hex]) => !!hex)
+      .map(([algo, hex]) => ({
+        label: algo.toUpperCase(),
+        value: formatDigest(hex) ?? hex,
+        valueClass: "detail-inline-pair__value--mono",
+      }));
+    const fingerprintNode = createInlinePairs(fingerprintPairs);
+    if (fingerprintNode) {
+      const fingerprintsSection = createSection("CRL fingerprints", [
+        { label: "Fingerprints", value: fingerprintNode },
+      ]);
+      if (fingerprintsSection) sections.push(fingerprintsSection);
+    }
+  }
+  if (details.signature) {
+    const signatureSection = createSection("Signature", [
+      { label: "Algorithm", value: formatAlgorithm(details.signature.algorithm) },
+      {
+        label: "Value",
+        value: createHexValue(details.signature.valueHex, { summary: "Signature", bitLength: details.signature.bitLength, bytesPerRow: 18 }),
+      },
+    ]);
+    if (signatureSection) sections.push(signatureSection);
+  }
   const entriesSection = buildCrlEntriesSection(details.entries);
   if (entriesSection) sections.push(entriesSection);
   const extensionsSection = buildCrlExtensionsSection(details.extensions);
@@ -407,14 +593,49 @@ export function buildDetailView(resource) {
 
   const header = document.createElement("div");
   header.className = "detail-header";
-  const title = document.createElement("div");
-  title.className = "detail-title";
-  title.textContent = attrs.objectType === "certificate"
+
+  const chipRow = document.createElement("div");
+  chipRow.className = "detail-chip-row";
+  const typeTitle = attrs.objectType === "certificate"
     ? "Certificate"
     : attrs.objectType === "crl"
       ? "Certificate Revocation List"
       : "Object";
+  const chipLabel = attrs.objectType === "certificate"
+    ? "Certificate"
+    : attrs.objectType === "crl"
+      ? (attrs.crl?.isDelta ? "Delta CRL" : "CRL")
+      : "Object";
+  const typeTone = attrs.objectType === "certificate"
+    ? "certificate"
+    : attrs.objectType === "crl"
+      ? (attrs.crl?.isDelta ? "delta" : "crl")
+      : "neutral";
+  const typeChip = createChip(chipLabel, { category: "type", tone: typeTone });
+  if (typeChip) chipRow.append(typeChip);
+
+  let certificateExpiryStatus = null;
+  let crlUpdateStatus = null;
+  let statusDescriptor = null;
+  if (attrs.objectType === "certificate" && attrs.certificate) {
+    const expirySource = attrs.certificate.validity?.notAfter ?? attrs.certificate.summary?.notAfter ?? null;
+    certificateExpiryStatus = computeTemporalStatus(expirySource);
+    statusDescriptor = describeCertificateStatus(certificateExpiryStatus);
+  } else if (attrs.objectType === "crl" && attrs.crl) {
+    const nextUpdateSource = attrs.crl.validity?.nextUpdate ?? null;
+    crlUpdateStatus = computeTemporalStatus(nextUpdateSource);
+    statusDescriptor = describeCrlStatus(crlUpdateStatus, attrs.crl.isDelta);
+  }
+
+  const statusChip = renderStatusDisplay(statusDescriptor, { detailed: false });
+  if (statusChip) chipRow.append(statusChip);
+  if (chipRow.childElementCount) header.append(chipRow);
+
+  const title = document.createElement("div");
+  title.className = "detail-title";
+  title.textContent = typeTitle;
   header.append(title);
+
   let highlightValue = null;
   if (attrs.objectType === "certificate") highlightValue = attrs.certificate?.summary?.subjectCommonName ?? null;
   else if (attrs.objectType === "crl") highlightValue = attrs.crl?.summary?.issuerCommonName ?? null;
@@ -424,6 +645,7 @@ export function buildDetailView(resource) {
     highlight.textContent = highlightValue;
     header.append(highlight);
   }
+
   const pathValue = attrs.path ?? (resource?.id ? `/${resource.id}` : null);
   if (pathValue) {
     const path = document.createElement("div");
@@ -431,16 +653,17 @@ export function buildDetailView(resource) {
     path.textContent = pathValue;
     header.append(path);
   }
-  article.append(header);
 
   const metaSection = buildMetaSection(resource);
-  if (metaSection) article.append(metaSection);
+  if (metaSection) header.append(metaSection);
 
-  if (attrs.objectType === "certificate") {
-    const certSections = buildCertificateSections(attrs.certificate);
+  article.append(header);
+
+  if (attrs.objectType === "certificate" && attrs.certificate) {
+    const certSections = buildCertificateSections(attrs.certificate, certificateExpiryStatus);
     certSections.forEach(section => article.append(section));
-  } else if (attrs.objectType === "crl") {
-    const crlSections = buildCrlSections(attrs.crl);
+  } else if (attrs.objectType === "crl" && attrs.crl) {
+    const crlSections = buildCrlSections(attrs.crl, crlUpdateStatus);
     crlSections.forEach(section => article.append(section));
   } else if (attrs.parseError) {
     article.append(createSection("Parse Error", [

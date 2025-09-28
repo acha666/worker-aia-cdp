@@ -196,6 +196,44 @@ export function createSection(title, rows) {
   return section;
 }
 
+export function createInlinePairs(entries, options = {}) {
+  if (!Array.isArray(entries) || entries.length === 0) return null;
+  const validEntries = entries
+    .map(entry => {
+      if (!entry) return null;
+      const label = entry.label ?? null;
+      const value = entry.value ?? null;
+      if (!label) return null;
+      if (value === null || value === undefined || value === "") return null;
+      return {
+        label: String(label).trim(),
+        value,
+        valueClass: entry.valueClass ?? null,
+      };
+    })
+    .filter(Boolean);
+  if (!validEntries.length) return null;
+  const container = document.createElement("div");
+  container.className = "detail-inline-pairs";
+  validEntries.forEach(entry => {
+    const item = document.createElement("div");
+    item.className = "detail-inline-pair";
+    const label = document.createElement("span");
+    label.className = "detail-inline-pair__label";
+    const text = entry.label.endsWith(":") ? entry.label : `${entry.label}:`;
+    label.textContent = text;
+    const value = document.createElement("span");
+    value.className = "detail-inline-pair__value";
+    if (options.valueClass) value.classList.add(options.valueClass);
+    if (entry.valueClass) value.classList.add(entry.valueClass);
+    if (entry.value instanceof Node) value.append(entry.value);
+    else value.textContent = typeof entry.value === "string" ? entry.value : String(entry.value);
+    item.append(label, value);
+    container.append(item);
+  });
+  return container;
+}
+
 export function formatSerial(serial) {
   if (!serial) return null;
   let hex = null;
@@ -205,15 +243,15 @@ export function formatSerial(serial) {
     else if (typeof serial.value === "string") hex = serial.value.replace(/^0x/i, "");
   }
   if (!hex) return null;
-  const parts = [];
+  const pairs = [];
   try {
     const decimal = BigInt(`0x${hex}`).toString(10);
-    parts.push(`decimal: ${decimal}`);
+    pairs.push({ label: "Decimal", value: decimal, valueClass: "detail-inline-pair__value--mono" });
   } catch (error) {
     console.warn("serial decimal conversion failed", error);
   }
-  parts.push(`hex: 0x${hex.toUpperCase()}`);
-  return parts;
+  pairs.push({ label: "Hex", value: `0x${hex.toUpperCase()}`, valueClass: "detail-inline-pair__value--mono" });
+  return createInlinePairs(pairs);
 }
 
 export function formatDateWithRelative(iso, days, seconds) {
