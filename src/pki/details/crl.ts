@@ -1,6 +1,6 @@
 import * as pkijs from "pkijs";
 import { describeName, bitStringBytes, describeAlgorithm, describeExtensionPresence } from "../utils";
-import { toHex, sha1Hex, sha256Hex, toJSDate, decimalFromHex, secondsUntil } from "../format";
+import { toHex, sha1Hex, sha256Hex, toJSDate, decimalFromHex } from "../format";
 import { SIGNATURE_ALG_NAMES } from "../constants";
 import { getCRLNumber, getDeltaBaseCRLNumber, getCRLAKIHex } from "../parsers";
 import { parseCRLReason } from "../extensions";
@@ -46,8 +46,6 @@ export async function buildCRLDetails(crl: pkijs.CertificateRevocationList, der:
     validity: {
       thisUpdate: thisUpdate?.toISOString() ?? null,
       nextUpdate: nextUpdate?.toISOString() ?? null,
-      secondsUntilNextUpdate: secondsUntil(nextUpdate),
-      isExpired: nextUpdate ? Date.now() > nextUpdate.getTime() : null,
     },
     signature: {
       algorithm: signatureAlgorithm,

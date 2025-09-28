@@ -1,7 +1,7 @@
 import { fromBER, Sequence, Integer } from "asn1js";
 import * as pkijs from "pkijs";
 import { describeName, bitStringBytes, describeAlgorithm, describeExtensionPresence } from "../utils";
-import { toHex, sha256Hex, sha1Hex, toJSDate, decimalFromHex, daysUntil, secondsUntil } from "../format";
+import { toHex, sha256Hex, sha1Hex, toJSDate, decimalFromHex } from "../format";
 import { KEY_ALG_NAMES, SIGNATURE_ALG_NAMES, CURVE_NAMES } from "../constants";
 import {
   parseBasicConstraints,
@@ -89,7 +89,6 @@ export async function buildCertificateDetails(cert: pkijs.Certificate, der: Arra
       serialNumberHex: serialHex,
       notBefore: notBefore?.toISOString() ?? null,
       notAfter: notAfter?.toISOString() ?? null,
-      isExpired: notAfter ? Date.now() > notAfter.getTime() : null,
     },
     version: (cert.version ?? 0) + 1,
     subject,
@@ -101,9 +100,6 @@ export async function buildCertificateDetails(cert: pkijs.Certificate, der: Arra
     validity: {
       notBefore: notBefore?.toISOString() ?? null,
       notAfter: notAfter?.toISOString() ?? null,
-      daysUntilExpiry: daysUntil(notAfter),
-      secondsUntilExpiry: secondsUntil(notAfter),
-      isExpired: notAfter ? Date.now() > notAfter.getTime() : null,
     },
     signature,
     fingerprints: {

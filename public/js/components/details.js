@@ -14,6 +14,20 @@ import {
   formatDateWithRelative,
 } from "../formatters.js";
 
+function computeTemporalStatus(iso) {
+  if (!iso) return { secondsUntil: null, daysUntil: null, isExpired: null };
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return { secondsUntil: null, daysUntil: null, isExpired: null };
+  const diffMs = date.getTime() - Date.now();
+  const secondsUntil = Math.floor(diffMs / 1000);
+  const daysUntil = Math.floor(secondsUntil / 86400);
+  return {
+    secondsUntil,
+    daysUntil,
+    isExpired: diffMs < 0,
+  };
+}
+
 function buildMetaSection(meta) {
   if (!meta) return null;
   let sizeValue = null;
@@ -39,15 +53,15 @@ function buildMetaSection(meta) {
   ]);
 }
 
-function buildCertificateSummary(summary, validity) {
+function buildCertificateSummary(summary, expiryStatus) {
   if (!summary) return null;
   const rows = [
     { label: "Subject CN", value: summary.subjectCN, skipEmpty: true },
     { label: "Issuer CN", value: summary.issuerCN, skipEmpty: true },
     { label: "Serial", value: summary.serialNumberHex ? `0x${summary.serialNumberHex.toUpperCase()}` : null },
     { label: "Not Before", value: formatOpensslDate(summary.notBefore) },
-    { label: "Not After", value: formatDateWithRelative(summary.notAfter, validity?.daysUntilExpiry, validity?.secondsUntilExpiry) },
-    { label: "Expired", value: typeof summary.isExpired === "boolean" ? (summary.isExpired ? "Yes" : "No") : null },
+    { label: "Not After", value: formatDateWithRelative(summary.notAfter, expiryStatus?.daysUntil, expiryStatus?.secondsUntil) },
+    { label: "Expired", value: typeof expiryStatus?.isExpired === "boolean" ? (expiryStatus.isExpired ? "Yes" : "No") : null },
   ];
   return createSection("Summary", rows);
 }
@@ -61,14 +75,14 @@ function buildNameSection(title, name) {
   return createSection(title, rows);
 }
 
-function buildValiditySection(validity) {
+function buildValiditySection(validity, expiryStatus) {
   if (!validity) return null;
   const rows = [
     { label: "Not Before", value: formatOpensslDate(validity.notBefore) },
-    { label: "Not After", value: formatDateWithRelative(validity.notAfter, validity.daysUntilExpiry, validity.secondsUntilExpiry) },
-    { label: "Days Until Expiry", value: typeof validity.daysUntilExpiry === "number" && Number.isFinite(validity.daysUntilExpiry) ? validity.daysUntilExpiry : null, skipEmpty: true },
-    { label: "Seconds Until Expiry", value: typeof validity.secondsUntilExpiry === "number" && Number.isFinite(validity.secondsUntilExpiry) ? validity.secondsUntilExpiry : null, skipEmpty: true },
-    { label: "Expired", value: typeof validity.isExpired === "boolean" ? (validity.isExpired ? "Yes" : "No") : null },
+    { label: "Not After", value: formatDateWithRelative(validity.notAfter, expiryStatus?.daysUntil, expiryStatus?.secondsUntil) },
+    { label: "Days Until Expiry", value: typeof expiryStatus?.daysUntil === "number" && Number.isFinite(expiryStatus.daysUntil) ? expiryStatus.daysUntil : null, skipEmpty: true },
+    { label: "Seconds Until Expiry", value: typeof expiryStatus?.secondsUntil === "number" && Number.isFinite(expiryStatus.secondsUntil) ? expiryStatus.secondsUntil : null, skipEmpty: true },
+    { label: "Expired", value: typeof expiryStatus?.isExpired === "boolean" ? (expiryStatus.isExpired ? "Yes" : "No") : null },
   ];
   return createSection("Validity", rows);
 }
@@ -248,7 +262,9 @@ function buildExtensionsSection(extensions) {
 function buildCertificateSections(details) {
   if (!details) return [];
   const sections = [];
-  const summarySection = buildCertificateSummary(details.summary, details.validity);
+  const expirySource = details.validity?.notAfter ?? details.summary?.notAfter ?? null;
+  const expiryStatus = computeTemporalStatus(expirySource);
+  const summarySection = buildCertificateSummary(details.summary, expiryStatus);
   if (summarySection) sections.push(summarySection);
   const dataSection = createSection("Data", [
     { label: "Version", value: details.version ? `Version ${details.version} (0x${Math.max(0, details.version - 1).toString(16)})` : null },
@@ -256,7 +272,7 @@ function buildCertificateSections(details) {
     { label: "Signature Algorithm", value: formatAlgorithm(details.signature?.algorithm) },
   ]);
   if (dataSection) sections.push(dataSection);
-  const validitySection = buildValiditySection(details.validity);
+  const validitySection = buildValiditySection(details.validity, expiryStatus);
   if (validitySection) sections.push(validitySection);
   const issuerSection = buildNameSection("Issuer", details.issuer);
   if (issuerSection) sections.push(issuerSection);
@@ -283,13 +299,13 @@ function buildCrlSummary(summary) {
   ]);
 }
 
-function buildCrlValiditySection(validity) {
+function buildCrlValiditySection(validity, nextUpdateStatus) {
   if (!validity) return null;
   const rows = [
     { label: "This Update", value: formatOpensslDate(validity.thisUpdate) },
-    { label: "Next Update", value: formatDateWithRelative(validity.nextUpdate, null, validity.secondsUntilNextUpdate) },
-    { label: "Seconds Until Next Update", value: typeof validity.secondsUntilNextUpdate === "number" && Number.isFinite(validity.secondsUntilNextUpdate) ? validity.secondsUntilNextUpdate : null, skipEmpty: true },
-    { label: "Expired", value: typeof validity.isExpired === "boolean" ? (validity.isExpired ? "Yes" : "No") : null },
+    { label: "Next Update", value: formatDateWithRelative(validity.nextUpdate, nextUpdateStatus?.daysUntil, nextUpdateStatus?.secondsUntil) },
+    { label: "Seconds Until Next Update", value: typeof nextUpdateStatus?.secondsUntil === "number" && Number.isFinite(nextUpdateStatus.secondsUntil) ? nextUpdateStatus.secondsUntil : null, skipEmpty: true },
+    { label: "Expired", value: typeof nextUpdateStatus?.isExpired === "boolean" ? (nextUpdateStatus.isExpired ? "Yes" : "No") : null },
   ];
   return createSection("Validity", rows);
 }
@@ -345,7 +361,8 @@ function buildCrlSections(details) {
   if (issuerSection) sections.push(issuerSection);
   const numbersSection = buildCrlNumbersSection(details.numbers, details.isDelta);
   if (numbersSection) sections.push(numbersSection);
-  const validitySection = buildCrlValiditySection(details.validity);
+  const nextUpdateStatus = computeTemporalStatus(details.validity?.nextUpdate ?? null);
+  const validitySection = buildCrlValiditySection(details.validity, nextUpdateStatus);
   if (validitySection) sections.push(validitySection);
   if (details.authorityKeyIdentifier) {
     sections.push(createSection("Authority Key Identifier", [

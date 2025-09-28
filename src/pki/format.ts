@@ -42,13 +42,3 @@ export function decimalFromHex(hex: string | null) {
     return null;
   }
 }
-
-export function secondsUntil(date: Date | undefined) {
-  if (!date) return null;
-  return Math.floor((date.getTime() - Date.now()) / 1000);
-}
-
-export function daysUntil(date: Date | undefined) {
-  if (!date) return null;
-  return Math.floor((date.getTime() - Date.now()) / 86400000);
-}
