@@ -60,8 +60,11 @@
 ## Running & Testing
 - Install deps: `npm install`.
 - Dev server: `npm run dev` (wrangler dev).
-- Unit tests (if present in `tests/`): `npm test`.
+- Unit tests: `npm test`.
+  - Backend coverage now exercises cache helpers (`src/config/cache.ts`), R2 list caching (`src/r2/listing.ts`), summary metadata workflows (`src/r2/summary.ts`), and PKI format utilities (`src/pki/format.ts`) using the OpenSSL fixtures under `tests/fixtures/`.
+  - Front-end suites run against a [`linkedom`](https://github.com/WebReflection/linkedom) DOM, covering formatter utilities plus the list/status components in `public/js/components/`.
 - Production deploy: `npm run deploy` (wrangler deploy).
+- Additional regeneration and troubleshooting notes live in `tests/README.md` (covers fixture commands and expected SHA-256 fingerprints).
 
 ## Key Behaviours to Remember
 - `initializePkijsEngine()` invoked once at startup (`src/worker.ts`).
