@@ -1,27 +1,37 @@
 import type { RouteHandler } from "../env";
-import { cacheDurations, createBinaryCacheKey, getEdgeCache } from "../config/cache";
+import {
+  cacheResponse,
+  cloneWithCacheStatus,
+  createBinaryCacheKey,
+  getCacheControlHeader,
+  getEdgeCache,
+  markCacheStatus,
+} from "../config/cache";
 import { buildHeadersForObject } from "../http/content";
 
 export const getBinaryOrText: RouteHandler = async (req, env) => {
   const url = new URL(req.url);
-  if (!/^\/(ca|crl|dcrl)\//.test(url.pathname)) return new Response("Not Found", { status: 404 });
+  if (!/^\/(ca|crl|dcrl)\//.test(url.pathname)) {
+    const notFound = new Response("Not Found", { status: 404 });
+    return markCacheStatus(notFound, "MISS");
+  }
 
   const key = url.pathname.replace(/^\/+/, "");
   const cache = getEdgeCache();
   const cacheKey = createBinaryCacheKey(key, req.method ?? "GET");
 
   const cachedResponse = await cache.match(cacheKey);
-  if (cachedResponse) return cachedResponse;
+  if (cachedResponse) return cloneWithCacheStatus(cachedResponse, "HIT");
 
   const object = await env.STORE.get(key);
   if (!object) {
     const notFound = new Response("Not Found", {
       status: 404,
       headers: {
-        "Cache-Control": `public, max-age=${cacheDurations.META_CACHE_TTL}, s-maxage=${cacheDurations.LIST_CACHE_SMAXAGE}, stale-while-revalidate=${cacheDurations.LIST_CACHE_SWR}`,
+        "Cache-Control": getCacheControlHeader("meta"),
       },
     });
-    await cache.put(cacheKey, notFound.clone());
+    await cacheResponse(cache, cacheKey, notFound);
     return notFound;
   }
 
@@ -30,6 +40,6 @@ export const getBinaryOrText: RouteHandler = async (req, env) => {
     ? new Response(await object.text(), { status: 200, headers })
     : new Response(await object.arrayBuffer(), { status: 200, headers });
 
-  await cache.put(cacheKey, response.clone());
+  await cacheResponse(cache, cacheKey, response);
   return response;
 };

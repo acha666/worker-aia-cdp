@@ -5,6 +5,9 @@ const META_CACHE_TTL = 60;
 
 const INTERNAL_CACHE_ORIGIN = "https://r2cache.internal";
 
+const META_CACHE_CONTROL = `public, max-age=${META_CACHE_TTL}, s-maxage=${LIST_CACHE_SMAXAGE}, stale-while-revalidate=${LIST_CACHE_SWR}`;
+const LIST_CACHE_CONTROL = `public, max-age=${LIST_CACHE_TTL}, s-maxage=${LIST_CACHE_SMAXAGE}, stale-while-revalidate=${LIST_CACHE_SWR}`;
+
 const LIST_CACHE_KEYS = {
   CA: new Request(`${INTERNAL_CACHE_ORIGIN}/list?prefix=ca/&delimiter=/`),
   CRL: new Request(`${INTERNAL_CACHE_ORIGIN}/list?prefix=crl/&delimiter=/`),
@@ -17,6 +20,17 @@ export const cacheDurations = {
   LIST_CACHE_SWR,
   META_CACHE_TTL,
 } as const;
+
+export const cacheControlDirectives = {
+  meta: META_CACHE_CONTROL,
+  list: LIST_CACHE_CONTROL,
+} as const;
+
+export type CachePolicy = keyof typeof cacheControlDirectives;
+
+export function getCacheControlHeader(policy: CachePolicy) {
+  return cacheControlDirectives[policy];
+}
 
 export const listCacheKeys = LIST_CACHE_KEYS;
 
@@ -58,4 +72,23 @@ export function createListCacheKey({
 
 export function getEdgeCache() {
   return (caches as unknown as { default: Cache }).default;
+}
+
+export type CacheStatus = "HIT" | "MISS";
+
+export function cloneWithCacheStatus(response: Response, status: CacheStatus) {
+  const cloned = response.clone();
+  cloned.headers.set("X-Worker-Cache", status);
+  return cloned;
+}
+
+export function markCacheStatus(response: Response, status: CacheStatus) {
+  response.headers.set("X-Worker-Cache", status);
+  return response;
+}
+
+export async function cacheResponse(cache: Cache, key: Request, response: Response, status: CacheStatus = "MISS") {
+  const cacheCopy = response.clone();
+  await cache.put(key, cacheCopy);
+  return markCacheStatus(response, status);
 }

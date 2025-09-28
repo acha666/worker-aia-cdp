@@ -1,6 +1,13 @@
 import type { RouteHandler } from "../env";
 import { jsonSuccess, jsonError } from "../http/json-response";
-import { cacheDurations, createListCacheKey, getEdgeCache } from "../config/cache";
+import {
+  cacheResponse,
+  cloneWithCacheStatus,
+  createListCacheKey,
+  getCacheControlHeader,
+  getEdgeCache,
+  markCacheStatus,
+} from "../config/cache";
 import {
   detectSummaryKind,
   readSummaryFromMetadata,
@@ -20,7 +27,7 @@ export const listObjects: RouteHandler = async (req, env, ctx) => {
     collection = collectionMatch[1];
     prefix = `${collection}/`;
   } else if (pathname !== "/api/v1/objects") {
-    return jsonError(404, "not_found", "Endpoint not found.");
+    return markCacheStatus(jsonError(404, "not_found", "Endpoint not found."), "MISS");
   }
 
   const delimiter = url.searchParams.get("delimiter") ?? "/";
@@ -33,7 +40,7 @@ export const listObjects: RouteHandler = async (req, env, ctx) => {
   const cacheKey = createListCacheKey({ collection: collectionKey, prefix: prefix || undefined, delimiter, cursor, limit });
 
   const cachedResponse = await cache.match(cacheKey);
-  if (cachedResponse) return cachedResponse;
+  if (cachedResponse) return cloneWithCacheStatus(cachedResponse, "HIT");
 
   const list = await env.STORE.list({ prefix, delimiter, cursor, limit, include: ["customMetadata"] } as any);
 
@@ -101,14 +108,16 @@ export const listObjects: RouteHandler = async (req, env, ctx) => {
         links,
       },
       headers: {
-        "Cache-Control": `public, max-age=${cacheDurations.LIST_CACHE_TTL}, s-maxage=${cacheDurations.LIST_CACHE_SMAXAGE}, stale-while-revalidate=${cacheDurations.LIST_CACHE_SWR}`,
+        "Cache-Control": getCacheControlHeader("list"),
         "X-Content-Summary": missingSummaries ? "pending" : "ready",
       },
     },
   );
 
   if (!missingSummaries) {
-    await cache.put(cacheKey, response.clone());
+    await cacheResponse(cache, cacheKey, response);
+  } else {
+    markCacheStatus(response, "MISS");
   }
 
   if (ensureTasks.length && ctx) {

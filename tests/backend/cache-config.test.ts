@@ -5,10 +5,15 @@ import { test } from "node:test";
 
 import {
   cacheDurations,
+  cacheResponse,
+  cacheControlDirectives,
+  cloneWithCacheStatus,
   createBinaryCacheKey,
   createListCacheKey,
   createMetaCacheKey,
+  getCacheControlHeader,
   getEdgeCache,
+  markCacheStatus,
   listCacheKeys,
 } from "../../src/config/cache";
 
@@ -80,4 +85,35 @@ test("createListCacheKey composes cache key for collections and options", () => 
   assert.equal(url.searchParams.get("cursor"), "opaque");
   assert.equal(url.searchParams.get("limit"), "25");
   assert.equal(request.method, "GET");
+});
+
+test("getCacheControlHeader exposes directives", () => {
+  assert.equal(getCacheControlHeader("meta"), cacheControlDirectives.meta);
+  assert.equal(getCacheControlHeader("list"), cacheControlDirectives.list);
+});
+
+test("cloneWithCacheStatus returns annotated copy without mutating original", () => {
+  const original = new Response("payload", { status: 200 });
+  const hit = cloneWithCacheStatus(original, "HIT");
+  assert.equal(hit.headers.get("X-Worker-Cache"), "HIT");
+  assert.equal(original.headers.get("X-Worker-Cache"), null);
+});
+
+test("markCacheStatus annotates response headers", () => {
+  const response = new Response(null, { status: 204 });
+  markCacheStatus(response, "MISS");
+  assert.equal(response.headers.get("X-Worker-Cache"), "MISS");
+});
+
+test("cacheResponse stores clone and labels outgoing response", async () => {
+  const memoryCache = new MemoryCache();
+  const cacheKey = new Request("https://example.test/cache");
+  const response = new Response("body", { status: 200 });
+
+  const result = await cacheResponse(memoryCache as unknown as Cache, cacheKey, response);
+
+  assert.equal(result.headers.get("X-Worker-Cache"), "MISS");
+  const stored = memoryCache.store.get(cacheKey.url);
+  assert.ok(stored);
+  assert.equal(stored?.headers.get("X-Worker-Cache"), null);
 });
