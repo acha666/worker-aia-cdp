@@ -12,6 +12,7 @@ import { parseCRL, getCRLNumber, getDeltaBaseCRLNumber, getCN, getSKIHex } from 
 import { toJSDate } from "../pki/format";
 import { putBinary, getExistingCRL } from "../r2/objects";
 import { getEdgeCache, listCacheKeys, createMetaCacheKey } from "../config/cache";
+import { buildSummaryMetadata, type ObjectSummary } from "../r2/summary";
 
 export const createCRL: RouteHandler = async (req, env) => {
   const contentType = (req.headers.get("content-type") || "").toLowerCase();
@@ -66,15 +67,33 @@ export const createCRL: RouteHandler = async (req, env) => {
   const nextUpdate = toJSDate(crl.nextUpdate);
   const crlNumber = getCRLNumber(crl);
   const deltaBase = getDeltaBaseCRLNumber(crl);
-  const meta: Record<string, string> = {
-  issuerCN: getCN(issuer.cert) || "",
-  issuerKeyId: getSKIHex(issuer.cert) || "",
-    crlNumber: crlNumber !== undefined ? crlNumber.toString() : "",
-    thisUpdate: thisUpdate ? thisUpdate.toISOString() : "",
-    nextUpdate: nextUpdate ? nextUpdate.toISOString() : "",
-    isDelta: String(classification.isDelta),
-    baseCRLNumber: classification.isDelta && deltaBase !== undefined ? deltaBase.toString() : "",
+  const issuerCN = getCN(issuer.cert) || "";
+  const thisUpdateIso = thisUpdate?.toISOString() ?? null;
+  const nextUpdateIso = nextUpdate?.toISOString() ?? null;
+
+  const baseMeta: Record<string, string> = {
+    issuerKeyId: getSKIHex(issuer.cert) || "",
+    isDelta: classification.isDelta ? "true" : "false",
   };
+  if (issuerCN) baseMeta.issuerCN = issuerCN;
+  if (crlNumber !== undefined) baseMeta.crlNumber = crlNumber.toString();
+  if (thisUpdateIso) baseMeta.thisUpdate = thisUpdateIso;
+  if (nextUpdateIso) baseMeta.nextUpdate = nextUpdateIso;
+  if (classification.isDelta && deltaBase !== undefined) baseMeta.baseCRLNumber = deltaBase.toString();
+
+  const summary: ObjectSummary = {
+    kind: "crl",
+    displayName: issuerCN || classification.friendly,
+    subjectCommonName: null,
+    issuerCommonName: issuerCN || null,
+    notBefore: null,
+    notAfter: null,
+    thisUpdate: thisUpdateIso,
+    nextUpdate: nextUpdateIso,
+    isDelta: classification.isDelta,
+  };
+
+  const meta = buildSummaryMetadata(summary, baseMeta);
 
   if (existing) {
     await archiveExistingCRL(env, classification.folder, classification.friendly, existing, meta);

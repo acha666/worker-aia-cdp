@@ -1,8 +1,15 @@
 import type { RouteHandler } from "../env";
 import { jsonSuccess, jsonError } from "../http/json-response";
 import { getEdgeCache, cacheDurations } from "../config/cache";
+import {
+  detectSummaryKind,
+  readSummaryFromMetadata,
+  ensureSummaryMetadata,
+  summaryToPayload,
+  fallbackDisplayName,
+} from "../r2/summary";
 
-export const listObjects: RouteHandler = async (req, env) => {
+export const listObjects: RouteHandler = async (req, env, ctx) => {
   const url = new URL(req.url);
   const { pathname } = url;
   const collectionMatch = pathname.match(/^\/api\/v1\/collections\/(ca|crl|dcrl)\/items$/);
@@ -34,14 +41,43 @@ export const listObjects: RouteHandler = async (req, env) => {
   const hit = await cache.match(cacheKey);
   if (hit) return hit;
 
-  const list = await env.STORE.list({ prefix, delimiter, cursor, limit });
+  const list = await env.STORE.list({ prefix, delimiter, cursor, limit, include: ["customMetadata"] } as any);
 
-  const items = list.objects.map(object => ({
-    key: object.key,
-    size: (object as any).size ?? 0,
-    etag: (object as any).etag ?? (object as any).httpEtag ?? null,
-    uploaded: (object as any).uploaded instanceof Date ? (object as any).uploaded.toISOString() : null,
-  }));
+  const ensureTasks: Promise<unknown>[] = [];
+  let missingSummaries = 0;
+  let shouldFlushCaches = false;
+
+  const items = list.objects.map(object => {
+    const metadata = (object as any).customMetadata as Record<string, string> | undefined;
+    const key = object.key;
+    const kind = detectSummaryKind(key);
+    let summary = readSummaryFromMetadata(metadata);
+
+    if (!summary && kind !== "other" && ctx) {
+      missingSummaries += 1;
+      shouldFlushCaches = true;
+      ensureTasks.push(
+        ensureSummaryMetadata({
+          env,
+          key,
+          kind,
+          existingMeta: metadata,
+          expectedEtag: ((object as any).httpEtag ?? (object as any).etag ?? null) as string | null,
+        }).catch(error => console.error("Failed to ensure summary metadata", { key, error })),
+      );
+    }
+
+    const displayName = summary?.displayName ?? fallbackDisplayName(key, kind);
+
+    return {
+      key,
+      size: (object as any).size ?? 0,
+      uploaded: (object as any).uploaded instanceof Date ? (object as any).uploaded.toISOString() : null,
+      type: summary?.kind ?? kind,
+      displayName,
+      summary: summaryToPayload(summary),
+    };
+  });
 
   const nextCursor = list.truncated ? list.cursor ?? null : null;
   const links: Record<string, string> = {
@@ -72,10 +108,32 @@ export const listObjects: RouteHandler = async (req, env) => {
       },
       headers: {
         "Cache-Control": `public, max-age=${cacheDurations.LIST_CACHE_TTL}, s-maxage=${cacheDurations.LIST_CACHE_SMAXAGE}, stale-while-revalidate=${cacheDurations.LIST_CACHE_SWR}`,
+        "X-Content-Summary": missingSummaries ? "pending" : "ready",
       },
     },
   );
 
-  await cache.put(cacheKey, response.clone());
+  if (!missingSummaries) {
+    await cache.put(cacheKey, response.clone());
+  }
+
+  if (ensureTasks.length && ctx) {
+    ctx.waitUntil(
+      Promise.allSettled(ensureTasks).then(() => {
+        if (!shouldFlushCaches) return;
+        const cacheInstance = getEdgeCache();
+        const targets = [
+          "https://r2cache.internal/collections/ca/items?prefix=ca/&delimiter=/",
+          "https://r2cache.internal/collections/crl/items?prefix=crl/&delimiter=/",
+          "https://r2cache.internal/collections/dcrl/items?prefix=dcrl/&delimiter=/",
+          "https://r2cache.internal/objects?prefix=ca/&delimiter=/",
+          "https://r2cache.internal/objects?prefix=crl/&delimiter=/",
+          "https://r2cache.internal/objects?prefix=dcrl/&delimiter=/",
+        ];
+        targets.forEach(urlString => cacheInstance.delete(new Request(urlString)));
+      }),
+    );
+  }
+
   return response;
 };

@@ -15,7 +15,7 @@ import {
   formatDateWithRelative,
 } from "../formatters.js";
 
-function computeTemporalStatus(iso) {
+export function computeTemporalStatus(iso) {
   if (!iso) return { secondsUntil: null, daysUntil: null, isExpired: null };
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return { secondsUntil: null, daysUntil: null, isExpired: null };
@@ -56,7 +56,7 @@ function createMetric(label, value) {
   return metric;
 }
 
-function describeCertificateStatus(expiryStatus, options = {}) {
+export function describeCertificateStatus(expiryStatus, options = {}) {
   if (!expiryStatus || typeof expiryStatus.isExpired !== "boolean") return null;
   const { soonThresholdDays = 30 } = options;
   const rel = formatRelativeDays(expiryStatus.daysUntil) ?? formatRelativeSeconds(expiryStatus.secondsUntil);
@@ -69,7 +69,7 @@ function describeCertificateStatus(expiryStatus, options = {}) {
   return { label: "Active", variant: "success", description: rel ?? null };
 }
 
-function describeCrlStatus(nextUpdateStatus, isDelta, options = {}) {
+export function describeCrlStatus(nextUpdateStatus, isDelta, options = {}) {
   if (!nextUpdateStatus || typeof nextUpdateStatus.isExpired !== "boolean") return null;
   const { warningThresholdDays = 1 } = options;
   const rel = formatRelativeDays(nextUpdateStatus.daysUntil) ?? formatRelativeSeconds(nextUpdateStatus.secondsUntil);
@@ -82,7 +82,7 @@ function describeCrlStatus(nextUpdateStatus, isDelta, options = {}) {
   return { label: isDelta ? "Delta current" : "Current", variant: "success", description: rel ?? null };
 }
 
-function renderStatusDisplay(descriptor, { detailed = false } = {}) {
+export function renderStatusDisplay(descriptor, { detailed = false } = {}) {
   if (!descriptor) return null;
   if (!detailed) return createChip(descriptor.label, { category: "status", tone: descriptor.variant ?? "neutral" });
   const wrapper = document.createElement("div");
