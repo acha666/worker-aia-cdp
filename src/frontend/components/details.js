@@ -6,4 +6,3 @@ export {
   createChip,
 } from "./details/status.js";
 export { buildDetailView } from "./details/view.js";
-

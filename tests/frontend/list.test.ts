@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parseHTML } from "linkedom";
 
-import { renderCertificates, renderCrls, renderDeltaCrls } from "../../public/js/components/list.js";
+import { renderCertificates, renderCrls, renderDeltaCrls } from "../../src/frontend/components/list.js";
 
 const { window } = parseHTML("<!doctype html><html><body></body></html>");
 

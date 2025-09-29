@@ -7,6 +7,22 @@ Cloudflare Worker that serves PKI CA certificates and revocation lists from R2. 
 2. Edit `wrangler.jsonc` so `STORE` points at your R2 bucket and set `SITE_NAME` if you want a custom title.
 3. Preview with `npm run dev`. Deploy with `npm run deploy`.
 
+## Development
+
+The frontend is built with **Vite** for improved development experience:
+
+- **Development**: `npm run dev` - Builds frontend and starts Wrangler dev server
+- **Frontend only**: `npm run dev:frontend` - Starts Vite dev server (requires backend running on port 8787)
+- **Backend only**: `npm run dev:worker` - Starts only the Wrangler dev server  
+- **Build**: `npm run build` - Production build
+- **Deploy**: `npm run deploy` - Build and deploy to Cloudflare
+
+### Frontend Structure
+- `src/frontend/` - Frontend source files (built to `public/`)
+- `src/frontend/main.js` - Entry point that imports CSS and initializes the app
+- `src/frontend/components/` - UI components (list, details, panels)
+- `src/frontend/styles/` - CSS files (imports from `public/styles.css`)
+
 ## API summary
 - `/` – HTML index of the latest CA and CRL objects.
 - `/ca/*`, `/crl/*`, `/dcrl/*` – direct GET/HEAD for DER or PEM content.

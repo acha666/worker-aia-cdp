@@ -1,3 +1,10 @@
 node_modules/
 .wrangler/
 .vscode/
+
+# Vite cache
+.vite/
+
+# Keep built assets in public/ since they're needed for Cloudflare Workers
+# public/js/main.js (built by Vite)
+# public/styles.css (built by Vite)
