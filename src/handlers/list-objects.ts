@@ -1,13 +1,6 @@
 import type { RouteHandler } from "../env";
 import { jsonSuccess, jsonError } from "../http/json-response";
-import {
-  cacheResponse,
-  cloneWithCacheStatus,
-  createListCacheKey,
-  getCacheControlHeader,
-  getEdgeCache,
-  markCacheStatus,
-} from "../config/cache";
+import { cacheResponse, createListCacheKey, getCacheControlHeader, getEdgeCache, withCacheStatus } from "../config/cache";
 import {
   detectSummaryKind,
   readSummaryFromMetadata,
@@ -27,7 +20,7 @@ export const listObjects: RouteHandler = async (req, env, ctx) => {
     collection = collectionMatch[1];
     prefix = `${collection}/`;
   } else if (pathname !== "/api/v1/objects") {
-    return markCacheStatus(jsonError(404, "not_found", "Endpoint not found."), "MISS");
+    return withCacheStatus(jsonError(404, "not_found", "Endpoint not found."), "MISS");
   }
 
   const delimiter = url.searchParams.get("delimiter") ?? "/";
@@ -40,7 +33,7 @@ export const listObjects: RouteHandler = async (req, env, ctx) => {
   const cacheKey = createListCacheKey({ collection: collectionKey, prefix: prefix || undefined, delimiter, cursor, limit });
 
   const cachedResponse = await cache.match(cacheKey);
-  if (cachedResponse) return cloneWithCacheStatus(cachedResponse, "HIT");
+  if (cachedResponse) return withCacheStatus(cachedResponse, "HIT");
 
   const list = await env.STORE.list({ prefix, delimiter, cursor, limit, include: ["customMetadata"] } as any);
 
@@ -114,10 +107,11 @@ export const listObjects: RouteHandler = async (req, env, ctx) => {
     },
   );
 
+  let finalResponse: Response;
   if (!missingSummaries) {
-    await cacheResponse(cache, cacheKey, response);
+    finalResponse = await cacheResponse(cache, cacheKey, response);
   } else {
-    markCacheStatus(response, "MISS");
+    finalResponse = withCacheStatus(response, "MISS");
   }
 
   if (ensureTasks.length && ctx) {
@@ -138,5 +132,5 @@ export const listObjects: RouteHandler = async (req, env, ctx) => {
     );
   }
 
-  return response;
+  return finalResponse;
 };

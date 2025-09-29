@@ -7,14 +7,13 @@ import {
   cacheDurations,
   cacheResponse,
   cacheControlDirectives,
-  cloneWithCacheStatus,
   createBinaryCacheKey,
   createListCacheKey,
   createMetaCacheKey,
   getCacheControlHeader,
   getEdgeCache,
-  markCacheStatus,
   listCacheKeys,
+  withCacheStatus,
 } from "../../src/config/cache";
 
 class MemoryCache {
@@ -92,17 +91,11 @@ test("getCacheControlHeader exposes directives", () => {
   assert.equal(getCacheControlHeader("list"), cacheControlDirectives.list);
 });
 
-test("cloneWithCacheStatus returns annotated copy without mutating original", () => {
+test("withCacheStatus returns annotated copy without mutating original", () => {
   const original = new Response("payload", { status: 200 });
-  const hit = cloneWithCacheStatus(original, "HIT");
+  const hit = withCacheStatus(original, "HIT");
   assert.equal(hit.headers.get("X-Worker-Cache"), "HIT");
   assert.equal(original.headers.get("X-Worker-Cache"), null);
-});
-
-test("markCacheStatus annotates response headers", () => {
-  const response = new Response(null, { status: 204 });
-  markCacheStatus(response, "MISS");
-  assert.equal(response.headers.get("X-Worker-Cache"), "MISS");
 });
 
 test("cacheResponse stores clone and labels outgoing response", async () => {

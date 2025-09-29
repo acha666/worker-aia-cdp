@@ -3,17 +3,16 @@ import { jsonError, jsonSuccess } from "../http/json-response";
 import { getMetaJSON, type ObjectMetadataResource } from "../crl/metadata";
 import {
   cacheResponse,
-  cloneWithCacheStatus,
   createMetaCacheKey,
   getCacheControlHeader,
   getEdgeCache,
-  markCacheStatus,
+  withCacheStatus,
 } from "../config/cache";
 
 export const getObjectMetadata: RouteHandler = async (req, env) => {
   const url = new URL(req.url);
   const match = url.pathname.match(/^\/api\/v1\/objects\/(.+)\/metadata$/);
-  if (!match) return markCacheStatus(jsonError(400, "invalid_path", "Metadata endpoint path is invalid."), "MISS");
+  if (!match) return withCacheStatus(jsonError(400, "invalid_path", "Metadata endpoint path is invalid."), "MISS");
 
   let decodedKey: string;
   try {
@@ -22,7 +21,7 @@ export const getObjectMetadata: RouteHandler = async (req, env) => {
     const invalid = jsonError(400, "invalid_key", "Object key must be URL-encoded.", {
       details: { message: error instanceof Error ? error.message : String(error) },
     });
-    return markCacheStatus(invalid, "MISS");
+    return withCacheStatus(invalid, "MISS");
   }
 
   const normalizedKey = decodedKey.startsWith("/") ? decodedKey : `/${decodedKey}`;
@@ -30,7 +29,7 @@ export const getObjectMetadata: RouteHandler = async (req, env) => {
   const cacheKey = createMetaCacheKey(normalizedKey);
 
   const cachedResponse = await cache.match(cacheKey);
-  if (cachedResponse) return cloneWithCacheStatus(cachedResponse, "HIT");
+  if (cachedResponse) return withCacheStatus(cachedResponse, "HIT");
 
   let metadata: ObjectMetadataResource | undefined;
   try {
@@ -39,7 +38,7 @@ export const getObjectMetadata: RouteHandler = async (req, env) => {
     const unsupported = jsonError(400, "unsupported_key", "The provided key prefix is not supported.", {
       details: { key: normalizedKey, message: error instanceof Error ? error.message : String(error) },
     });
-    return markCacheStatus(unsupported, "MISS");
+    return withCacheStatus(unsupported, "MISS");
   }
 
   if (!metadata) {
@@ -49,8 +48,7 @@ export const getObjectMetadata: RouteHandler = async (req, env) => {
       },
       details: { key: normalizedKey },
     });
-    await cacheResponse(cache, cacheKey, notFound);
-    return notFound;
+    return cacheResponse(cache, cacheKey, notFound);
   }
 
   const response = jsonSuccess(metadata, {
@@ -64,6 +62,5 @@ export const getObjectMetadata: RouteHandler = async (req, env) => {
     },
   });
 
-  await cacheResponse(cache, cacheKey, response);
-  return response;
+  return cacheResponse(cache, cacheKey, response);
 };

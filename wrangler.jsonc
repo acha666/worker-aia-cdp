@@ -5,8 +5,7 @@
     "r2_buckets": [
         {
             "binding": "STORE",
-            "bucket_name": "aia-cdp",
-            "preview_bucket_name": "aia-cdp-dev"
+            "bucket_name": "aia-cdp"
         }
     ],
     "vars": {
@@ -19,5 +18,26 @@
     },
     "assets": {
         "directory": "./public"
+    },
+    "env": {
+        "dev": {
+            "name": "aia-cdp-worker-dev",
+            "workers_dev": true,
+            "r2_buckets": [
+                {
+                    "binding": "STORE",
+                    "bucket_name": "aia-cdp",
+                    "preview_bucket_name": "aia-cdp-dev"
+                }
+            ],
+            "vars": {
+                "SITE_NAME": "Acha PKI AIA/CDP (Dev)"
+            },
+            "observability": {
+                "logs": {
+                    "enabled": true
+                }
+            }
+        }
     }
 }

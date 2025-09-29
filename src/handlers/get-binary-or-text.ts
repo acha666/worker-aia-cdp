@@ -1,11 +1,10 @@
 import type { RouteHandler } from "../env";
 import {
   cacheResponse,
-  cloneWithCacheStatus,
   createBinaryCacheKey,
   getCacheControlHeader,
   getEdgeCache,
-  markCacheStatus,
+  withCacheStatus,
 } from "../config/cache";
 import { buildHeadersForObject } from "../http/content";
 
@@ -13,7 +12,7 @@ export const getBinaryOrText: RouteHandler = async (req, env) => {
   const url = new URL(req.url);
   if (!/^\/(ca|crl|dcrl)\//.test(url.pathname)) {
     const notFound = new Response("Not Found", { status: 404 });
-    return markCacheStatus(notFound, "MISS");
+    return withCacheStatus(notFound, "MISS");
   }
 
   const key = url.pathname.replace(/^\/+/, "");
@@ -21,7 +20,7 @@ export const getBinaryOrText: RouteHandler = async (req, env) => {
   const cacheKey = createBinaryCacheKey(key, req.method ?? "GET");
 
   const cachedResponse = await cache.match(cacheKey);
-  if (cachedResponse) return cloneWithCacheStatus(cachedResponse, "HIT");
+  if (cachedResponse) return withCacheStatus(cachedResponse, "HIT");
 
   const object = await env.STORE.get(key);
   if (!object) {
@@ -31,8 +30,7 @@ export const getBinaryOrText: RouteHandler = async (req, env) => {
         "Cache-Control": getCacheControlHeader("meta"),
       },
     });
-    await cacheResponse(cache, cacheKey, notFound);
-    return notFound;
+    return cacheResponse(cache, cacheKey, notFound);
   }
 
   const headers = buildHeadersForObject(object, key);
@@ -40,6 +38,5 @@ export const getBinaryOrText: RouteHandler = async (req, env) => {
     ? new Response(await object.text(), { status: 200, headers })
     : new Response(await object.arrayBuffer(), { status: 200, headers });
 
-  await cacheResponse(cache, cacheKey, response);
-  return response;
+  return cacheResponse(cache, cacheKey, response);
 };

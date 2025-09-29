@@ -76,19 +76,18 @@ export function getEdgeCache() {
 
 export type CacheStatus = "HIT" | "MISS";
 
-export function cloneWithCacheStatus(response: Response, status: CacheStatus) {
-  const cloned = response.clone();
-  cloned.headers.set("X-Worker-Cache", status);
-  return cloned;
-}
-
-export function markCacheStatus(response: Response, status: CacheStatus) {
-  response.headers.set("X-Worker-Cache", status);
-  return response;
+export function withCacheStatus(response: Response, status: CacheStatus) {
+  const clone = response.clone();
+  const headers = new Headers(clone.headers);
+  headers.set("X-Worker-Cache", status);
+  return new Response(clone.body, {
+    status: clone.status,
+    statusText: clone.statusText,
+    headers,
+  });
 }
 
 export async function cacheResponse(cache: Cache, key: Request, response: Response, status: CacheStatus = "MISS") {
-  const cacheCopy = response.clone();
-  await cache.put(key, cacheCopy);
-  return markCacheStatus(response, status);
+  await cache.put(key, response.clone());
+  return withCacheStatus(response, status);
 }
