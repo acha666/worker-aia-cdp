@@ -1,46 +1,54 @@
 import type { RouteHandler } from "../env";
 import { jsonError, jsonSuccess } from "../http/json-response";
 import { getMetaJSON, type ObjectMetadataResource } from "../crl/metadata";
-import { createMetaCacheKey, getEdgeCache, cacheDurations } from "../config/cache";
+import {
+  cacheResponse,
+  createMetaCacheKey,
+  getCacheControlHeader,
+  getEdgeCache,
+  withCacheStatus,
+} from "../config/cache";
 
 export const getObjectMetadata: RouteHandler = async (req, env) => {
   const url = new URL(req.url);
   const match = url.pathname.match(/^\/api\/v1\/objects\/(.+)\/metadata$/);
-  if (!match) return jsonError(400, "invalid_path", "Metadata endpoint path is invalid.");
+  if (!match) return withCacheStatus(jsonError(400, "invalid_path", "Metadata endpoint path is invalid."), "MISS");
 
   let decodedKey: string;
   try {
     decodedKey = decodeURIComponent(match[1]);
   } catch (error) {
-    return jsonError(400, "invalid_key", "Object key must be URL-encoded.", {
+    const invalid = jsonError(400, "invalid_key", "Object key must be URL-encoded.", {
       details: { message: error instanceof Error ? error.message : String(error) },
     });
+    return withCacheStatus(invalid, "MISS");
   }
 
   const normalizedKey = decodedKey.startsWith("/") ? decodedKey : `/${decodedKey}`;
   const cache = getEdgeCache();
   const cacheKey = createMetaCacheKey(normalizedKey);
-  const cached = await cache.match(cacheKey);
-  if (cached) return cached;
+
+  const cachedResponse = await cache.match(cacheKey);
+  if (cachedResponse) return withCacheStatus(cachedResponse, "HIT");
 
   let metadata: ObjectMetadataResource | undefined;
   try {
     metadata = await getMetaJSON(env, normalizedKey);
   } catch (error) {
-    return jsonError(400, "unsupported_key", "The provided key prefix is not supported.", {
+    const unsupported = jsonError(400, "unsupported_key", "The provided key prefix is not supported.", {
       details: { key: normalizedKey, message: error instanceof Error ? error.message : String(error) },
     });
+    return withCacheStatus(unsupported, "MISS");
   }
 
   if (!metadata) {
     const notFound = jsonError(404, "not_found", "Object not found.", {
       headers: {
-        "Cache-Control": `public, max-age=${cacheDurations.META_CACHE_TTL}, s-maxage=${cacheDurations.LIST_CACHE_SMAXAGE}, stale-while-revalidate=${cacheDurations.LIST_CACHE_SWR}`,
+        "Cache-Control": getCacheControlHeader("meta"),
       },
       details: { key: normalizedKey },
     });
-    await cache.put(cacheKey, notFound.clone());
-    return notFound;
+    return cacheResponse(cache, cacheKey, notFound);
   }
 
   const response = jsonSuccess(metadata, {
@@ -50,10 +58,9 @@ export const getObjectMetadata: RouteHandler = async (req, env) => {
       cachedAt: new Date().toISOString(),
     },
     headers: {
-      "Cache-Control": `public, max-age=${cacheDurations.META_CACHE_TTL}, s-maxage=${cacheDurations.LIST_CACHE_SMAXAGE}, stale-while-revalidate=${cacheDurations.LIST_CACHE_SWR}`,
+      "Cache-Control": getCacheControlHeader("meta"),
     },
   });
 
-  await cache.put(cacheKey, response.clone());
-  return response;
+  return cacheResponse(cache, cacheKey, response);
 };

@@ -12,7 +12,14 @@
     --kbd-border: #d0d7de;
     --header-bg: #f6f8fa;
     --h2-bg: #eaeef2;
-    --focus: #0969da
+    --focus: #0969da;
+    --chip-height: 26px;
+    --chip-padding-y: 4px;
+    --chip-padding-x: 10px;
+    --chip-font-size: 11px;
+    --chip-font-weight: 600;
+    --chip-letter-spacing: 0.08em;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace
 }
 
 :root[data-theme="dark"] {
@@ -145,7 +152,17 @@ ul.files li:first-child {
 .file-item {
     border-left: 3px solid transparent;
     border-radius: 6px;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
     transition: background-color .25s ease, box-shadow .25s ease, transform .25s ease, border-left-color .25s ease;
+}
+
+ul.files li:first-child .file-item {
+    border-top-left-radius: 6px;
+}
+
+ul.files li:last-child .file-item {
+    border-bottom-left-radius: 6px;
 }
 
 .file-item--certificate {
@@ -190,15 +207,25 @@ ul.files li:first-child {
     gap: 8px
 }
 
-.file-badge {
+.file-badge,
+.detail-chip,
+.detail-extension-flag {
     display: inline-flex;
     align-items: center;
-    padding: 2px 8px;
+    justify-content: center;
+    min-height: var(--chip-height);
+    padding: var(--chip-padding-y) var(--chip-padding-x);
     border-radius: 999px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
+    font-size: var(--chip-font-size);
+    font-weight: var(--chip-font-weight);
+    letter-spacing: var(--chip-letter-spacing);
     text-transform: uppercase;
+    line-height: 1;
+    gap: 6px;
+    vertical-align: middle
+}
+
+.file-badge {
     background: var(--code-bg);
     color: var(--muted)
 }
@@ -213,7 +240,7 @@ ul.files li:first-child {
 .file-path {
     color: var(--muted);
     font-size: 12px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-family: var(--font-mono);
     word-break: break-all
 }
 
@@ -361,7 +388,7 @@ a:focus-visible {
 code,
 pre,
 kbd {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-family: var(--font-mono);
     font-size: 12.5px
 }
 
@@ -448,15 +475,6 @@ footer {
 }
 
 .detail-chip {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2px 10px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
     background: var(--code-bg);
     color: var(--muted)
 }
@@ -539,7 +557,7 @@ footer {
 }
 
 .detail-subtitle {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     color: var(--muted);
     word-break: break-all;
@@ -674,7 +692,7 @@ footer {
 }
 
 .detail-grid dd:last-child {
-    margin-bottom: 0;
+    margin-bottom: 12px;
 }
 
 .detail-list {
@@ -719,7 +737,7 @@ footer {
 }
 
 .detail-inline-pair__value--mono {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-family: var(--font-mono);
 }
 
 .detail-section--extensions {
@@ -772,7 +790,7 @@ footer {
 }
 
 .detail-extension-card__oid {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-family: var(--font-mono);
     background: var(--code-bg);
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -780,14 +798,6 @@ footer {
 }
 
 .detail-extension-flag {
-    display: inline-flex;
-    align-items: center;
-    padding: 2px 6px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
     border: 1px solid transparent;
 }
 
@@ -832,13 +842,12 @@ footer {
 }
 
 .detail-extension-card__digest {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-    font-size: 12px;
     color: var(--muted);
 }
 
 .detail-extension-card__raw {
     margin: 0;
+    font-family: var(--font-mono);
 }
 
 .detail-muted {
@@ -853,6 +862,7 @@ footer {
     border-radius: 6px;
     line-height: 1.4;
     word-break: break-all;
+    font-family: var(--font-mono);
 }
 
 .hex-toggle {
@@ -871,7 +881,6 @@ footer {
     outline: none;
     list-style: none;
     line-height: 1.4;
-    padding: 2px 0;
 }
 
 .hex-toggle summary::marker {
@@ -881,8 +890,8 @@ footer {
 .hex-toggle summary::before {
     content: "";
     flex-shrink: 0;
-    width: 0.45em;
-    height: 0.45em;
+    width: 0.4em;
+    height: 0.4em;
     border-right: 2px solid currentColor;
     border-bottom: 2px solid currentColor;
     transform: rotate(-45deg);
@@ -908,8 +917,10 @@ footer {
     border: 1px solid var(--border);
     border-radius: 6px;
     overflow-x: auto;
-    white-space: pre;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    font-family: var(--font-mono);
 }
 
 .detail-raw {
@@ -920,7 +931,7 @@ footer {
     border-radius: 8px;
     white-space: pre-wrap;
     word-break: break-word;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-family: var(--font-mono);
 }
 
 .spinner {

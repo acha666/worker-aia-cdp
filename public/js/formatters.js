@@ -136,6 +136,16 @@ export function createMuted(text = "—") {
   return span;
 }
 
+export function createMonoValue(content) {
+  if (content === null || content === undefined) return null;
+  const text = typeof content === "string" ? content : String(content);
+  if (!text) return null;
+  const span = document.createElement("span");
+  span.className = "detail-inline-pair__value detail-inline-pair__value--mono";
+  span.textContent = text;
+  return span;
+}
+
 export function formatDigest(hex) {
   if (!hex) return null;
   const clean = typeof hex === "string" ? hex.replace(/[^0-9a-f]/gi, "") : "";
@@ -143,16 +153,12 @@ export function formatDigest(hex) {
   return (clean.match(/.{1,2}/g) || []).join(":");
 }
 
-export function colonizeHex(hex, bytesPerRow = 16) {
+export function colonizeHex(hex) {
   if (!hex) return "";
   const clean = hex.replace(/[^0-9a-f]/gi, "").toLowerCase();
   const pairs = clean.match(/.{1,2}/g) || [];
   if (pairs.length === 0) return "";
-  const lines = [];
-  for (let index = 0; index < pairs.length; index += bytesPerRow) {
-    lines.push(pairs.slice(index, index + bytesPerRow).join(":"));
-  }
-  return lines.join("\n");
+  return pairs.join(":");
 }
 
 export function hexPreview(hex, count = 8) {
@@ -172,7 +178,7 @@ export function createHexValue(hex, options = {}) {
   if (clean.length <= threshold) {
     const code = document.createElement("code");
     code.className = "hex-inline";
-    code.textContent = colonizeHex(clean, options.bytesPerRow ?? 16).replace(/\n/g, " ");
+  code.textContent = colonizeHex(clean);
     return code;
   }
   const details = document.createElement("details");
@@ -188,7 +194,7 @@ export function createHexValue(hex, options = {}) {
   details.append(summary);
   const pre = document.createElement("pre");
   pre.className = "hex-content";
-  pre.textContent = colonizeHex(clean, options.bytesPerRow ?? 16);
+  pre.textContent = colonizeHex(clean);
   details.append(pre);
   return details;
 }

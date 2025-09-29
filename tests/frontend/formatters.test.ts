@@ -71,6 +71,9 @@ test("createHexValue generates expandable details for long values", () => {
   assert(pre instanceof window.HTMLElement);
   const preText = pre.textContent ?? "";
   assert.equal(preText.includes("aa:aa:aa:aa:aa:aa:aa:aa"), true);
+  assert.equal(preText.includes("\n"), false);
+  const expected = Array.from({ length: 64 }, () => "aa").join(":");
+  assert.equal(preText, expected);
 });
 
 test("formatSerial renders decimal and hex pairs", () => {
