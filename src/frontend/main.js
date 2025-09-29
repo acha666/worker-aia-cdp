@@ -1,3 +1,4 @@
+import "./styles/main.css";
 import { listCollection } from "./api.js";
 import { renderCertificates, renderCrls, renderDeltaCrls } from "./components/list.js";
 import { registerDetailPanels } from "./components/panels.js";
