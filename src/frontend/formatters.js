@@ -1,4 +1,5 @@
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const COLON_HEX_PATTERN = /^[0-9a-f]{2}(?::[0-9a-f]{2})+$/i;
 
 function formatTimezoneOffset(date) {
   const offsetMinutes = -date.getTimezoneOffset();
@@ -136,13 +137,34 @@ export function createMuted(text = "—") {
   return span;
 }
 
+function setTextWithColonBreaks(element, value) {
+  if (!element) return;
+  if (value === null || value === undefined) {
+    element.textContent = "";
+    return;
+  }
+  if (typeof value !== "string" || !COLON_HEX_PATTERN.test(value)) {
+    element.textContent = typeof value === "string" ? value : String(value);
+    return;
+  }
+  element.textContent = "";
+  const segments = value.split(":");
+  segments.forEach((segment, index) => {
+    if (index > 0) {
+      element.append(document.createTextNode(":"));
+      element.append(document.createElement("wbr"));
+    }
+    if (segment) element.append(document.createTextNode(segment));
+  });
+}
+
 export function createMonoValue(content) {
   if (content === null || content === undefined) return null;
   const text = typeof content === "string" ? content : String(content);
   if (!text) return null;
   const span = document.createElement("span");
   span.className = "detail-inline-pair__value detail-inline-pair__value--mono";
-  span.textContent = text;
+  setTextWithColonBreaks(span, text);
   return span;
 }
 
@@ -175,10 +197,11 @@ export function createHexValue(hex, options = {}) {
   const clean = typeof hex === "string" ? hex.replace(/[^0-9a-f]/gi, "").toLowerCase() : "";
   if (!clean) return createMuted();
   const threshold = options.threshold ?? 96;
+  const colonized = colonizeHex(clean);
   if (clean.length <= threshold) {
     const code = document.createElement("code");
     code.className = "hex-inline";
-  code.textContent = colonizeHex(clean);
+    setTextWithColonBreaks(code, colonized);
     return code;
   }
   const details = document.createElement("details");
@@ -194,7 +217,7 @@ export function createHexValue(hex, options = {}) {
   details.append(summary);
   const pre = document.createElement("pre");
   pre.className = "hex-content";
-  pre.textContent = colonizeHex(clean);
+  setTextWithColonBreaks(pre, colonized);
   details.append(pre);
   return details;
 }
@@ -221,7 +244,7 @@ export function renderValue(value, skipEmpty) {
   if (typeof value === "string") {
     if (value.length === 0) return skipEmpty ? null : createMuted();
     const span = document.createElement("span");
-    span.textContent = value;
+    setTextWithColonBreaks(span, value);
     return span;
   }
   if (typeof value === "number") {
@@ -293,7 +316,8 @@ export function createInlinePairs(entries, options = {}) {
     if (options.valueClass) value.classList.add(options.valueClass);
     if (entry.valueClass) value.classList.add(entry.valueClass);
     if (entry.value instanceof Node) value.append(entry.value);
-    else value.textContent = typeof entry.value === "string" ? entry.value : String(entry.value);
+    else if (typeof entry.value === "string") setTextWithColonBreaks(value, entry.value);
+    else value.textContent = String(entry.value);
     item.append(label, value);
     container.append(item);
   });

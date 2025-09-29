@@ -6,6 +6,7 @@ import { parseHTML } from "linkedom";
 
 import {
   createHexValue,
+  createMonoValue,
   formatDateSummary,
   formatNumber,
   formatOpensslDate,
@@ -53,6 +54,7 @@ test("createHexValue returns inline code for short values", () => {
   assert.equal(hexNode.tagName, "CODE");
   assert.equal(hexNode.className, "hex-inline");
   assert.equal(hexNode.textContent, "aa:bb:cc");
+  assert.equal(hexNode.innerHTML, "aa:<wbr>bb:<wbr>cc");
 });
 
 test("createHexValue generates expandable details for long values", () => {
@@ -72,8 +74,18 @@ test("createHexValue generates expandable details for long values", () => {
   const preText = pre.textContent ?? "";
   assert.equal(preText.includes("aa:aa:aa:aa:aa:aa:aa:aa"), true);
   assert.equal(preText.includes("\n"), false);
+  const preHtml = pre.innerHTML ?? "";
+  assert.equal(preHtml.includes("<wbr>"), true);
   const expected = Array.from({ length: 64 }, () => "aa").join(":");
   assert.equal(preText, expected);
+});
+
+test("createMonoValue inserts word breaks after colon-separated hex", () => {
+  const mono = createMonoValue("AA:BB:CC:DD");
+  assert(mono instanceof window.HTMLElement);
+  assert.equal(mono.classList.contains("detail-inline-pair__value--mono"), true);
+  assert.equal(mono.textContent, "AA:BB:CC:DD");
+  assert.equal(mono.innerHTML, "AA:<wbr>BB:<wbr>CC:<wbr>DD");
 });
 
 test("formatSerial renders decimal and hex pairs", () => {
