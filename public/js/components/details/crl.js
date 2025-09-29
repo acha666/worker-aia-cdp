@@ -1,6 +1,7 @@
 import {
   createHexValue,
   createInlinePairs,
+  createMonoValue,
   createSection,
   formatAlgorithm,
   formatDateWithRelative,
@@ -71,8 +72,10 @@ export function buildCrlSections(details, nextUpdateStatus) {
   const identitySection = buildIdentitySection(null, details.issuer);
   if (identitySection) sections.push(identitySection);
   if (details.authorityKeyIdentifier) {
+    const keyIdentifierText = formatDigest(details.authorityKeyIdentifier) ?? details.authorityKeyIdentifier;
+    const keyIdentifierDisplay = createMonoValue(keyIdentifierText) ?? keyIdentifierText;
     const akiSection = createSection("Authority key identifier", [
-      { label: "Key identifier", value: formatDigest(details.authorityKeyIdentifier) ?? details.authorityKeyIdentifier },
+      { label: "Key identifier", value: keyIdentifierDisplay },
     ]);
     if (akiSection) sections.push(akiSection);
   }

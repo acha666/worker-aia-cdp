@@ -120,12 +120,8 @@ function describeCertificatePolicies(data) {
 }
 
 function describeAuthorityKeyIdentifier(data) {
-  if (!data) return null;
-  if (typeof data === "string") return [`keyIdentifier: ${formatDigest(data) ?? data}`];
+  if (!data || typeof data === "string") return null;
   const lines = [];
-  if (data.keyIdentifier) {
-    lines.push(`keyIdentifier: ${formatDigest(data.keyIdentifier) ?? data.keyIdentifier}`);
-  }
   if (Array.isArray(data.authorityCertIssuer) && data.authorityCertIssuer.length) {
     lines.push(`authorityCertIssuer: ${data.authorityCertIssuer.join(", ")}`);
   }
@@ -147,25 +143,50 @@ function extractHex(value) {
   return null;
 }
 
-function renderKeyIdentifier(value) {
-  const hex = extractHex(value);
+function buildKeyIdentifierDisplay(hex, options = {}) {
   if (!hex) return null;
   const wrapper = document.createElement("div");
   wrapper.className = "detail-extension-card__hex";
-  const digest = formatDigest(hex);
-  if (digest) {
-    const digestSpan = document.createElement("div");
-    digestSpan.className = "detail-extension-card__digest";
-    digestSpan.textContent = digest;
-    wrapper.append(digestSpan);
+  const hexNode = createHexValue(hex, {
+    summary: options.summary ?? "Key identifier",
+    bytesPerRow: options.bytesPerRow ?? 16,
+    previewBytes: options.previewBytes ?? 18,
+    threshold: options.threshold ?? 160,
+  });
+  if (hexNode) wrapper.append(hexNode);
+  return wrapper.childElementCount ? wrapper : null;
+}
+
+function renderKeyIdentifier(value) {
+  const hex = extractHex(value);
+  if (!hex) return null;
+  const content = document.createElement("div");
+  content.className = "detail-extension-card__content";
+  const display = buildKeyIdentifierDisplay(hex, { summary: "Key identifier" });
+  if (display) content.append(display);
+  return content.childElementCount ? content : null;
+}
+
+function renderAuthorityKeyIdentifier(value) {
+  if (!value) return null;
+  const content = document.createElement("div");
+  content.className = "detail-extension-card__content";
+  let hasContent = false;
+  const keyHex = typeof value === "string" ? value : extractHex(value.keyIdentifier) ?? extractHex(value);
+  const keyDisplay = buildKeyIdentifierDisplay(keyHex, { summary: "Key identifier" });
+  if (keyDisplay) {
+    content.append(keyDisplay);
+    hasContent = true;
   }
-  wrapper.append(createHexValue(hex, {
-    summary: "Show hex",
-    bytesPerRow: 16,
-    previewBytes: 18,
-    threshold: 160,
-  }));
-  return wrapper;
+  const extra = describeAuthorityKeyIdentifier(value);
+  if (extra) {
+    const extraNode = renderList(extra);
+    if (extraNode) {
+      content.append(extraNode);
+      hasContent = true;
+    }
+  }
+  return hasContent ? content : null;
 }
 
 function renderGenericObject(value) {
@@ -206,7 +227,7 @@ const EXTENSION_RENDERERS = {
   "1.3.6.1.5.5.7.1.1": value => renderList(describeAuthorityInfoAccess(value)),
   "2.5.29.31": value => renderList(describeCRLDistributionPoints(value)),
   "2.5.29.32": value => renderList(describeCertificatePolicies(value)),
-  "2.5.29.35": value => renderList(describeAuthorityKeyIdentifier(value)),
+  "2.5.29.35": value => renderAuthorityKeyIdentifier(value),
   "2.5.29.14": value => renderKeyIdentifier(value),
 };
 

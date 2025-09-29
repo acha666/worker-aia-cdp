@@ -1,6 +1,7 @@
 import {
   createHexValue,
   createInlinePairs,
+  createMonoValue,
   createSection,
   formatAlgorithm,
   formatDateWithRelative,
@@ -139,7 +140,11 @@ function buildCertificateCryptoSection(details) {
 
   const subjectKeyExtension = findExtensionByOid(details.extensions, "2.5.29.14");
   const subjectKeyHex = extractExtensionHex(subjectKeyExtension);
-  if (subjectKeyHex) rows.push({ label: "Subject key identifier", value: formatDigest(subjectKeyHex) ?? subjectKeyHex });
+  if (subjectKeyHex) {
+    const subjectKeyText = formatDigest(subjectKeyHex) ?? subjectKeyHex;
+    const display = createMonoValue(subjectKeyText) ?? subjectKeyText;
+    rows.push({ label: "Subject key identifier", value: display });
+  }
   if (details.fingerprints) {
     const pairs = Object.entries(details.fingerprints)
       .filter(([, hex]) => !!hex)
