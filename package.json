@@ -11,8 +11,8 @@
         "dev:frontend": "vite",
         "dev:worker": "wrangler dev",
         "dev:remote": "wrangler dev --remote -e dev",
-        "deploy": "npm run build && wrangler deploy",
-        "deploy:dev": "npm run build && wrangler deploy -e dev",
+    "deploy": "wrangler deploy",
+    "deploy:dev": "wrangler deploy -e dev",
         "preview": "vite preview",
         "test": "tsx --test tests/**/*.test.ts"
     },

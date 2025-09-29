@@ -31,8 +31,7 @@ Cloudflare Worker that serves PKI Authority Information Access (AIA) certificate
 ### Production (Wrangler deploy)
 
 1. `npx wrangler login`
-2. `npm run build`
-3. `wrangler deploy --remote`
+2. `npm run deploy` *(runs `wrangler deploy`, which executes the configured build command for you)*
 
 `wrangler.jsonc` seeds the production Worker with the `STORE` binding (`aia-cdp`) and `SITE_NAME` (`PKI AIA/CDP`).
 
@@ -47,7 +46,7 @@ Cloudflare Worker that serves PKI Authority Information Access (AIA) certificate
 1. In the dashboard, open **Workers → Deployments → Connect to Git** and select this repository.
 2. Configure commands:
    - Install: `npm install`
-   - Build: `npm run build`
+   - Build *(optional)*: `npm run build` *(Wrangler will execute the configured build command during deploy; keep this step only if you want an explicit preflight build.)*
    - Deploy: `npx wrangler deploy`
 3. Provide an API token (Workers + R2 write scopes) or service binding.
 4. Define `SITE_NAME` and other vars per environment, and confirm the `STORE` binding targets the right bucket before enabling auto-production promotions.
