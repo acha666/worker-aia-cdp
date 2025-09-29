@@ -2,6 +2,10 @@
     "name": "aia-cdp-worker",
     "main": "src/worker.ts",
     "compatibility_date": "2025-09-16",
+    "build": {
+        "command": "npm run build",
+        "watch_dir": "src/frontend"
+    },
     "r2_buckets": [
         {
             "binding": "STORE",
@@ -9,7 +13,7 @@
         }
     ],
     "vars": {
-        "SITE_NAME": "Acha PKI AIA/CDP"
+        "SITE_NAME": "PKI AIA/CDP"
     },
     "observability": {
         "logs": {
@@ -31,7 +35,11 @@
                 }
             ],
             "vars": {
-                "SITE_NAME": "Acha PKI AIA/CDP (Dev)"
+                "SITE_NAME": "PKI AIA/CDP (Dev)"
+            },
+            "build": {
+                "command": "npm run build",
+                "watch_dir": "src/frontend"
             },
             "observability": {
                 "logs": {

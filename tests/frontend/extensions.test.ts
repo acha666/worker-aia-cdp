@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parseHTML } from "linkedom";
 
-import { buildExtensionsSection } from "../../public/js/components/details/extensions.js";
+import { buildExtensionsSection } from "../../src/frontend/components/details/extensions.js";
 
 const { window } = parseHTML("<!doctype html><html><body></body></html>");
 
