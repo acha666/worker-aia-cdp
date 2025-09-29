@@ -59,12 +59,15 @@
 
 ## Running & Testing
 - Install deps: `npm install`.
-- Dev server: `npm run dev` (wrangler dev).
+- Dev server: `npm run dev:local` for local Vite + Wrangler. Use `npm run dev:remote` when you need the Worker to execute against Cloudflare's edge (hits the `preview_bucket_name` for `STORE`).
 - Unit tests: `npm test`.
   - Backend coverage now exercises cache helpers (`src/config/cache.ts`), R2 list caching (`src/r2/listing.ts`), summary metadata workflows (`src/r2/summary.ts`), and PKI format utilities (`src/pki/format.ts`) using the OpenSSL fixtures under `tests/fixtures/`.
   - Front-end suites run against a [`linkedom`](https://github.com/WebReflection/linkedom) DOM, covering formatter utilities plus the list/status components in `public/js/components/`.
-- Production deploy: `npm run deploy` (wrangler deploy).
 - Additional regeneration and troubleshooting notes live in `tests/README.md` (covers fixture commands and expected SHA-256 fingerprints).
+
+## Deployment Playbook
+- **Manual:** authenticate Wrangler, run `npm run build`, then `wrangler deploy --remote` (append `-e dev` for the staging environment). Confirm the `STORE` binding targets the correct R2 bucket.
+- **Git-based:** connect the repo under **Workers → Deployments**. Configure commands `npm install`, `npm run build`, and `npx wrangler deploy --remote`. Provide an API token with Worker + R2 write access and map environment variables (e.g. `SITE_NAME`) per environment before enabling auto deploy.
 
 ## Key Behaviours to Remember
 - `initializePkijsEngine()` invoked once at startup (`src/worker.ts`).
