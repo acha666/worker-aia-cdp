@@ -13,7 +13,7 @@ import {
   formatRelativeSeconds,
   formatSerial,
   renderValue,
-} from "../../src/frontend/formatters.js";
+} from "../../frontend/src/formatters.js";
 
 const { window } = parseHTML("<!doctype html><html><body></body></html>");
 

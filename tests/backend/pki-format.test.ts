@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
-import { decimalFromHex, sha256Hex, toHex } from "../../src/pki/format";
+import { decimalFromHex, sha256Hex, toHex } from "../../backend/src/pki/format";
 
 const CERT_DER_URL = new URL("../fixtures/test-leaf.cert.der", import.meta.url);
 

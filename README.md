@@ -4,10 +4,10 @@ Cloudflare Worker that serves PKI Authority Information Access (AIA) certificate
 
 ## Repository map
 
-- `src/worker.ts` – Worker entry point and routing.
-- `src/frontend/` – UI modules, helpers, and tests.
-- `src/frontend/styles/main.css` – canonical stylesheet imported by the entry module.
-- `src/frontend/public/` – static assets copied verbatim into the build (favicons, logos, etc.).
+- `backend/src/worker.ts` – Worker entry point and routing.
+- `frontend/src/` – UI modules, helpers, and tests.
+- `frontend/src/styles/main.css` – canonical stylesheet imported by the entry module.
+- `frontend/public/` – static assets copied verbatim into the build (favicons, logos, etc.).
 - `public/` – generated artefacts (HTML, JS, CSS); ignored by git and recreated by `npm run build`.
 - `tests/` – backend and frontend tests executed with `tsx --test`.
 - `scripts/` – optional automation helpers (e.g. Windows AD CS uploader).
@@ -55,12 +55,12 @@ Cloudflare Worker that serves PKI Authority Information Access (AIA) certificate
 
 - `wrangler.jsonc` sets `vars.SITE_NAME` per environment; the Worker reads it via `env.SITE_NAME`.
 - During builds, Vite loads `SITE_NAME` from `.env*` files or `process.env`. `vite.config.js` falls back to the same string used in `wrangler.jsonc`.
-- The plugin in `vite.config.js` replaces `%SITE_NAME%` placeholders in `src/frontend/index.html` and exposes `__SITE_NAME__` for scripts.
+- The plugin in `vite.config.js` replaces `%SITE_NAME%` placeholders in `frontend/src/index.html` and exposes `__SITE_NAME__` for scripts.
 - When Wrangler runs the build step, pass `SITE_NAME="…"` (or provide an `.env.production`) so the generated HTML matches the target environment.
 
 ## Static assets
 
-- Add favicons or other static files to `src/frontend/public/`.
+- Add favicons or other static files to `frontend/public/`.
 - Vite copies that folder into `public/` during any build.
 - Remove `public/` to force a clean rebuild; the directory is disposable.
 

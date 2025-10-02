@@ -10,7 +10,7 @@ import {
   describeCertificateStatus,
   describeCrlStatus,
   renderStatusDisplay,
-} from "../../src/frontend/components/details/status.js";
+} from "../../frontend/src/components/details/status.js";
 
 const { window } = parseHTML("<!doctype html><html><body></body></html>");
 

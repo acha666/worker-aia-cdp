@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { jsonError, jsonSuccess, mergeJsonHeaders } from "../../src/http/json-response";
+import { jsonError, jsonSuccess, mergeJsonHeaders } from "../../backend/src/http/json-response";
 
 test("jsonSuccess wraps payload with metadata and default headers", async () => {
   const response = jsonSuccess({ hello: "world" }, {

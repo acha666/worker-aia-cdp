@@ -3,8 +3,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { cachedListAllWithPrefix } from "../../src/r2/listing";
-import { listCacheKeys } from "../../src/config/cache";
+import { cachedListAllWithPrefix } from "../../backend/src/r2/listing";
+import { listCacheKeys } from "../../backend/src/config/cache";
 
 class MemoryCache {
   readonly store = new Map<string, Response>();
@@ -25,7 +25,7 @@ function createEnv(listImpl: (options: { prefix: string; cursor?: string; delimi
     STORE: {
       list: listImpl,
     },
-  } as unknown as import("../../src/env").Env;
+  } as unknown as import("../../backend/src/env").Env;
 }
 
 test("cachedListAllWithPrefix returns cached items without hitting R2", async () => {

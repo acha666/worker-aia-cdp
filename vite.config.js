@@ -45,11 +45,11 @@ export default defineConfig(({ mode }) => {
       }
     },
 
-    // Root directory for frontend source
-    root: 'src/frontend',
+  // Root directory for frontend source
+  root: 'frontend/src',
 
-    // Public directory for static assets
-    publicDir: 'public',
+  // Public directory for static assets
+  publicDir: '../public',
 
     plugins: [
       {

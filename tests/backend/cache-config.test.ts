@@ -14,7 +14,7 @@ import {
   getEdgeCache,
   listCacheKeys,
   withCacheStatus,
-} from "../../src/config/cache";
+} from "../../backend/src/config/cache";
 
 class MemoryCache {
   readonly store = new Map<string, Response>();

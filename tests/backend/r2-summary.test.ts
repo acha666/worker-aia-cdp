@@ -15,7 +15,7 @@ import {
   mergeSummaryWithMetadata,
   readSummaryFromMetadata,
   summaryToPayload,
-} from "../../src/r2/summary";
+} from "../../backend/src/r2/summary";
 
 type R2HTTPMetadata = Record<string, unknown>;
 
@@ -92,7 +92,7 @@ class MockBucket {
 function createEnv(bucket: MockBucket) {
   return {
     STORE: bucket,
-  } as unknown as import("../../src/env").Env;
+  } as unknown as import("../../backend/src/env").Env;
 }
 
 test("detectSummaryKind discriminates by extension", () => {

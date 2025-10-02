@@ -4,8 +4,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
-import { buildCertificateDetails, parseCertificate } from "../../src/pki";
-import { extractPEMBlock } from "../../src/crl/pem";
+import { buildCertificateDetails, parseCertificate } from "../../backend/src/pki";
+import { extractPEMBlock } from "../../backend/src/crl/pem";
 
 const CERT_DER_URL = new URL("../fixtures/test-leaf.cert.der", import.meta.url);
 const CA_PEM_URL = new URL("../fixtures/test-ca.cert.pem", import.meta.url);
