@@ -1,8 +1,20 @@
 import { fromBER, Sequence, Integer, OctetString } from "asn1js";
 import * as pkijs from "pkijs";
-import { describeName, bitStringBytes, describeAlgorithm } from "../utils";
-import { toHex, sha256Hex, sha1Hex, toJSDate } from "../format";
-import { KEY_ALG_NAMES, SIGNATURE_ALG_NAMES, CURVE_NAMES, EXTENSION_NAMES } from "../constants";
+import {
+  describeName,
+  bitStringBytes,
+  describeAlgorithm,
+  toHex,
+  sha256Hex,
+  sha1Hex,
+  toJSDate,
+} from "../utils";
+import {
+  KEY_ALG_NAMES,
+  SIGNATURE_ALG_NAMES,
+  CURVE_NAMES,
+  EXTENSION_NAMES,
+} from "../constants";
 import {
   parseBasicConstraints,
   parseKeyUsageExtension,
@@ -12,9 +24,9 @@ import {
   parseCRLDistributionPoints,
   parseCertificatePolicies,
   parseAuthorityKeyIdentifier,
+  type ExtensionDetail,
 } from "../extensions";
 import { getSKIHex } from "../parsers";
-import type { ExtensionDetail } from "./extensions";
 
 export interface DistinguishedNameAttribute {
   oid: string;
@@ -69,18 +81,29 @@ export interface CertificateMetadata {
   extensions: ExtensionDetail[];
 }
 
-export async function buildCertificateDetails(cert: pkijs.Certificate, der: ArrayBuffer): Promise<CertificateMetadata> {
+export async function buildCertificateDetails(
+  cert: pkijs.Certificate,
+  der: ArrayBuffer,
+): Promise<CertificateMetadata> {
   const subjectDescription = describeName(cert.subject);
   const issuerDescription = describeName(cert.issuer);
-  const notBefore = toJSDate((cert as any).notBefore);
-  const notAfter = toJSDate((cert as any).notAfter);
-  const serialHex = cert.serialNumber.valueBlock.valueHex ? toHex(cert.serialNumber.valueBlock.valueHex) : null;
-  const signatureAlgorithm = describeAlgorithm(cert.signatureAlgorithm.algorithmId, SIGNATURE_ALG_NAMES);
+  const notBefore = toJSDate(cert.notBefore as unknown as Date);
+  const notAfter = toJSDate(cert.notAfter as unknown as Date);
+  const serialHex = cert.serialNumber.valueBlock.valueHex
+    ? toHex(cert.serialNumber.valueBlock.valueHex)
+    : null;
+  const signatureAlgorithm = describeAlgorithm(
+    cert.signatureAlgorithm.algorithmId,
+    SIGNATURE_ALG_NAMES,
+  );
   const signatureBytes = bitStringBytes(cert.signatureValue);
   const signatureHex = signatureBytes.length ? toHex(signatureBytes) : null;
 
   const spki = cert.subjectPublicKeyInfo;
-  const publicKeyAlgorithm = describeAlgorithm(spki.algorithm.algorithmId, KEY_ALG_NAMES);
+  const publicKeyAlgorithm = describeAlgorithm(
+    spki.algorithm.algorithmId,
+    KEY_ALG_NAMES,
+  );
   const spkiDer = spki.toSchema().toBER(false);
   const spkFingerprintSha256 = await sha256Hex(spkiDer);
   const spkFingerprintSha1 = await sha1Hex(spkiDer);
@@ -97,18 +120,24 @@ export async function buildCertificateDetails(cert: pkijs.Certificate, der: Arra
       const modulus = sequence.valueBlock.value[0] as Integer;
       const exponent = sequence.valueBlock.value[1] as Integer;
       let modBytes = new Uint8Array(modulus.valueBlock.valueHex);
-      if (modBytes.length > 0 && modBytes[0] === 0) modBytes = modBytes.slice(1);
+      if (modBytes.length > 0 && modBytes[0] === 0) {
+        modBytes = modBytes.slice(1);
+      }
       keySizeBits = modBytes.length * 8;
       modulusHex = toHex(modBytes);
       keyExponent = exponent.valueBlock.valueDec ?? null;
     }
   } else if (spki.algorithm.algorithmId === "1.2.840.10045.2.1") {
-    const params: any = spki.algorithm.algorithmParams;
+    const params = spki.algorithm.algorithmParams as unknown as
+      | { valueBlock?: { toString?: () => string } }
+      | undefined;
     if (params?.valueBlock?.toString) {
       curveOid = params.valueBlock.toString();
-      curveName = curveOid ? CURVE_NAMES[curveOid] ?? curveOid : null;
+      curveName = curveOid ? (CURVE_NAMES[curveOid] ?? curveOid) : null;
     }
-    if (spkBytes.length > 1) keySizeBits = ((spkBytes.length - 1) / 2) * 8;
+    if (spkBytes.length > 1) {
+      keySizeBits = ((spkBytes.length - 1) / 2) * 8;
+    }
   } else if (CURVE_NAMES[spki.algorithm.algorithmId]) {
     curveOid = spki.algorithm.algorithmId;
     curveName = CURVE_NAMES[curveOid];
@@ -165,20 +194,34 @@ export async function buildCertificateDetails(cert: pkijs.Certificate, der: Arra
   };
 }
 
-type CertificateExtensionParsers = Record<string, (extension: pkijs.Extension, certificate: pkijs.Certificate) => unknown>;
+type CertificateExtensionParsers = Record<
+  string,
+  (extension: pkijs.Extension, certificate: pkijs.Certificate) => unknown
+>;
 
-function stripCritical<T extends { critical?: boolean }>(value: T | null | undefined): Omit<T, "critical"> | undefined {
-  if (!value || typeof value !== "object") return undefined;
+function stripCritical<T extends { critical?: boolean }>(
+  value: T | null | undefined,
+): Omit<T, "critical"> | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
   const { critical: _omit, ...rest } = value as T;
   return rest as Omit<T, "critical">;
 }
 
-function parseSubjectKeyIdentifierExtension(extension: pkijs.Extension, certificate: pkijs.Certificate) {
+function parseSubjectKeyIdentifierExtension(
+  extension: pkijs.Extension,
+  certificate: pkijs.Certificate,
+) {
   const existing = getSKIHex(certificate);
-  if (existing) return { hex: existing };
+  if (existing) {
+    return { hex: existing };
+  }
   try {
     const asn1 = fromBER(extension.extnValue.valueBlock.valueHex);
-    if (asn1.offset === -1) return undefined;
+    if (asn1.offset === -1) {
+      return undefined;
+    }
     const octet = asn1.result as OctetString;
     return { hex: toHex(octet.valueBlock.valueHex) };
   } catch (error) {
@@ -192,16 +235,23 @@ const CERTIFICATE_EXTENSION_PARSERS: CertificateExtensionParsers = {
   "2.5.29.15": (extension) => stripCritical(parseKeyUsageExtension(extension)),
   "2.5.29.37": (extension) => stripCritical(parseExtendedKeyUsage(extension)),
   "2.5.29.17": (extension) => stripCritical(parseSubjectAltName(extension)),
-  "1.3.6.1.5.5.7.1.1": (extension) => stripCritical(parseAuthorityInfoAccess(extension)),
-  "2.5.29.31": (extension) => stripCritical(parseCRLDistributionPoints(extension)),
-  "2.5.29.32": (extension) => stripCritical(parseCertificatePolicies(extension)),
-  "2.5.29.35": (extension) => stripCritical(parseAuthorityKeyIdentifier(extension)),
-  "2.5.29.14": (extension, certificate) => parseSubjectKeyIdentifierExtension(extension, certificate),
+  "1.3.6.1.5.5.7.1.1": (extension) =>
+    stripCritical(parseAuthorityInfoAccess(extension)),
+  "2.5.29.31": (extension) =>
+    stripCritical(parseCRLDistributionPoints(extension)),
+  "2.5.29.32": (extension) =>
+    stripCritical(parseCertificatePolicies(extension)),
+  "2.5.29.35": (extension) =>
+    stripCritical(parseAuthorityKeyIdentifier(extension)),
+  "2.5.29.14": (extension, certificate) =>
+    parseSubjectKeyIdentifierExtension(extension, certificate),
 };
 
-function buildCertificateExtensionDetails(cert: pkijs.Certificate): ExtensionDetail[] {
+function buildCertificateExtensionDetails(
+  cert: pkijs.Certificate,
+): ExtensionDetail[] {
   const extensions = cert.extensions ?? [];
-  return extensions.map(extension => {
+  return extensions.map((extension) => {
     const oid = extension.extnID;
     const parser = CERTIFICATE_EXTENSION_PARSERS[oid];
     const base: ExtensionDetail = {
@@ -209,9 +259,13 @@ function buildCertificateExtensionDetails(cert: pkijs.Certificate): ExtensionDet
       name: EXTENSION_NAMES[oid] ?? null,
       critical: extension.critical ?? false,
       status: "unparsed",
-      rawHex: extension.extnValue?.valueBlock?.valueHex ? toHex(extension.extnValue.valueBlock.valueHex) : null,
+      rawHex: extension.extnValue?.valueBlock?.valueHex
+        ? toHex(extension.extnValue.valueBlock.valueHex)
+        : null,
     };
-    if (!parser) return base;
+    if (!parser) {
+      return base;
+    }
     try {
       const value = parser(extension, cert) ?? undefined;
       return {

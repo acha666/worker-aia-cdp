@@ -4,11 +4,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { cachedListAllWithPrefix } from "../../backend/src/r2/listing";
-import { listCacheKeys } from "../../backend/src/config/cache";
+import { listCacheKeys } from "../../backend/src/cache";
 
 class MemoryCache {
   readonly store = new Map<string, Response>();
-  putCalls: Array<{ request: Request; response: Response }> = [];
+  putCalls: { request: Request; response: Response }[] = [];
 
   async match(request: Request) {
     return this.store.get(request.url) ?? null;
@@ -20,7 +20,13 @@ class MemoryCache {
   }
 }
 
-function createEnv(listImpl: (options: { prefix: string; cursor?: string; delimiter?: string }) => Promise<any>) {
+function createEnv(
+  listImpl: (options: {
+    prefix: string;
+    cursor?: string;
+    delimiter?: string;
+  }) => Promise<any>,
+) {
   return {
     STORE: {
       list: listImpl,
@@ -37,9 +43,12 @@ test("cachedListAllWithPrefix returns cached items without hitting R2", async ()
     ],
     cachedAt: "2025-09-26T00:00:00.000Z",
   };
-  await cache.put(listCacheKeys.CA, new Response(JSON.stringify(cachedItems), {
-    headers: { "Content-Type": "application/json" },
-  }));
+  await cache.put(
+    listCacheKeys.CA,
+    new Response(JSON.stringify(cachedItems), {
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
   cache.putCalls = [];
 
   const originalCaches = globalThis.caches;
@@ -69,7 +78,11 @@ test("cachedListAllWithPrefix fetches from R2 and populates cache when missing",
   globalThis.caches = { default: cache } as any;
 
   const objects = [
-    { key: "crl/current.crl", size: 4096, uploaded: new Date("2025-09-27T03:04:05.000Z") },
+    {
+      key: "crl/current.crl",
+      size: 4096,
+      uploaded: new Date("2025-09-27T03:04:05.000Z"),
+    },
   ];
 
   const env = createEnv(async () => ({
@@ -88,7 +101,10 @@ test("cachedListAllWithPrefix fetches from R2 and populates cache when missing",
     assert.equal(cache.putCalls.length, 1);
     const putCall = cache.putCalls[0];
     assert.equal(putCall.request.url, listCacheKeys.CRL.url);
-    const stored = await putCall.response.clone().json();
+    const stored = (await putCall.response.clone().json()) as {
+      items: { key: string; size: number; uploaded: string }[];
+      cachedAt: string;
+    };
     assert.equal(stored.items.length, 1);
     assert.equal(stored.items[0].key, "crl/current.crl");
     assert.equal(stored.items[0].size, 4096);

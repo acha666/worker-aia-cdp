@@ -42,7 +42,8 @@ if (typeof globalThis.crypto === "undefined") {
   (globalThis as { crypto: Crypto }).crypto = webcrypto as unknown as Crypto;
 }
 if (typeof globalThis.atob !== "function") {
-  globalThis.atob = (input: string) => Buffer.from(input, "base64").toString("binary");
+  globalThis.atob = (input: string) =>
+    Buffer.from(input, "base64").toString("binary");
 }
 
 const CERT_PEM_URL = new URL("../fixtures/test-leaf.cert.pem", import.meta.url);
@@ -54,9 +55,16 @@ class MockR2Object implements R2ObjectBody {
   readonly etag?: string | null;
   #buffer: ArrayBuffer;
 
-  constructor(buffer: ArrayBuffer | Uint8Array, metadata?: Record<string, string>) {
-    const bytes = buffer instanceof Uint8Array ? buffer.slice() : new Uint8Array(buffer);
-    this.#buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  constructor(
+    buffer: ArrayBuffer | Uint8Array,
+    metadata?: Record<string, string>,
+  ) {
+    const bytes =
+      buffer instanceof Uint8Array ? buffer.slice() : new Uint8Array(buffer);
+    this.#buffer = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength,
+    );
     this.customMetadata = metadata;
     this.httpMetadata = {};
     this.httpEtag = '"etag-value"';
@@ -80,12 +88,16 @@ class MockBucket {
     this.object = object;
   }
 
-  async get(key: string): Promise<R2Object | null> {
+  async get(_key: string): Promise<R2Object | null> {
     return this.object as unknown as R2Object | null;
   }
 
-  async put(key: string, data: ArrayBuffer | Uint8Array, options: R2PutOptions): Promise<void> {
-    this.lastPut = { key, data, options };
+  async put(
+    _key: string,
+    _data: ArrayBuffer | Uint8Array,
+    _options: R2PutOptions,
+  ): Promise<void> {
+    this.lastPut = { key: _key, data: _data, options: _options };
   }
 }
 
@@ -104,8 +116,14 @@ test("detectSummaryKind discriminates by extension", () => {
 });
 
 test("fallbackDisplayName strips prefix and cleans value", () => {
-  assert.equal(fallbackDisplayName("ca/Example Authority.cer"), "Example Authority");
-  assert.equal(fallbackDisplayName("crl/example-delta.crl", "crl"), "example delta");
+  assert.equal(
+    fallbackDisplayName("ca/Example Authority.cer"),
+    "Example Authority",
+  );
+  assert.equal(
+    fallbackDisplayName("crl/example-delta.crl", "crl"),
+    "example delta",
+  );
 });
 
 test("readSummaryFromMetadata reconstructs summary payload", () => {
@@ -153,7 +171,10 @@ test("buildSummaryMetadata rolls new fields into base metadata", () => {
     nextUpdate: null,
     isDelta: null,
   };
-  const metadata = buildSummaryMetadata(summary, { foo: "bar", baz: undefined });
+  const metadata = buildSummaryMetadata(summary, {
+    foo: "bar",
+    baz: undefined,
+  });
   assert.equal(metadata.summaryVersion, SUMMARY_VERSION);
   assert.equal(metadata.summaryObjectType, "certificate");
   assert.equal(metadata.summaryDisplayName, "Leaf Certificate");

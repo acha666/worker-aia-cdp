@@ -1,10 +1,20 @@
 import * as pkijs from "pkijs";
-import { describeName, bitStringBytes, describeAlgorithm } from "../utils";
-import { toHex, sha1Hex, sha256Hex, toJSDate } from "../format";
+import {
+  describeName,
+  bitStringBytes,
+  describeAlgorithm,
+  toHex,
+  sha1Hex,
+  sha256Hex,
+  toJSDate,
+} from "../utils";
 import { SIGNATURE_ALG_NAMES, EXTENSION_NAMES } from "../constants";
 import { getCRLNumber, getDeltaBaseCRLNumber, getCRLAKIHex } from "../parsers";
-import { parseAuthorityKeyIdentifier, parseCRLReason } from "../extensions";
-import type { ExtensionDetail } from "./extensions";
+import {
+  parseAuthorityKeyIdentifier,
+  parseCRLReason,
+  type ExtensionDetail,
+} from "../extensions";
 
 export interface CrlEntrySummary {
   serialNumberHex: string | null;
@@ -48,7 +58,10 @@ export interface CrlMetadata {
   isDelta: boolean;
 }
 
-export async function buildCRLDetails(crl: pkijs.CertificateRevocationList, der: ArrayBuffer): Promise<CrlMetadata> {
+export async function buildCRLDetails(
+  crl: pkijs.CertificateRevocationList,
+  der: ArrayBuffer,
+): Promise<CrlMetadata> {
   const issuerDescription = describeName(crl.issuer);
   const thisUpdate = toJSDate(crl.thisUpdate);
   const nextUpdate = toJSDate(crl.nextUpdate);
@@ -56,16 +69,23 @@ export async function buildCRLDetails(crl: pkijs.CertificateRevocationList, der:
   const baseCRLNumber = getDeltaBaseCRLNumber(crl)?.toString() ?? null;
   const isDelta = baseCRLNumber !== null;
   const authorityKeyIdentifier = getCRLAKIHex(crl) || null;
-  const signatureAlgorithm = describeAlgorithm(crl.signatureAlgorithm.algorithmId, SIGNATURE_ALG_NAMES);
+  const signatureAlgorithm = describeAlgorithm(
+    crl.signatureAlgorithm.algorithmId,
+    SIGNATURE_ALG_NAMES,
+  );
   const signatureBytes = bitStringBytes(crl.signatureValue);
   const signatureHex = signatureBytes.length ? toHex(signatureBytes) : null;
   const fingerprints = {
     sha1: await sha1Hex(der),
     sha256: await sha256Hex(der),
   };
-  const revoked = ((crl as any).revokedCertificates ?? []) as Array<pkijs.RevokedCertificate>;
-  const sample = revoked.slice(0, 5).map(entry => {
-    const serialHex = entry.userCertificate.valueBlock.valueHex ? toHex(entry.userCertificate.valueBlock.valueHex) : null;
+  const revoked = ((
+    crl as unknown as { revokedCertificates?: pkijs.RevokedCertificate[] }
+  ).revokedCertificates ?? []) as pkijs.RevokedCertificate[];
+  const sample = revoked.slice(0, 5).map((entry) => {
+    const serialHex = entry.userCertificate.valueBlock.valueHex
+      ? toHex(entry.userCertificate.valueBlock.valueHex)
+      : null;
     return {
       serialNumberHex: serialHex,
       revocationDate: toJSDate(entry.revocationDate)?.toISOString() ?? null,
@@ -106,16 +126,24 @@ export async function buildCRLDetails(crl: pkijs.CertificateRevocationList, der:
   };
 }
 
-type CrlExtensionParsers = Record<string, (extension: pkijs.Extension, crl: pkijs.CertificateRevocationList) => unknown>;
+type CrlExtensionParsers = Record<
+  string,
+  (extension: pkijs.Extension, crl: pkijs.CertificateRevocationList) => unknown
+>;
 
-function stripCritical<T extends { critical?: boolean }>(value: T | null | undefined): Omit<T, "critical"> | undefined {
-  if (!value || typeof value !== "object") return undefined;
+function stripCritical<T extends { critical?: boolean }>(
+  value: T | null | undefined,
+): Omit<T, "critical"> | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
   const { critical: _omit, ...rest } = value as T;
   return rest as Omit<T, "critical">;
 }
 
 const CRL_EXTENSION_PARSERS: CrlExtensionParsers = {
-  "2.5.29.35": (extension) => stripCritical(parseAuthorityKeyIdentifier(extension)),
+  "2.5.29.35": (extension) =>
+    stripCritical(parseAuthorityKeyIdentifier(extension)),
   "2.5.29.20": (_extension, crl) => {
     const number = getCRLNumber(crl);
     return typeof number === "bigint" ? number.toString(10) : undefined;
@@ -126,9 +154,11 @@ const CRL_EXTENSION_PARSERS: CrlExtensionParsers = {
   },
 };
 
-function buildCrlExtensionDetails(crl: pkijs.CertificateRevocationList): ExtensionDetail[] {
+function buildCrlExtensionDetails(
+  crl: pkijs.CertificateRevocationList,
+): ExtensionDetail[] {
   const extensions = crl.crlExtensions?.extensions ?? [];
-  return extensions.map(extension => {
+  return extensions.map((extension) => {
     const oid = extension.extnID;
     const parser = CRL_EXTENSION_PARSERS[oid];
     const base: ExtensionDetail = {
@@ -136,9 +166,13 @@ function buildCrlExtensionDetails(crl: pkijs.CertificateRevocationList): Extensi
       name: EXTENSION_NAMES[oid] ?? null,
       critical: extension.critical ?? false,
       status: "unparsed",
-      rawHex: extension.extnValue?.valueBlock?.valueHex ? toHex(extension.extnValue.valueBlock.valueHex) : null,
+      rawHex: extension.extnValue?.valueBlock?.valueHex
+        ? toHex(extension.extnValue.valueBlock.valueHex)
+        : null,
     };
-    if (!parser) return base;
+    if (!parser) {
+      return base;
+    }
     try {
       const value = parser(extension, crl) ?? undefined;
       return {
