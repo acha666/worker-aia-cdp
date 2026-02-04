@@ -3,15 +3,30 @@
     "main": "backend/src/worker.ts",
     "compatibility_date": "2025-09-16",
     "build": {
-    "command": "npm run build",
-    "watch_dir": "frontend/src"
+        "command": "npm run build",
+        "watch_dir": "frontend/src"
     },
     "r2_buckets": [
         {
-            "binding": "STORE",
-            "bucket_name": "aia-cdp"
+            // Automatic resource provisioning
+            // https://developers.cloudflare.com/changelog/2025-10-24-automatic-resource-provisioning/
+            "binding": "STORE"
         }
     ],
+    "env": {
+        "local": {
+            // Local dev environment with explicit bucket name
+            // Disables automatic provisioning for CLI compatibility
+            "r2_buckets": [
+                {
+                    "binding": "STORE",
+                    "bucket_name": "aia-cdp-local",
+                    "preview_bucket_name": "aia-cdp-local"
+                }
+            ]
+        }
+    },
+    "keep_vars": true,
     "vars": {
         "SITE_NAME": "PKI AIA/CDP"
     },
@@ -22,30 +37,5 @@
     },
     "assets": {
         "directory": "./public"
-    },
-    "env": {
-        "dev": {
-            "name": "aia-cdp-worker-dev",
-            "workers_dev": true,
-            "r2_buckets": [
-                {
-                    "binding": "STORE",
-                    "bucket_name": "aia-cdp",
-                    "preview_bucket_name": "aia-cdp-dev"
-                }
-            ],
-            "vars": {
-                "SITE_NAME": "PKI AIA/CDP (Dev)"
-            },
-            "build": {
-                "command": "npm run build",
-                "watch_dir": "frontend/src"
-            },
-            "observability": {
-                "logs": {
-                    "enabled": true
-                }
-            }
-        }
     }
 }
