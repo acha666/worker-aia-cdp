@@ -75,6 +75,7 @@ export const useCertificatesStore = defineStore("certificates", () => {
       const detail = await getCertificate(id, {
         include: ["extensions"],
       });
+      if (!detail) return null;
       detailCache.value.set(id, detail);
       return detail;
     } catch (e) {

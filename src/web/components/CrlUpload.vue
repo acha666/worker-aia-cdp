@@ -116,7 +116,7 @@ async function processFile(file: File) {
 </script>
 
 <template>
-  <div class="bg-white border border-gray-200 rounded-lg p-6">
+  <div class="card p-6">
     <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
       <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
@@ -236,7 +236,7 @@ async function processFile(file: File) {
         <button
           type="submit"
           :disabled="!isValid || store.uploading"
-          class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          class="btn-primary flex items-center gap-2"
         >
           <svg v-if="store.uploading" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
             <circle

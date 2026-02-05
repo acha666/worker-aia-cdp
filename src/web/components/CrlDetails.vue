@@ -4,16 +4,11 @@ import type { CrlDetail, Extension } from "@contracts/schemas";
 import ExtensionView from "./ExtensionView.vue";
 import { formatDateReadable, formatTimezoneOffset, getRelativeTime } from "../utils/dates";
 import { formatName } from "../utils/x509";
+import { copyToClipboard, formatHex } from "../utils/format";
 
 const props = defineProps<{
   crl: CrlDetail;
 }>();
-
-function formatHex(hex: string, groupSize = 2): string {
-  const upper = hex.toUpperCase();
-  const groups = upper.match(new RegExp(`.{1,${groupSize}}`, "g")) || [];
-  return groups.join(":");
-}
 
 const validityInfo = computed(() => {
   const thisUpdate = props.crl.tbsCertList.thisUpdate?.iso;
@@ -39,10 +34,6 @@ const validityInfo = computed(() => {
 
   return { display, relative };
 });
-
-function copyToClipboard(text: string) {
-  navigator.clipboard.writeText(text);
-}
 
 function getCrlReasonName(extension: Extension): string | null {
   if (extension.parseStatus !== "parsed") return null;

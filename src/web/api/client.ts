@@ -54,7 +54,28 @@ function handleApiResponse<T>(response: { status: number; body: unknown }): T {
     throw new ApiError(body.error.code, body.error.message, body.error.details);
   }
 
+  if (body.data === null || body.data === undefined) {
+    throw new ApiError("empty_response", "Empty response data", { status: response.status });
+  }
+
   return body.data as T;
+}
+
+function handleApiResponseNullable<T>(response: { status: number; body: unknown }): T | null {
+  const body = response.body as {
+    data: T | null;
+    error: {
+      code: string;
+      message: string;
+      details?: Record<string, unknown>;
+    } | null;
+  };
+
+  if (body.error) {
+    throw new ApiError(body.error.code, body.error.message, body.error.details);
+  }
+
+  return body.data ?? null;
 }
 
 // =============================================================================
@@ -110,7 +131,7 @@ export interface GetCertificateOptions {
 export async function getCertificate(
   id: string,
   options?: GetCertificateOptions
-): Promise<CertificateDetail & { storage?: StorageInfo }> {
+): Promise<(CertificateDetail & { storage?: StorageInfo }) | null> {
   const response = await api.certificates.get({
     params: { id },
     query: {
@@ -118,7 +139,7 @@ export async function getCertificate(
     },
   });
 
-  return handleApiResponse(response);
+  return handleApiResponseNullable(response);
 }
 
 // =============================================================================
@@ -176,7 +197,7 @@ export interface GetCrlOptions {
 export async function getCrl(
   id: string,
   options?: GetCrlOptions
-): Promise<CrlDetail & { storage?: StorageInfo }> {
+): Promise<(CrlDetail & { storage?: StorageInfo }) | null> {
   const response = await api.crls.get({
     params: { id },
     query: {
@@ -186,7 +207,7 @@ export async function getCrl(
     },
   });
 
-  return handleApiResponse(response);
+  return handleApiResponseNullable(response);
 }
 
 export async function uploadCrl(pem: string): Promise<CrlUploadResult> {

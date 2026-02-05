@@ -41,10 +41,11 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "include": ["index.html"],
-    "exclude": ["*.map"],
-  },
-  "site": {
-    "bucket": "./public",
-  },
+    "include": [
+      "index.html"
+    ],
+    "exclude": [
+      "*.map"
+    ],
+  }
 }

@@ -2,8 +2,9 @@
 import { computed } from "vue";
 import type { CertificateDetail } from "@contracts/schemas";
 import ExtensionView from "./ExtensionView.vue";
-import { formatDateReadable, formatRelativeSeconds, formatTimezoneOffset } from "../utils/dates";
+import { formatDateReadable, formatTimezoneOffset, getRelativeTime } from "../utils/dates";
 import { formatName } from "../utils/x509";
+import { copyToClipboard, formatHex } from "../utils/format";
 
 const props = defineProps<{
   certificate: CertificateDetail;
@@ -28,24 +29,6 @@ const publicKeyInfo = computed(() => {
   return { type: parsed.type ?? "unknown" };
 });
 
-function formatHex(hex: string, groupSize = 2): string {
-  const upper = hex.toUpperCase();
-  const groups = upper.match(new RegExp(`.{1,${groupSize}}`, "g")) || [];
-  return groups.join(":");
-}
-
-function getRelativeTime(notAfter: string | null): string {
-  if (!notAfter) return "";
-  try {
-    const date = new Date(notAfter);
-    const now = new Date();
-    const diffSeconds = Math.floor((date.getTime() - now.getTime()) / 1000);
-    return formatRelativeSeconds(diffSeconds);
-  } catch {
-    return "";
-  }
-}
-
 const validityInfo = computed(() => {
   const { notBefore, notAfter } = props.certificate.tbsCertificate.validity;
   if (!notBefore?.iso || !notAfter?.iso) {
@@ -64,10 +47,6 @@ const validityInfo = computed(() => {
 
   return { display, relative };
 });
-
-function copyToClipboard(text: string) {
-  navigator.clipboard.writeText(text);
-}
 </script>
 
 <template>

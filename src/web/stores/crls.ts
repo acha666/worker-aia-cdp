@@ -67,6 +67,7 @@ export const useCrlsStore = defineStore("crls", () => {
       const detail = await getCrl(id, {
         include: ["extensions", "revokedCertificates"],
       });
+      if (!detail) return null;
       detailCache.value.set(id, detail);
       return detail;
     } catch (e) {
