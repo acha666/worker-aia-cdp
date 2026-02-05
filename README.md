@@ -1,32 +1,18 @@
 # PKI AIA/CDP Worker
 
-Host your PKI certificates and Certificate Revocation Lists (CRLs) on Cloudflare's edge network using Workers and R2 storage.
+Cloudflare Worker and Vue UI for serving X.509 certificates and CRLs using AIA and CDP distribution.
 
-## What This Does
-
-- **Serves certificates and CRLs** via HTTP from R2 storage
-- **Parses and displays** PKI information in a web UI
-- **Provides API endpoints** for programmatic access
-- **Runs on Cloudflare's edge** for global availability
-
-Perfect for organizations that need to publish AIA (Authority Information Access) certificates and CDP (CRL Distribution Point) files.
-
-## For Developers
-
-Working on this project? See [DEV-README.md](DEV-README.md) for development setup and workflow.
-
-Quick start:
+## Quick start
 
 ```bash
 npm install
-cp wrangler.example.jsonc wrangler.jsonc
 npm run seed:dev
 npm run dev
 ```
 
 ## Deployment
 
-### Option 1: Deploy via Cloudflare Dashboard (Easiest)
+### Deploy via Cloudflare Dashboard (Easiest)
 
 1. **Fork this repository** to your GitHub account
 
@@ -43,75 +29,50 @@ npm run dev
    - R2 bucket is automatically created
    - Future git pushes will auto-deploy
 
-### Option 2: Deploy via Command Line
+### Deploy via Command Line
 
-1. **Login to Cloudflare:**
+```bash
+npx wrangler login
+npm run deploy
+```
 
-   ```bash
-   npx wrangler login
-   ```
+## Initial Setup
 
-2. **Customize configuration:**
-   - Copy `wrangler.example.jsonc` to `wrangler.jsonc`
-   - Edit `bucket_name` and `SITE_NAME` if desired
+Upload your CA certificates to R2 prior to uploading CRLs. The certificates stored in R2 define the whitelist of issuers whose CRLs are accepted. CRL validation checks that the issuer certificate exists in the bucket before storing a new CRL.
 
-3. **Deploy:**
-   ```bash
-   npm run deploy
-   ```
+Use the web UI or POST to `/api/v2/crls` to upload CRL files after certificates are in place.
 
-### After Deployment
+## Usage
 
-Upload Endpoints
+### Web UI
 
-| Endpoint                    | Method | Description                                          |
-| --------------------------- | ------ | ---------------------------------------------------- |
-| `/`                         | GET    | Web UI showing all certificates and CRLs             |
-| `/ca/{filename}`            | GET    | Download certificate (DER format)                    |
-| `/crl/{filename}`           | GET    | Download CRL (DER format, append .pem for PEM)       |
-| `/dcrl/{filename}`          | GET    | Download Delta CRL (DER format, append .pem for PEM) |
-| `/api/v2/certificates`      | GET    | List certificates (JSON)                             |
-| `/api/v2/certificates/{id}` | GET    | Certificate details (JSON)                           |
-| `/api/v2/crls`              | GET    | List CRLs (JSON)                                     |
-| `/api/v2/crls/{id}`         | GET    | CRL details (JSON)                                   |
-| `/api/v2/crls`              | POST   | Upload a CRL (PEM or DER)                            |
-| `/api/v2/stats`             | GET    | Aggregate statistics                                 |
-| `/api/v2/health`            | GET    | Health check                                         |
+| Path | Method | Purpose                               |
+| ---- | ------ | ------------------------------------- |
+| `/`  | GET    | Certificate and CRL manager interface |
 
-## Requirements
+### Artifact Downloads
 
-- **Cloudflare account** (free tier works!)
-- **Node.js 18+** (for local development)
-- **Git** (to fork and deploy)
+Direct access for PKI tooling. Both DER and PEM formats are available; append `.pem` to the URL for PEM-encoded artifacts.
 
-## Windows AD CS Integration
+| Path               | Format      |
+| ------------------ | ----------- |
+| `/ca/{filename}`   | Certificate |
+| `/crl/{filename}`  | Full CRL    |
+| `/dcrl/{filename}` | Delta CRL   |
 
-If you use Windows Active Directory Certificate Services, check out `scripts/adcs-crl-uploader.ps1` for automated CRL publishing. It monitors CA events and automatically uploads new CRLs to your worker.
+### API Endpoints
 
-## License
+JSON endpoints for programmatic access. See full API design in [docs/api-design-v2.md](docs/api-design-v2.md).
 
-See [LICENSE](LICENSE) for details
-
-**Using the Windows PowerShell script:**
-See `scripts/adcs-crl-uploader.ps1` for automated CRL uploads from Windows AD CS.
-
-## API surface
-
-- `/` – HTML index listing certificates and CRLs.
-- `/ca/*`, `/crl/*`, `/dcrl/*` – binary/PEM delivery via GET/HEAD.
-- `GET /api/v2/certificates` – list certificates.
-- `GET /api/v2/certificates/{id}` – certificate details.
-- `GET /api/v2/crls` – list CRLs.
-- `GET /api/v2/crls/{id}` – CRL details.
-- `POST /api/v2/crls` – upload CRL (`Content-Type: text/plain` or `application/pkix-crl`).
-- `GET /api/v2/stats` – aggregated stats.
-- `GET /api/v2/health` – health check.
-
-## Requirements
-
-- Node.js ≥ 18
-- Cloudflare account with Wrangler CLI authenticated for manual deployment (`npx wrangler login`)
-- R2 bucket automatically provisioned or manually created
+| Path                        | Method | Purpose                 |
+| --------------------------- | ------ | ----------------------- |
+| `/api/v2/health`            | GET    | Service health check    |
+| `/api/v2/certificates`      | GET    | List certificates       |
+| `/api/v2/certificates/{id}` | GET    | Certificate details     |
+| `/api/v2/crls`              | GET    | List CRLs               |
+| `/api/v2/crls/{id}`         | GET    | CRL details             |
+| `/api/v2/crls`              | POST   | Upload CRL (PEM or DER) |
+| `/api/v2/stats`             | GET    | Service statistics      |
 
 ## Windows AD CS helper
 
