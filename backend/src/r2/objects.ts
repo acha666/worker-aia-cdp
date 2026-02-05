@@ -35,7 +35,9 @@ export async function putBinary(
 export async function getExistingCRL(env: Env, key: string) {
   try {
     const object = await env.STORE.get(key);
-    if (!object) {return undefined;}
+    if (!object) {
+      return undefined;
+    }
 
     const der = await object.arrayBuffer();
     let parsed;

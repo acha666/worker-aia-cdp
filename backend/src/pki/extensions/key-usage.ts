@@ -4,15 +4,21 @@ import { KEY_USAGE_FLAGS } from "../constants";
 import { toHex } from "../utils";
 
 export function parseKeyUsageExtension(extension?: pkijs.Extension) {
-  if (!extension) {return undefined;}
+  if (!extension) {
+    return undefined;
+  }
   try {
     const asn1 = fromBER(extension.extnValue.valueBlock.valueHex);
-    if (asn1.offset === -1) {return undefined;}
+    if (asn1.offset === -1) {
+      return undefined;
+    }
     const bitString = asn1.result as BitString;
     const bytes =
       bitString.valueBlock.valueHexView ??
       new Uint8Array(bitString.valueBlock.valueHex);
-    if (bytes.length === 0) {return undefined;}
+    if (bytes.length === 0) {
+      return undefined;
+    }
     const unusedBits =
       typeof bitString.valueBlock.unusedBits === "number"
         ? bitString.valueBlock.unusedBits
@@ -30,7 +36,9 @@ export function parseKeyUsageExtension(extension?: pkijs.Extension) {
       const bitPosition = 7 - (bitIndex % 8);
       const isSet = (bytes[byteIndex] & (1 << bitPosition)) !== 0;
       flags[flagName] = isSet;
-      if (isSet) {enabled.push(flagName);}
+      if (isSet) {
+        enabled.push(flagName);
+      }
     }
     return {
       critical: extension.critical ?? false,

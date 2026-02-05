@@ -16,6 +16,7 @@ Perfect for organizations that need to publish AIA (Authority Information Access
 Working on this project? See [DEV-README.md](DEV-README.md) for development setup and workflow.
 
 Quick start:
+
 ```bash
 npm install
 cp wrangler.example.jsonc wrangler.jsonc
@@ -32,15 +33,12 @@ npm run dev
 2. **Connect to Cloudflare:**
    - Go to Cloudflare Dashboard → **Workers & Pages** → **Create**
    - Click **Connect to Git** and select your fork
-   
 3. **Configure build:**
    - Build command: `npm run build`
    - Deploy command: `npx wrangler deploy`
-   
 4. **Set your site name:**
    - Add environment variable `SITE_NAME` with your custom name
    - The `keep_vars: true` setting protects all vars from being reset on redeploy
-   
 5. **Deploy!**
    - R2 bucket is automatically created
    - Future git pushes will auto-deploy
@@ -48,6 +46,7 @@ npm run dev
 ### Option 2: Deploy via Command Line
 
 1. **Login to Cloudflare:**
+
    ```bash
    npx wrangler login
    ```
@@ -65,15 +64,19 @@ npm run dev
 
 Upload Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Web UI showing all certificates and CRLs |
-| `/ca/{filename}` | GET | Download certificate (DER format) |
-| `/crl/{filename}` | GET | Download CRL (PEM format) |
-| `/dcrl/{filename}` | GET | Download Delta CRL (DER format) |
-| `/api/v1/collections/{ca\|crl\|dcrl}/items` | GET | List objects as JSON |
-| `/api/v1/objects/{key}/metadata` | GET | Get parsed PKI metadata |
-| `/api/v1/crls` | POST | Upload a CRL (send PEM in body) |
+| Endpoint                    | Method | Description                                          |
+| --------------------------- | ------ | ---------------------------------------------------- |
+| `/`                         | GET    | Web UI showing all certificates and CRLs             |
+| `/ca/{filename}`            | GET    | Download certificate (DER format)                    |
+| `/crl/{filename}`           | GET    | Download CRL (DER format, append .pem for PEM)       |
+| `/dcrl/{filename}`          | GET    | Download Delta CRL (DER format, append .pem for PEM) |
+| `/api/v2/certificates`      | GET    | List certificates (JSON)                             |
+| `/api/v2/certificates/{id}` | GET    | Certificate details (JSON)                           |
+| `/api/v2/crls`              | GET    | List CRLs (JSON)                                     |
+| `/api/v2/crls/{id}`         | GET    | CRL details (JSON)                                   |
+| `/api/v2/crls`              | POST   | Upload a CRL (PEM or DER)                            |
+| `/api/v2/stats`             | GET    | Aggregate statistics                                 |
+| `/api/v2/health`            | GET    | Health check                                         |
 
 ## Requirements
 
@@ -96,9 +99,13 @@ See `scripts/adcs-crl-uploader.ps1` for automated CRL uploads from Windows AD CS
 
 - `/` – HTML index listing certificates and CRLs.
 - `/ca/*`, `/crl/*`, `/dcrl/*` – binary/PEM delivery via GET/HEAD.
-- `GET /api/v1/collections/{ca|crl|dcrl}/items` – paginated collection listing.
-- `GET /api/v1/objects/{objectKey}/metadata` – parsed metadata for an object.
-- `POST /api/v1/crls` – upload CRL PEM (`Content-Type: text/plain`).
+- `GET /api/v2/certificates` – list certificates.
+- `GET /api/v2/certificates/{id}` – certificate details.
+- `GET /api/v2/crls` – list CRLs.
+- `GET /api/v2/crls/{id}` – CRL details.
+- `POST /api/v2/crls` – upload CRL (`Content-Type: text/plain` or `application/pkix-crl`).
+- `GET /api/v2/stats` – aggregated stats.
+- `GET /api/v2/health` – health check.
 
 ## Requirements
 

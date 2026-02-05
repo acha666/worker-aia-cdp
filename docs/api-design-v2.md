@@ -12,8 +12,9 @@ This document outlines the redesigned REST API for the PKI AIA/CDP Worker. The A
 4. **Standardized Responses**: Consistent JSON envelope with `data`, `meta`, and `error` fields
 5. **HATEOAS Links**: Include navigational links in responses
 6. **Pagination**: Cursor-based pagination for collections
-7. **Filtering/Sorting**: Query parameters for filtering and ordering
+7. **Filtering/Ordering**: Query parameters for filtering and ordering where supported
 8. **Proper Status Codes**: Semantic HTTP status codes
+9. **Format Deduplication**: When a resource is available in multiple formats (e.g., DER and PEM), the API returns a single logical item representing the canonical DER format. Alternative formats are available via URL path extensions.
 
 ---
 
@@ -24,6 +25,54 @@ This document outlines the redesigned REST API for the PKI AIA/CDP Worker. The A
 ```
 
 All API endpoints are prefixed with `/api/v2`. Binary download endpoints remain at root level for direct URL usage in PKI configurations.
+
+---
+
+## Format Deduplication (API Design Principle #9)
+
+### Overview
+
+When a resource (certificate or CRL) is available in multiple formats (typically DER and PEM), the API applies format deduplication:
+
+1. **API Responses**: Only return information about the canonical DER format
+2. **List Endpoints**: Only one entry per resource (merged from DER and PEM variants)
+3. **Detail Endpoints**: Always describe the DER representation, regardless of how the resource was requested
+4. **Format Access**: Clients can access alternative formats (PEM) via URL path extensions
+
+### How It Works
+
+For each resource, metadata fields always represent the **canonical DER format**:
+
+```typescript
+storage: {
+  filename: string;
+  format: "der"; // Always "der" - the canonical format
+  size: number; // Size of DER-encoded data
+  uploadedAt: string;
+  etag: string;
+}
+```
+
+### Accessing Alternative Formats
+
+To download a resource in PEM format, clients can transform the `downloadUrl`:
+
+**Example for Certificates:**
+
+- **DER format**: `/ca/root-ca.crt`
+- **PEM format**: `/ca/root-ca.crt.pem` (append `.pem`)
+
+**Example for CRLs:**
+
+- **DER format**: `/crl/root-ca.crl`
+- **PEM format**: `/crl/root-ca.crl.pem` (append `.pem`)
+
+### Implementation Details
+
+- Both DER and PEM files are stored in R2 storage
+- When listing resources, duplicates (DER and PEM of the same certificate/CRL) are merged into a single entry
+- The merged entry always represents the canonical DER version
+- API responses always report canonical DER metadata, even if accessed via a `.pem` URL
 
 ---
 
@@ -90,10 +139,12 @@ GET /api/v2/certificates
 |-----------|------|---------|-------------|
 | `cursor` | string | - | Pagination cursor |
 | `limit` | number | 50 | Items per page (1-100) |
-| `sort` | string | `-uploadedAt` | Sort field (prefix `-` for descending) |
 | `status` | string | - | Filter by status: `valid`, `expired`, `not-yet-valid` |
 | `search` | string | - | Search by subject/issuer CN |
-| `include` | string | - | Comma-separated: `summary`, `fingerprints` |
+
+**Notes:**
+
+- Results are returned in storage key order. Explicit sorting is not currently supported.
 
 **Response:**
 
@@ -102,35 +153,52 @@ interface CertificateListItem {
   id: string; // URL-safe key (e.g., "root-ca.crt")
   type: "certificate";
   href: string; // API URL for this certificate
-  downloadUrl: string; // Direct download URL
+  downloadUrl: string; // Direct download URL (DER format, append .pem for PEM)
 
-  attributes: {
+  storage: {
     filename: string;
-    format: "der" | "pem";
-    size: number;
+    format: "der"; // Always canonical DER format (API design principle #9)
+    size: number; // Size of DER-encoded certificate
     uploadedAt: string; // ISO 8601
+  };
 
-    summary: {
-      subjectCN: string | null;
-      issuerCN: string | null;
-      notBefore: string | null;
-      notAfter: string | null;
-      serialNumber: string | null;
-    };
+  summary: {
+    subjectCN: string | null;
+    issuerCN: string | null;
+    notBefore: string | null;
+    notAfter: string | null;
+    serialNumber: string | null;
+  };
 
-    status: {
-      state: "valid" | "expired" | "not-yet-valid";
-      expiresIn?: number; // Seconds until expiry (if valid)
-      expiredAgo?: number; // Seconds since expiry (if expired)
-    };
+  status: {
+    state: "valid" | "expired" | "not-yet-valid";
+    expiresIn?: number; // Seconds until expiry (if valid)
+    expiredAgo?: number; // Seconds since expiry (if expired)
+    startsIn?: number; // Seconds until valid (if not-yet-valid)
+  };
 
-    fingerprints?: {
-      sha1: string;
-      sha256: string;
-    };
+  fingerprints: {
+    sha1: string;
+    sha256: string;
   };
 }
 ```
+
+**Format Availability:**
+
+For each certificate returned, both representations are available for download:
+
+| Format | URL Pattern                  |
+| ------ | ---------------------------- |
+| DER    | `/{id}` (from `downloadUrl`) |
+| PEM    | `/{id}.pem`                  |
+
+Example:
+
+- DER: `/ca/root-ca.crt`
+- PEM: `/ca/root-ca.crt.pem`
+
+**Note:** The API always returns metadata for the canonical DER format. To get the PEM-encoded version of the certificate, append `.pem` to the `downloadUrl`.
 
 **Example Response:**
 
@@ -142,22 +210,26 @@ interface CertificateListItem {
       "type": "certificate",
       "href": "/api/v2/certificates/root-ca.crt",
       "downloadUrl": "/ca/root-ca.crt",
-      "attributes": {
+      "storage": {
         "filename": "root-ca.crt",
         "format": "der",
         "size": 1234,
-        "uploadedAt": "2025-01-15T10:30:00Z",
-        "summary": {
-          "subjectCN": "Example Root CA",
-          "issuerCN": "Example Root CA",
-          "notBefore": "2024-01-01T00:00:00Z",
-          "notAfter": "2034-01-01T00:00:00Z",
-          "serialNumber": "01"
-        },
-        "status": {
-          "state": "valid",
-          "expiresIn": 283824000
-        }
+        "uploadedAt": "2025-01-15T10:30:00Z"
+      },
+      "summary": {
+        "subjectCN": "Example Root CA",
+        "issuerCN": "Example Root CA",
+        "notBefore": "2024-01-01T00:00:00Z",
+        "notAfter": "2034-01-01T00:00:00Z",
+        "serialNumber": "01"
+      },
+      "status": {
+        "state": "valid",
+        "expiresIn": 283824000
+      },
+      "fingerprints": {
+        "sha1": "...",
+        "sha256": "..."
       }
     }
   ],
@@ -196,14 +268,19 @@ GET /api/v2/certificates/{id}
 **Query Parameters:**
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `include` | string | `tbsCertificate` | Comma-separated sections to include |
+| `include` | string | - | Comma-separated optional sections to include |
 
 **Include Options:**
 
-- `tbsCertificate` - Core certificate fields (default, always included)
 - `extensions` - Parsed X.509v3 extensions
 - `signatureAlgorithm` - Signature algorithm details
 - `signatureValue` - Signature bytes (hex)
+
+**Notes:**
+
+- `tbsCertificate` is always included.
+- If `include` is omitted, the response includes extensions and signature fields by default.
+- If `include` is provided, only the listed optional sections are included.
 
 **Response Structure (X.509 Aligned):**
 
@@ -220,16 +297,16 @@ Certificate ::= SEQUENCE {
 ```typescript
 interface CertificateDetail {
   // === Resource Metadata ===
-  id: string;
+  id: string; // Canonical DER identifier (e.g., "root-ca.crt")
   type: "certificate";
-  href: string;
-  downloadUrl: string;
+  href: string; // Link to this resource (always points to canonical DER version)
+  downloadUrl: string; // Download link (always DER format, append .pem for PEM)
 
   // === Storage Metadata ===
   storage: {
     filename: string;
-    format: "der" | "pem";
-    size: number;
+    format: "der"; // Always canonical DER format (API design principle #9)
+    size: number; // Size of DER-encoded certificate
     uploadedAt: string; // ISO 8601
     etag: string;
   };
@@ -296,7 +373,6 @@ interface AlgorithmIdentifier {
 interface ObjectIdentifier {
   oid: string; // Dotted decimal (e.g., "1.2.840.113549.1.1.11")
   name: string | null; // Resolved name (e.g., "sha256WithRSAEncryption")
-  shortName: string | null; // Short form (e.g., "SHA256-RSA")
 }
 
 interface AlgorithmParameters {
@@ -627,8 +703,7 @@ interface RelationshipLink {
       "signature": {
         "algorithm": {
           "oid": "1.2.840.113549.1.1.11",
-          "name": "sha256WithRSAEncryption",
-          "shortName": "SHA256-RSA"
+          "name": "sha256WithRSAEncryption"
         }
       },
       "issuer": {
@@ -775,25 +850,32 @@ GET /api/v2/crls
 |-----------|------|---------|-------------|
 | `cursor` | string | - | Pagination cursor |
 | `limit` | number | 50 | Items per page (1-100) |
-| `sort` | string | `-thisUpdate` | Sort field |
 | `type` | string | - | Filter: `full`, `delta` |
 | `status` | string | - | Filter: `current`, `stale`, `expired` |
-| `issuer` | string | - | Filter by issuer CN or key ID |
+
+**Notes:**
+
+- Results are returned in storage key order. Explicit sorting is not currently supported.
 
 **Response:**
 
+Each CRL is returned as a single item, representing the canonical DER-encoded format. Both DER and PEM representations are available for download:
+
+- **DER format**: Use the `downloadUrl` directly
+- **PEM format**: Append `.pem` to the base filename (e.g., `/crl/filename.crl.pem`)
+
 ```typescript
 interface CrlListItem {
-  id: string;
+  id: string; // Canonical identifier (e.g., "crl/root-ca.crl" or "dcrl/issuing-ca.crl")
   type: "crl";
-  href: string;
-  downloadUrl: string;
+  href: string; // Link to detail endpoint
+  downloadUrl: string; // Download link (DER format)
 
   storage: {
-    filename: string;
-    format: "der" | "pem";
-    size: number;
-    uploadedAt: string;
+    filename: string; // Base filename without extension
+    format: "der"; // Always DER (canonical format)
+    size: number; // Size of DER-encoded file
+    uploadedAt: string; // ISO 8601 timestamp
   };
 
   summary: {
@@ -819,6 +901,20 @@ interface CrlListItem {
 }
 ```
 
+**Format Availability:**
+
+For each CRL returned, both representations are available:
+
+| Format | URL Pattern                  |
+| ------ | ---------------------------- |
+| DER    | `/{id}` (from `downloadUrl`) |
+| PEM    | `/{id}.pem`                  |
+
+Example:
+
+- DER: `/crl/root-ca.crl`
+- PEM: `/crl/root-ca.crl.pem`
+
 ---
 
 #### Get CRL Details
@@ -835,17 +931,22 @@ GET /api/v2/crls/{id}
 **Query Parameters:**
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `include` | string | `tbsCertList` | Comma-separated sections |
+| `include` | string | - | Comma-separated optional sections |
 | `revocations.limit` | number | 10 | Max revocation entries |
-| `revocations.cursor` | string | - | Pagination cursor |
+| `revocations.cursor` | number | 0 | Pagination offset (0-based) |
 
 **Include Options:**
 
-- `tbsCertList` - Core CRL fields (default)
 - `extensions` - CRL extensions
 - `revokedCertificates` - List of revoked certs
 - `signatureAlgorithm` - Signature algorithm
 - `signatureValue` - Signature bytes
+
+**Notes:**
+
+- `tbsCertList` is always included.
+- If `include` is omitted, the response includes extensions, signature fields, and revoked certificates by default.
+- If `include` is provided, only the listed optional sections are included.
 
 **Response Structure (X.509 CRL Aligned):**
 
@@ -862,16 +963,16 @@ CertificateList ::= SEQUENCE {
 ```typescript
 interface CrlDetail {
   // === Resource Metadata ===
-  id: string;
+  id: string; // Canonical DER identifier (e.g., "crl/root-ca.crl" or "dcrl/issuing-ca.crl")
   type: "crl";
-  href: string;
-  downloadUrl: string;
+  href: string; // Link to this resource (always points to canonical DER version)
+  downloadUrl: string; // Download link (always DER format, append .pem for PEM)
 
   // === Storage Metadata ===
   storage: {
-    filename: string;
-    format: "der" | "pem";
-    size: number;
+    filename: string; // Base filename without extension
+    format: "der"; // Always canonical DER format (API design principle #9)
+    size: number; // Size of DER-encoded CRL
     uploadedAt: string;
     etag: string;
   };
@@ -1226,6 +1327,8 @@ interface CrlUploadResponse {
 
 ### 3. Revocation Lookup
 
+**Status:** Not implemented in the current worker. The endpoints below are reserved for future work.
+
 #### Check Certificate Revocation Status
 
 ```
@@ -1562,7 +1665,6 @@ interface BitString {
 interface ObjectIdentifier {
   oid: string; // Dotted decimal: "1.2.840.113549.1.1.11"
   name: string | null; // Resolved name or null if unknown
-  shortName?: string | null; // Abbreviated form
 }
 
 /** AlgorithmIdentifier (RFC 5280 §4.1.1.2) */
@@ -2091,7 +2193,6 @@ interface HealthResult {
 interface ListParams {
   cursor?: string;
   limit?: number;
-  sort?: string;
 }
 
 interface CertificateListParams extends ListParams {
@@ -2102,7 +2203,6 @@ interface CertificateListParams extends ListParams {
 interface CrlListParams extends ListParams {
   type?: "full" | "delta";
   status?: "current" | "stale" | "expired";
-  issuer?: string;
 }
 
 interface PkiApiClient {
@@ -2117,11 +2217,18 @@ interface PkiApiClient {
 
   // CRLs
   listCrls(params?: CrlListParams): Promise<ApiResponse<CrlListItem[]>>;
-  getCrl(id: string, include?: string[]): Promise<ApiResponse<CrlDetail>>;
+  getCrl(
+    id: string,
+    options?: {
+      include?: string[];
+      revocationsLimit?: number;
+      revocationsCursor?: number;
+    },
+  ): Promise<ApiResponse<CrlDetail>>;
   uploadCrl(
     data: string | ArrayBuffer,
     contentType: string,
-  ): Promise<ApiResponse<CrlUploadResponse>>;
+  ): Promise<ApiResponse<CrlUploadResult>>;
 
   // Revocations
   checkRevocation(
@@ -2154,30 +2261,17 @@ interface PkiApiClient {
 
 ---
 
-## Migration Notes (v1 → v2)
-
-| Old Endpoint                         | New Endpoint                                               | Notes                  |
-| ------------------------------------ | ---------------------------------------------------------- | ---------------------- |
-| `GET /api/v1/objects`                | `GET /api/v2/certificates` + `GET /api/v2/crls`            | Split by resource type |
-| `GET /api/v1/collections/ca/items`   | `GET /api/v2/certificates`                                 | Renamed                |
-| `GET /api/v1/collections/crl/items`  | `GET /api/v2/crls?type=full`                               | Added type filter      |
-| `GET /api/v1/collections/dcrl/items` | `GET /api/v2/crls?type=delta`                              | Added type filter      |
-| `GET /api/v1/objects/{key}/metadata` | `GET /api/v2/certificates/{id}` or `GET /api/v2/crls/{id}` | Split by type          |
-| `POST /api/v1/crls`                  | `POST /api/v2/crls`                                        | Enhanced response      |
-
----
-
 ## Caching Strategy
 
-| Endpoint Pattern                 | Cache TTL | Cache Key Components                        |
-| -------------------------------- | --------- | ------------------------------------------- |
-| `GET /api/v2/certificates`       | 60s       | prefix, cursor, limit, sort, status, search |
-| `GET /api/v2/certificates/{id}`  | 300s      | id, include                                 |
-| `GET /api/v2/crls`               | 60s       | prefix, cursor, limit, sort, type, status   |
-| `GET /api/v2/crls/{id}`          | 300s      | id, include                                 |
-| `GET /ca/*`, `/crl/*`, `/dcrl/*` | 3600s     | path                                        |
-| `GET /api/v2/stats`              | 60s       | -                                           |
-| `GET /api/v2/health`             | 10s       | -                                           |
+| Endpoint Pattern                 | Cache TTL | Cache Key Components                  |
+| -------------------------------- | --------- | ------------------------------------- |
+| `GET /api/v2/certificates`       | 60s       | prefix, cursor, limit, status, search |
+| `GET /api/v2/certificates/{id}`  | 300s      | id, include                           |
+| `GET /api/v2/crls`               | 60s       | prefix, cursor, limit, type, status   |
+| `GET /api/v2/crls/{id}`          | 300s      | id, include                           |
+| `GET /ca/*`, `/crl/*`, `/dcrl/*` | 3600s     | path                                  |
+| `GET /api/v2/stats`              | 60s       | -                                     |
+| `GET /api/v2/health`             | 10s       | -                                     |
 
 ---
 
@@ -2195,22 +2289,22 @@ interface PkiApiClient {
 
 ### Phase 1: Core API
 
-- [ ] Response envelope helpers
-- [ ] Error handling middleware
-- [ ] `GET /api/v2/certificates` - List certificates
-- [ ] `GET /api/v2/certificates/{id}` - Get certificate details
-- [ ] `GET /api/v2/crls` - List CRLs
-- [ ] `GET /api/v2/crls/{id}` - Get CRL details
-- [ ] `POST /api/v2/crls` - Upload CRL
-- [ ] Binary download endpoints (unchanged)
+- [x] Response envelope helpers
+- [x] Error handling middleware
+- [x] `GET /api/v2/certificates` - List certificates
+- [x] `GET /api/v2/certificates/{id}` - Get certificate details
+- [x] `GET /api/v2/crls` - List CRLs
+- [x] `GET /api/v2/crls/{id}` - Get CRL details
+- [x] `POST /api/v2/crls` - Upload CRL
+- [x] Binary download endpoints (unchanged)
 
 ### Phase 2: Enhanced Features
 
 - [ ] `GET /api/v2/search` - Global search
 - [ ] `GET /api/v2/crls/{id}/revocations/{serial}` - Single revocation check
 - [ ] `POST /api/v2/crls/{id}/revocations/lookup` - Bulk revocation check
-- [ ] `GET /api/v2/stats` - Statistics
-- [ ] `GET /api/v2/health` - Health check
+- [x] `GET /api/v2/stats` - Statistics
+- [x] `GET /api/v2/health` - Health check
 
 ### Phase 3: Optimization
 

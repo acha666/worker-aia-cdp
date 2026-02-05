@@ -34,4 +34,4 @@ Execute all tests with:
 npm test
 ```
 
-The suite exercises both back-end worker utilities (`backend/src/http/json-response.ts`, `backend/src/pki/format.ts`) and front-end helpers in `frontend/src/formatters.js` using a lightweight DOM from [`linkedom`](https://github.com/WebReflection/linkedom).
+The suite exercises both back-end worker utilities (`src/worker/utils/json-response.ts`, `src/worker/pki/utils/conversion.ts`) and front-end helpers in `src/web` using a lightweight DOM from [`linkedom`](https://github.com/WebReflection/linkedom).

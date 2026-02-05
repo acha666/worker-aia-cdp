@@ -70,9 +70,17 @@ export function createListCacheKey({
 }: ListCacheKeyOptions) {
   const path = collection ? `/collections/${collection}/items` : "/objects";
   const url = new URL(`${INTERNAL_CACHE_ORIGIN}${path}`);
-  if (prefix) {url.searchParams.set("prefix", prefix);}
-  if (delimiter) {url.searchParams.set("delimiter", delimiter);}
-  if (cursor) {url.searchParams.set("cursor", cursor);}
-  if (typeof limit === "number") {url.searchParams.set("limit", String(limit));}
+  if (prefix) {
+    url.searchParams.set("prefix", prefix);
+  }
+  if (delimiter) {
+    url.searchParams.set("delimiter", delimiter);
+  }
+  if (cursor) {
+    url.searchParams.set("cursor", cursor);
+  }
+  if (typeof limit === "number") {
+    url.searchParams.set("limit", String(limit));
+  }
   return new Request(url.toString(), { method: "GET" });
 }

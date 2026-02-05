@@ -5,7 +5,7 @@
   "scripts": {
     "build": "vite build",
     "build:dev": "vite build --mode development",
-    "dev": "npm-run-all --parallel dev:assets dev:worker",
+    "dev": "npm run dev:worker",
     "dev:assets": "vite build --mode development --watch",
     "dev:frontend": "vite",
     "dev:worker": "wrangler dev --env local",
@@ -22,21 +22,33 @@
     "check:fix": "npm-run-all --serial lint:fix type-check"
   },
   "dependencies": {
+    "@headlessui/vue": "^1.7.23",
+    "@heroicons/vue": "^2.2.0",
+    "@ts-rest/core": "^3.52.1",
+    "@vitejs/plugin-vue": "^6.0.4",
     "asn1js": "^3.0.7",
+    "pinia": "^3.0.4",
     "pkijs": "^3.3.3",
-    "pvutils": "^1.1.5"
+    "pvutils": "^1.1.5",
+    "vue": "^3.5.27",
+    "vue-router": "^4.6.4",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260203.0",
     "@eslint/js": "^9.39.2",
     "@types/node": "^25.2.0",
     "@vitejs/plugin-legacy": "^7.2.1",
+    "autoprefixer": "^10.4.24",
     "linkedom": "^0.18.12",
     "npm-run-all": "^4.1.5",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.19",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.54.0",
     "vite": "^7.3.1",
+    "vue-tsc": "^3.2.4",
     "wrangler": "^4.62.0"
   }
 }
