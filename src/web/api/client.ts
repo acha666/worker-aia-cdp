@@ -33,7 +33,7 @@ export class ApiError extends Error {
   constructor(
     public code: string,
     message: string,
-    public details?: Record<string, unknown>,
+    public details?: Record<string, unknown>
   ) {
     super(message);
     this.name = "ApiError";
@@ -73,7 +73,7 @@ export interface ListCertificatesResult {
 }
 
 export async function listCertificates(
-  options?: ListCertificatesOptions,
+  options?: ListCertificatesOptions
 ): Promise<ListCertificatesResult> {
   const response = await api.certificates.list({
     query: {
@@ -109,7 +109,7 @@ export interface GetCertificateOptions {
 
 export async function getCertificate(
   id: string,
-  options?: GetCertificateOptions,
+  options?: GetCertificateOptions
 ): Promise<CertificateDetail & { storage?: StorageInfo }> {
   const response = await api.certificates.get({
     params: { id },
@@ -137,9 +137,7 @@ export interface ListCrlsResult {
   nextCursor: string | null;
 }
 
-export async function listCrls(
-  options?: ListCrlsOptions,
-): Promise<ListCrlsResult> {
+export async function listCrls(options?: ListCrlsOptions): Promise<ListCrlsResult> {
   const response = await api.crls.list({
     query: {
       type: options?.type === "all" ? undefined : options?.type,
@@ -170,19 +168,14 @@ export async function listCrls(
 }
 
 export interface GetCrlOptions {
-  include?: (
-    | "extensions"
-    | "signatureAlgorithm"
-    | "signatureValue"
-    | "revokedCertificates"
-  )[];
+  include?: ("extensions" | "signatureAlgorithm" | "signatureValue" | "revokedCertificates")[];
   revocationsLimit?: number;
   revocationsCursor?: number;
 }
 
 export async function getCrl(
   id: string,
-  options?: GetCrlOptions,
+  options?: GetCrlOptions
 ): Promise<CrlDetail & { storage?: StorageInfo }> {
   const response = await api.crls.get({
     params: { id },
@@ -207,9 +200,7 @@ export async function uploadCrl(pem: string): Promise<CrlUploadResult> {
   return handleApiResponse(response);
 }
 
-export async function uploadCrlBinary(
-  data: ArrayBuffer,
-): Promise<CrlUploadResult> {
+export async function uploadCrlBinary(data: ArrayBuffer): Promise<CrlUploadResult> {
   const response = await api.crls.upload({
     body: data,
     extraHeaders: {

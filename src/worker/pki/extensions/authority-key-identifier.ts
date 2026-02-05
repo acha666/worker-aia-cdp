@@ -22,8 +22,7 @@ export function parseAuthorityKeyIdentifier(extension?: pkijs.Extension) {
       }
       if (element.idBlock.tagNumber === 0) {
         keyIdentifier = toHex(
-          (element as unknown as { valueBlock: { valueHex: ArrayBuffer } })
-            .valueBlock.valueHex,
+          (element as unknown as { valueBlock: { valueHex: ArrayBuffer } }).valueBlock.valueHex
         );
       } else if (element.idBlock.tagNumber === 1) {
         const names = new pkijs.GeneralNames({ schema: element });
@@ -39,8 +38,7 @@ export function parseAuthorityKeyIdentifier(extension?: pkijs.Extension) {
         }
       } else if (element.idBlock.tagNumber === 2) {
         authorityCertSerialNumber = toHex(
-          (element as unknown as { valueBlock: { valueHex: ArrayBuffer } })
-            .valueBlock.valueHex,
+          (element as unknown as { valueBlock: { valueHex: ArrayBuffer } }).valueBlock.valueHex
         );
       }
     }

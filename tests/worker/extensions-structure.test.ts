@@ -34,41 +34,25 @@ test("certificate metadata exposes structured extension entries", async () => {
   const caDerBlock = extractPEMBlock(
     caPem,
     "-----BEGIN CERTIFICATE-----",
-    "-----END CERTIFICATE-----",
+    "-----END CERTIFICATE-----"
   );
   const caDer = toArrayBufferFromView(caDerBlock);
   const caCertificate = parseCertificate(caDer);
   const caMetadata = await buildCertificateDetails(caCertificate, caDer);
 
-  const allEntries = [
-    ...(leafMetadata.extensions ?? []),
-    ...(caMetadata.extensions ?? []),
-  ];
+  const allEntries = [...(leafMetadata.extensions ?? []), ...(caMetadata.extensions ?? [])];
 
-  assert.ok(
-    Array.isArray(leafMetadata.extensions),
-    "leaf extensions should be an array",
-  );
-  assert.ok(
-    Array.isArray(caMetadata.extensions),
-    "CA extensions should be an array",
-  );
-  assert.ok(
-    allEntries.length > 0,
-    "combined extensions should include at least one entry",
-  );
+  assert.ok(Array.isArray(leafMetadata.extensions), "leaf extensions should be an array");
+  assert.ok(Array.isArray(caMetadata.extensions), "CA extensions should be an array");
+  assert.ok(allEntries.length > 0, "combined extensions should include at least one entry");
 
   for (const entry of allEntries) {
     assert.ok(entry.oid, "each extension entry includes an oid");
     assert.ok(
       ["parsed", "unparsed", "error"].includes(entry.status),
-      "entry status should be normalized",
+      "entry status should be normalized"
     );
-    assert.equal(
-      typeof entry.critical === "boolean",
-      true,
-      "critical flag should be boolean",
-    );
+    assert.equal(typeof entry.critical === "boolean", true, "critical flag should be boolean");
   }
 
   const ski = allEntries.find((entry) => entry.oid === "2.5.29.14");
@@ -78,15 +62,9 @@ test("certificate metadata exposes structured extension entries", async () => {
     ski?.value && typeof ski.value === "object" && "hex" in ski.value
       ? (ski.value as { hex: string }).hex
       : null;
-  assert.equal(
-    typeof skiValue,
-    "string",
-    "subject key identifier should expose hex value",
-  );
+  assert.equal(typeof skiValue, "string", "subject key identifier should expose hex value");
 
-  const basicConstraints = allEntries.find(
-    (entry) => entry.oid === "2.5.29.19",
-  );
+  const basicConstraints = allEntries.find((entry) => entry.oid === "2.5.29.19");
   assert.ok(basicConstraints);
   assert.equal(basicConstraints?.name, "Basic Constraints");
 });

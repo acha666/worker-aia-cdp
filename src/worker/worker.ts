@@ -5,11 +5,7 @@ import { apiRouter } from "./api/v2/server";
 initializePkijsEngine();
 
 export default {
-  async fetch(
-    req: Request,
-    env: Env,
-    ctx: ExecutionContext,
-  ): Promise<Response> {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
 
     try {
@@ -27,13 +23,10 @@ export default {
       return env.ASSETS.fetch(req);
     } catch (error) {
       console.error("Unhandled error:", error);
-      return new Response(
-        JSON.stringify({ error: "internal_error", detail: String(error) }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+      return new Response(JSON.stringify({ error: "internal_error", detail: String(error) }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
     }
   },
 } satisfies ExportedHandler<Env>;

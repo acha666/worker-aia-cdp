@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import type {
-  CertificateStatusState,
-  CrlStatusState,
-} from "@contracts/schemas";
+import type { CertificateStatusState, CrlStatusState } from "@contracts/schemas";
 
 const props = defineProps<{
   state: CertificateStatusState | CrlStatusState;

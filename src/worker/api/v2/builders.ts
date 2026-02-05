@@ -3,13 +3,7 @@
  * Follows RFC 5280 structure
  */
 
-import {
-  fromBER,
-  Sequence,
-  Integer,
-  OctetString,
-  BitString as Asn1BitString,
-} from "asn1js";
+import { fromBER, Sequence, Integer, OctetString, BitString as Asn1BitString } from "asn1js";
 import * as pkijs from "pkijs";
 import {
   OID_DICTIONARY,
@@ -21,13 +15,7 @@ import {
   KEY_USAGE_FLAGS,
   CRL_REASON_CODES,
 } from "../../pki/constants";
-import {
-  toHex,
-  sha256Hex,
-  sha1Hex,
-  toJSDate,
-  decimalFromHex,
-} from "../../pki/utils/conversion";
+import { toHex, sha256Hex, sha1Hex, toJSDate, decimalFromHex } from "../../pki/utils/conversion";
 import type {
   X509Version,
   SerialNumber,
@@ -91,16 +79,14 @@ export function buildBitString(bitString: Asn1BitString): BitString {
   const bytes = new Uint8Array(bitString.valueBlock.valueHex);
   const hex = toHex(bytes).toUpperCase();
   const unusedBits =
-    typeof bitString.valueBlock.unusedBits === "number"
-      ? bitString.valueBlock.unusedBits
-      : 0;
+    typeof bitString.valueBlock.unusedBits === "number" ? bitString.valueBlock.unusedBits : 0;
   const bitLength = bytes.length * 8 - unusedBits;
   return { hex, bitLength, unusedBits };
 }
 
 export function buildObjectIdentifier(
   oid: string,
-  dictionary?: Record<string, string>,
+  dictionary?: Record<string, string>
 ): ObjectIdentifier {
   const dictEntry = OID_DICTIONARY[oid];
   const algName = dictionary?.[oid];
@@ -113,7 +99,7 @@ export function buildObjectIdentifier(
 export function buildAlgorithmIdentifier(
   algorithmId: string,
   algorithmParams?: unknown,
-  dictionary?: Record<string, string>,
+  dictionary?: Record<string, string>
 ): AlgorithmIdentifier {
   const result: AlgorithmIdentifier = {
     algorithm: buildObjectIdentifier(algorithmId, dictionary),
@@ -199,8 +185,7 @@ export function buildName(name: pkijs.RelativeDistinguishedNames): Name {
     const oid = tv.type;
     const dictEntry = OID_DICTIONARY[oid];
     const rawValue = tv.value.valueBlock.value;
-    const stringValue =
-      typeof rawValue === "string" ? rawValue : String(rawValue);
+    const stringValue = typeof rawValue === "string" ? rawValue : String(rawValue);
 
     // Determine encoding type
     let encoding: AttributeTypeAndValue["value"]["encoding"] = "unknown";
@@ -267,12 +252,12 @@ export function buildName(name: pkijs.RelativeDistinguishedNames): Name {
 // =============================================================================
 
 export async function buildSubjectPublicKeyInfo(
-  spki: pkijs.PublicKeyInfo,
+  spki: pkijs.PublicKeyInfo
 ): Promise<SubjectPublicKeyInfo> {
   const algorithm = buildAlgorithmIdentifier(
     spki.algorithm.algorithmId,
     spki.algorithm.algorithmParams,
-    KEY_ALG_NAMES,
+    KEY_ALG_NAMES
   );
 
   const subjectPublicKey = buildBitString(spki.subjectPublicKey);
@@ -297,9 +282,7 @@ export async function buildSubjectPublicKeyInfo(
     parsed = parseECPublicKey(spki);
   } else if (algOid === "1.3.101.112" || algOid === "1.3.101.113") {
     // Ed25519 or Ed448
-    const keyHex = toHex(
-      spki.subjectPublicKey.valueBlock.valueHex,
-    ).toUpperCase();
+    const keyHex = toHex(spki.subjectPublicKey.valueBlock.valueHex).toUpperCase();
     parsed = {
       type: algOid === "1.3.101.112" ? "ed25519" : "ed448",
       publicKey: { hex: keyHex },
@@ -314,9 +297,7 @@ export async function buildSubjectPublicKeyInfo(
   };
 }
 
-function parseRSAPublicKey(
-  spki: pkijs.PublicKeyInfo,
-): RSAPublicKey | undefined {
+function parseRSAPublicKey(spki: pkijs.PublicKeyInfo): RSAPublicKey | undefined {
   try {
     const keyAsn1 = fromBER(spki.subjectPublicKey.valueBlock.valueHex);
     if (keyAsn1.offset === -1) {
@@ -353,9 +334,7 @@ function parseECPublicKey(spki: pkijs.PublicKeyInfo): ECPublicKey | undefined {
     };
     const curveOid = params?.valueBlock?.toString?.() ?? "";
 
-    const pointBytes = new Uint8Array(
-      spki.subjectPublicKey.valueBlock.valueHex,
-    );
+    const pointBytes = new Uint8Array(spki.subjectPublicKey.valueBlock.valueHex);
     const pointHex = toHex(pointBytes).toUpperCase();
 
     // For uncompressed points (starting with 04), extract x and y
@@ -382,9 +361,7 @@ function parseECPublicKey(spki: pkijs.PublicKeyInfo): ECPublicKey | undefined {
 // Extension Builders
 // =============================================================================
 
-export function buildExtensions(
-  extensions: pkijs.Extension[] | undefined,
-): Extensions | undefined {
+export function buildExtensions(extensions: pkijs.Extension[] | undefined): Extensions | undefined {
   if (!extensions || extensions.length === 0) {
     return undefined;
   }
@@ -438,9 +415,7 @@ function buildExtension(ext: pkijs.Extension): Extension {
 }
 
 // Extension parsers
-type ExtensionParser = (
-  ext: pkijs.Extension,
-) => ParsedExtensionValue | undefined;
+type ExtensionParser = (ext: pkijs.Extension) => ParsedExtensionValue | undefined;
 
 const EXTENSION_PARSERS: Record<string, ExtensionParser> = {
   // Basic Constraints (2.5.29.19)
@@ -472,16 +447,13 @@ const EXTENSION_PARSERS: Record<string, ExtensionParser> = {
     }
     const bitString = asn1.result as Asn1BitString;
     const bytes =
-      bitString.valueBlock.valueHexView ??
-      new Uint8Array(bitString.valueBlock.valueHex);
+      bitString.valueBlock.valueHexView ?? new Uint8Array(bitString.valueBlock.valueHex);
     if (bytes.length === 0) {
       return undefined;
     }
 
     const unusedBits =
-      typeof bitString.valueBlock.unusedBits === "number"
-        ? bitString.valueBlock.unusedBits
-        : 0;
+      typeof bitString.valueBlock.unusedBits === "number" ? bitString.valueBlock.unusedBits : 0;
     const totalBits = Math.max(0, bytes.length * 8 - unusedBits);
 
     const usages: string[] = [];
@@ -526,9 +498,7 @@ const EXTENSION_PARSERS: Record<string, ExtensionParser> = {
     const sequence = asn1.result as Sequence;
     const purposes: ObjectIdentifier[] = [];
     for (const node of sequence.valueBlock.value) {
-      const oid = (
-        node as { valueBlock?: { toString?: () => string } }
-      )?.valueBlock?.toString?.();
+      const oid = (node as { valueBlock?: { toString?: () => string } })?.valueBlock?.toString?.();
       if (typeof oid === "string" && oid.length > 0) {
         purposes.push(buildObjectIdentifier(oid, EKU_NAMES));
       }
@@ -582,8 +552,7 @@ const EXTENSION_PARSERS: Record<string, ExtensionParser> = {
     return {
       extensionType: "authorityKeyIdentifier",
       keyIdentifier,
-      authorityCertIssuer:
-        authorityCertIssuer.length > 0 ? authorityCertIssuer : undefined,
+      authorityCertIssuer: authorityCertIssuer.length > 0 ? authorityCertIssuer : undefined,
       authorityCertSerialNumber,
     };
   },
@@ -686,43 +655,37 @@ const EXTENSION_PARSERS: Record<string, ExtensionParser> = {
     }
     const certPolicies = new pkijs.CertificatePolicies({ schema: asn1.result });
 
-    const policies: PolicyInformation[] = certPolicies.certificatePolicies.map(
-      (policy) => {
-        const policyAny = policy as {
-          policyIdentifier?:
-            | string
-            | { valueBlock?: { toString?: () => string } };
-          policyQualifiers?: {
-            policyQualifierId?: string;
-            qualifier?: string | { valueBlock?: { value?: string } };
-          }[];
-        };
-        const identifier = policyAny.policyIdentifier;
-        const oid =
-          typeof identifier === "string"
-            ? identifier
-            : (identifier?.valueBlock?.toString?.() ?? "");
+    const policies: PolicyInformation[] = certPolicies.certificatePolicies.map((policy) => {
+      const policyAny = policy as {
+        policyIdentifier?: string | { valueBlock?: { toString?: () => string } };
+        policyQualifiers?: {
+          policyQualifierId?: string;
+          qualifier?: string | { valueBlock?: { value?: string } };
+        }[];
+      };
+      const identifier = policyAny.policyIdentifier;
+      const oid =
+        typeof identifier === "string" ? identifier : (identifier?.valueBlock?.toString?.() ?? "");
 
-        const policyQualifiers = policyAny.policyQualifiers?.map((q) => {
-          const qualifierOid = q.policyQualifierId ?? "";
-          let qualifier: string | undefined;
-          if (typeof q.qualifier === "string") {
-            qualifier = q.qualifier;
-          } else if (q.qualifier?.valueBlock?.value) {
-            qualifier = String(q.qualifier.valueBlock.value);
-          }
-          return {
-            qualifierId: buildObjectIdentifier(qualifierOid),
-            qualifier,
-          };
-        });
-
+      const policyQualifiers = policyAny.policyQualifiers?.map((q) => {
+        const qualifierOid = q.policyQualifierId ?? "";
+        let qualifier: string | undefined;
+        if (typeof q.qualifier === "string") {
+          qualifier = q.qualifier;
+        } else if (q.qualifier?.valueBlock?.value) {
+          qualifier = String(q.qualifier.valueBlock.value);
+        }
         return {
-          policyIdentifier: buildObjectIdentifier(oid),
-          policyQualifiers,
+          qualifierId: buildObjectIdentifier(qualifierOid),
+          qualifier,
         };
-      },
-    );
+      });
+
+      return {
+        policyIdentifier: buildObjectIdentifier(oid),
+        policyQualifiers,
+      };
+    });
 
     return { extensionType: "certificatePolicies", policies };
   },
@@ -836,7 +799,7 @@ function parseGeneralName(gn: pkijs.GeneralName): GeneralName {
             const shortName = OID_DICTIONARY[a.type.oid]?.short;
             return `${shortName ?? a.type.oid}=${a.value.string}`;
           })
-          .join("+"),
+          .join("+")
       )
       .join(", ");
   } else if (gn.type === 0 && gn.value) {
@@ -891,15 +854,13 @@ function formatIPv6(bytes: Uint8Array): string {
 // Certificate Builder
 // =============================================================================
 
-export async function buildTBSCertificate(
-  cert: pkijs.Certificate,
-): Promise<TBSCertificate> {
+export async function buildTBSCertificate(cert: pkijs.Certificate): Promise<TBSCertificate> {
   const version = buildVersion(cert.version);
   const serialNumber = buildSerialNumber(cert.serialNumber);
   const signature = buildAlgorithmIdentifier(
     cert.signatureAlgorithm.algorithmId,
     cert.signatureAlgorithm.algorithmParams,
-    SIGNATURE_ALG_NAMES,
+    SIGNATURE_ALG_NAMES
   );
   const issuer = buildName(cert.issuer);
   const subject = buildName(cert.subject);
@@ -909,9 +870,7 @@ export async function buildTBSCertificate(
     notAfter: buildTime(cert.notAfter),
   };
 
-  const subjectPublicKeyInfo = await buildSubjectPublicKeyInfo(
-    cert.subjectPublicKeyInfo,
-  );
+  const subjectPublicKeyInfo = await buildSubjectPublicKeyInfo(cert.subjectPublicKeyInfo);
   const extensions = buildExtensions(cert.extensions);
 
   return {
@@ -926,9 +885,7 @@ export async function buildTBSCertificate(
   };
 }
 
-export async function buildCertificateFingerprints(
-  der: ArrayBuffer,
-): Promise<Fingerprints> {
+export async function buildCertificateFingerprints(der: ArrayBuffer): Promise<Fingerprints> {
   return {
     sha1: await sha1Hex(der),
     sha256: await sha256Hex(der),
@@ -937,7 +894,7 @@ export async function buildCertificateFingerprints(
 
 export function buildCertificateStatus(
   notBefore: Date | undefined,
-  notAfter: Date | undefined,
+  notAfter: Date | undefined
 ): CertificateStatus {
   const now = Date.now();
   const validFrom = notBefore?.toISOString() ?? "";
@@ -977,33 +934,29 @@ export function buildCertificateStatus(
 
 export function buildTBSCertList(
   crl: pkijs.CertificateRevocationList,
-  options?: { revocationsLimit?: number; revocationsCursor?: number },
+  options?: { revocationsLimit?: number; revocationsCursor?: number }
 ): TBSCertList {
-  const hasExtensions =
-    crl.crlExtensions?.extensions && crl.crlExtensions.extensions.length > 0;
+  const hasExtensions = crl.crlExtensions?.extensions && crl.crlExtensions.extensions.length > 0;
   const version = hasExtensions ? buildVersion(1) : undefined; // v2 if extensions
 
   const signature = buildAlgorithmIdentifier(
     crl.signatureAlgorithm.algorithmId,
     crl.signatureAlgorithm.algorithmParams,
-    SIGNATURE_ALG_NAMES,
+    SIGNATURE_ALG_NAMES
   );
   const issuer = buildName(crl.issuer);
   const thisUpdate = buildTime(crl.thisUpdate);
   const nextUpdate = crl.nextUpdate ? buildTime(crl.nextUpdate) : undefined;
 
   // Build revoked certificates list
-  const revokedCerts = (
-    crl as { revokedCertificates?: pkijs.RevokedCertificate[] }
-  ).revokedCertificates;
+  const revokedCerts = (crl as { revokedCertificates?: pkijs.RevokedCertificate[] })
+    .revokedCertificates;
   let revokedCertificates: TBSCertList["revokedCertificates"];
 
   if (revokedCerts && revokedCerts.length > 0) {
     const limit = options?.revocationsLimit ?? 10;
     const cursor = options?.revocationsCursor ?? 0;
-    const items = revokedCerts
-      .slice(cursor, cursor + limit)
-      .map(buildRevokedCertificate);
+    const items = revokedCerts.slice(cursor, cursor + limit).map(buildRevokedCertificate);
     const hasMore = cursor + limit < revokedCerts.length;
 
     revokedCertificates = {
@@ -1028,17 +981,12 @@ export function buildTBSCertList(
   };
 }
 
-function buildRevokedCertificate(
-  revoked: pkijs.RevokedCertificate,
-): RevokedCertificate {
+function buildRevokedCertificate(revoked: pkijs.RevokedCertificate): RevokedCertificate {
   const userCertificate = buildSerialNumber(revoked.userCertificate);
   const revocationDate = buildTime(revoked.revocationDate);
 
   let crlEntryExtensions: RevokedCertificate["crlEntryExtensions"];
-  if (
-    revoked.crlEntryExtensions?.extensions &&
-    revoked.crlEntryExtensions.extensions.length > 0
-  ) {
+  if (revoked.crlEntryExtensions?.extensions && revoked.crlEntryExtensions.extensions.length > 0) {
     const items = revoked.crlEntryExtensions.extensions.map(buildExtension);
     crlEntryExtensions = {
       count: items.length,
@@ -1053,9 +1001,7 @@ function buildRevokedCertificate(
   };
 }
 
-export async function buildCrlFingerprints(
-  der: ArrayBuffer,
-): Promise<Fingerprints> {
+export async function buildCrlFingerprints(der: ArrayBuffer): Promise<Fingerprints> {
   return {
     sha1: await sha1Hex(der),
     sha256: await sha256Hex(der),
@@ -1064,7 +1010,7 @@ export async function buildCrlFingerprints(
 
 export function buildCrlStatus(
   thisUpdate: Date | undefined,
-  nextUpdate: Date | undefined,
+  nextUpdate: Date | undefined
 ): CrlStatus {
   const now = Date.now();
   const thisUpdateIso = thisUpdate?.toISOString() ?? "";
@@ -1103,12 +1049,8 @@ export function buildCrlStatus(
   };
 }
 
-export function determineCrlType(
-  crl: pkijs.CertificateRevocationList,
-): CrlType {
-  const deltaCrlIndicator = crl.crlExtensions?.extensions.find(
-    (ext) => ext.extnID === "2.5.29.27",
-  );
+export function determineCrlType(crl: pkijs.CertificateRevocationList): CrlType {
+  const deltaCrlIndicator = crl.crlExtensions?.extensions.find((ext) => ext.extnID === "2.5.29.27");
   return deltaCrlIndicator ? "delta" : "full";
 }
 

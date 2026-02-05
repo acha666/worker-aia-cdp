@@ -29,7 +29,7 @@ watch(
   () => store.getDetail(props.crl.id),
   (cached) => {
     if (cached) detail.value = cached;
-  },
+  }
 );
 
 const displayName = computed(() => {
@@ -67,9 +67,7 @@ const updateInfo = computed(() => {
   <div
     :class="[
       'overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow border-l-4 border-b border-gray-200',
-      crl.summary.crlType === 'delta'
-        ? 'border-l-green-600'
-        : 'border-l-purple-500',
+      crl.summary.crlType === 'delta' ? 'border-l-green-600' : 'border-l-purple-500',
       props.isFirst ? 'rounded-t-lg' : '',
       props.isLast ? 'rounded-b-lg' : '',
     ]"
@@ -90,9 +88,7 @@ const updateInfo = computed(() => {
             <StatusBadge :state="crl.status.state" type="crl" />
           </div>
           <p class="text-xs text-gray-600 mb-3">
-            <span v-if="crl.summary.crlNumber"
-              >CRL #{{ crl.summary.crlNumber }}</span
-            >
+            <span v-if="crl.summary.crlNumber">CRL #{{ crl.summary.crlNumber }}</span>
             <span v-if="crl.summary.crlNumber" class="mx-1">·</span>
             <span>{{ crl.summary.revokedCount }} revoked</span>
           </p>
@@ -107,9 +103,7 @@ const updateInfo = computed(() => {
                 v-if="crl.status.state === 'current' && updateInfo.remaining"
                 :class="[
                   'ml-1',
-                  crl.summary.crlType === 'delta'
-                    ? 'text-green-700'
-                    : 'text-purple-700',
+                  crl.summary.crlType === 'delta' ? 'text-green-700' : 'text-purple-700',
                 ]"
               >
                 ({{ updateInfo.remaining }})
@@ -134,10 +128,7 @@ const updateInfo = computed(() => {
           title="Toggle details"
         >
           <svg
-            :class="[
-              'w-5 h-5 transition-transform',
-              expanded ? 'rotate-0' : '-rotate-90',
-            ]"
+            :class="['w-5 h-5 transition-transform', expanded ? 'rotate-0' : '-rotate-90']"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -194,18 +185,14 @@ const updateInfo = computed(() => {
         <div
           :class="[
             'border-t p-4 bg-white',
-            crl.summary.crlType === 'delta'
-              ? 'border-t-green-200'
-              : 'border-t-purple-200',
+            crl.summary.crlType === 'delta' ? 'border-t-green-200' : 'border-t-purple-200',
           ]"
         >
           <div v-if="isLoading" class="flex items-center justify-center py-8">
             <svg
               :class="[
                 'animate-spin h-5 w-5',
-                crl.summary.crlType === 'delta'
-                  ? 'text-green-600'
-                  : 'text-purple-600',
+                crl.summary.crlType === 'delta' ? 'text-green-600' : 'text-purple-600',
               ]"
               fill="none"
               viewBox="0 0 24 24"
@@ -227,9 +214,7 @@ const updateInfo = computed(() => {
             <span class="ml-2 text-xs text-gray-600">Loading...</span>
           </div>
           <CrlDetails v-else-if="detail" :crl="detail" />
-          <div v-else class="text-center py-4 text-xs text-gray-500">
-            Failed to load details
-          </div>
+          <div v-else class="text-center py-4 text-xs text-gray-500">Failed to load details</div>
         </div>
       </div>
     </Transition>

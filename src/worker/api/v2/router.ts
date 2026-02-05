@@ -25,26 +25,15 @@ interface RouterOptions {
 export function createServerRouter<T extends AppRouter>(
   _contract: T,
   handlers: ServerRouter<T>,
-  _options: RouterOptions = {},
+  _options: RouterOptions = {}
 ): {
   handlers: ServerRouter<T>;
-  handle: (
-    req: Request,
-    env: Env,
-    ctx: ExecutionContext,
-  ) => Promise<Response | null>;
+  handle: (req: Request, env: Env, ctx: ExecutionContext) => Promise<Response | null>;
 } {
-  const routeMap = new Map<
-    string,
-    { method: string; pattern: RegExp; handler: RouteHandler }
-  >();
+  const routeMap = new Map<string, { method: string; pattern: RegExp; handler: RouteHandler }>();
 
   // Build route map from contract and handlers
-  function buildRoutes(
-    contract: AppRouter,
-    handlerObj: Record<string, unknown>,
-    prefix = "",
-  ) {
+  function buildRoutes(contract: AppRouter, handlerObj: Record<string, unknown>, prefix = "") {
     for (const [key, value] of Object.entries(contract)) {
       const handler = handlerObj[key];
 
@@ -63,11 +52,7 @@ export function createServerRouter<T extends AppRouter>(
         }
       } else if (typeof value === "object" && value !== null) {
         // This is a nested router
-        buildRoutes(
-          value as AppRouter,
-          handler as Record<string, unknown>,
-          prefix,
-        );
+        buildRoutes(value as AppRouter, handler as Record<string, unknown>, prefix);
       }
     }
   }
@@ -76,11 +61,7 @@ export function createServerRouter<T extends AppRouter>(
 
   return {
     handlers,
-    handle: async (
-      req: Request,
-      env: Env,
-      ctx: ExecutionContext,
-    ): Promise<Response | null> => {
+    handle: async (req: Request, env: Env, ctx: ExecutionContext): Promise<Response | null> => {
       const url = new URL(req.url);
       const method = req.method.toUpperCase();
 
@@ -91,11 +72,7 @@ export function createServerRouter<T extends AppRouter>(
             return await route.handler(req, env, ctx);
           } catch (error) {
             console.error("Handler error:", error);
-            return jsonError(
-              500,
-              "internal_error",
-              "An unexpected error occurred",
-            );
+            return jsonError(500, "internal_error", "An unexpected error occurred");
           }
         }
       }
@@ -133,10 +110,7 @@ function pathToRegex(path: string): RegExp {
 /**
  * Extract path parameters from a URL
  */
-export function extractPathParams(
-  path: string,
-  pattern: string,
-): Record<string, string> {
+export function extractPathParams(path: string, pattern: string): Record<string, string> {
   const params: Record<string, string> = {};
   const pathParts = path.split("/");
   const patternParts = pattern.split("/");

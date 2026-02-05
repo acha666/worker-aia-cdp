@@ -1,38 +1,23 @@
 {
-    "compilerOptions": {
-        "target": "ESNext",
-        "module": "ESNext",
-        "moduleResolution": "Bundler",
-        "lib": [
-            "ES2022",
-            "DOM",
-            "DOM.Iterable"
-        ],
-        "strict": true,
-        "isolatedModules": true,
-        "noEmit": true,
-        "skipLibCheck": true,
-        "forceConsistentCasingInFileNames": true,
-        "resolveJsonModule": true,
-        "jsx": "preserve",
-        "jsxImportSource": "vue",
-        "baseUrl": ".",
-        "paths": {
-            "@/*": [
-                "src/web/*"
-            ],
-            "@contracts/*": [
-                "src/contracts/*"
-            ]
-        }
-    },
-    "include": [
-        "src/web/**/*.ts",
-        "src/web/**/*.vue",
-        "src/web/env.d.ts",
-        "src/contracts/**/*.ts"
-    ],
-    "exclude": [
-        "node_modules"
-    ]
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "jsx": "preserve",
+    "jsxImportSource": "vue",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/web/*"],
+      "@contracts/*": ["src/contracts/*"]
+    }
+  },
+  "include": ["src/web/**/*.ts", "src/web/**/*.vue", "src/web/env.d.ts", "src/contracts/**/*.ts"],
+  "exclude": ["node_modules"]
 }

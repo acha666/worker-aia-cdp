@@ -1,14 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import type { CrlListItem, CrlDetail } from "@contracts/schemas";
-import {
-  listCrls,
-  getCrl,
-  uploadCrl,
-  uploadCrlBinary,
-  type ListCrlsResult,
-  type UploadCrlResult,
-} from "../api/client";
+import { listCrls, getCrl, uploadCrl, uploadCrlBinary, type UploadCrlResult } from "../api/client";
 
 export const useCrlsStore = defineStore("crls", () => {
   // State
@@ -26,20 +19,16 @@ export const useCrlsStore = defineStore("crls", () => {
 
   // Getters
   const allCrls = computed(() => [...fullCrls.value, ...deltaCrls.value]);
-  const totalCount = computed(
-    () => fullCrls.value.length + deltaCrls.value.length,
-  );
+  const totalCount = computed(() => fullCrls.value.length + deltaCrls.value.length);
   const currentCount = computed(
-    () => allCrls.value.filter((c) => c.status.state === "current").length,
+    () => allCrls.value.filter((c) => c.status.state === "current").length
   );
-  const staleCount = computed(
-    () => allCrls.value.filter((c) => c.status.state === "stale").length,
-  );
+  const staleCount = computed(() => allCrls.value.filter((c) => c.status.state === "stale").length);
   const expiredCount = computed(
-    () => allCrls.value.filter((c) => c.status.state === "expired").length,
+    () => allCrls.value.filter((c) => c.status.state === "expired").length
   );
   const totalRevocations = computed(() =>
-    allCrls.value.reduce((sum, crl) => sum + crl.summary.revokedCount, 0),
+    allCrls.value.reduce((sum, crl) => sum + crl.summary.revokedCount, 0)
   );
 
   // Actions
@@ -63,8 +52,9 @@ export const useCrlsStore = defineStore("crls", () => {
 
   async function fetchDetail(id: string): Promise<CrlDetail | null> {
     // Check cache first
-    if (detailCache.value.has(id)) {
-      return detailCache.value.get(id)!;
+    const cached = detailCache.value.get(id);
+    if (cached) {
+      return cached;
     }
 
     // Avoid duplicate requests
@@ -99,8 +89,7 @@ export const useCrlsStore = defineStore("crls", () => {
       await fetchAll();
       return result;
     } catch (e) {
-      uploadError.value =
-        e instanceof Error ? e.message : "Failed to upload CRL";
+      uploadError.value = e instanceof Error ? e.message : "Failed to upload CRL";
       console.error("Failed to upload CRL:", e);
       return null;
     } finally {
@@ -108,9 +97,7 @@ export const useCrlsStore = defineStore("crls", () => {
     }
   }
 
-  async function uploadBinary(
-    data: ArrayBuffer,
-  ): Promise<UploadCrlResult | null> {
+  async function uploadBinary(data: ArrayBuffer): Promise<UploadCrlResult | null> {
     uploading.value = true;
     uploadError.value = null;
     lastUploadResult.value = null;
@@ -122,8 +109,7 @@ export const useCrlsStore = defineStore("crls", () => {
       await fetchAll();
       return result;
     } catch (e) {
-      uploadError.value =
-        e instanceof Error ? e.message : "Failed to upload CRL";
+      uploadError.value = e instanceof Error ? e.message : "Failed to upload CRL";
       console.error("Failed to upload CRL:", e);
       return null;
     } finally {

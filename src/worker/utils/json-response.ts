@@ -33,10 +33,17 @@ export function jsonSuccess<T>(data: T, options: SuccessOptions = {}) {
   });
 }
 
-export function jsonError(status: number, code: string, message: string, options: ErrorOptions = {}) {
+export function jsonError(
+  status: number,
+  code: string,
+  message: string,
+  options: ErrorOptions = {}
+) {
   const { headers, details } = options;
   const errorPayload: Record<string, unknown> = { code, message };
-  if (details !== undefined) {errorPayload.details = details;}
+  if (details !== undefined) {
+    errorPayload.details = details;
+  }
   const payload = { data: null, meta: null, error: errorPayload };
   return new Response(JSON.stringify(payload), {
     status,

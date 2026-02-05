@@ -3,11 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import {
-  jsonError,
-  jsonSuccess,
-  mergeJsonHeaders,
-} from "../../src/worker/utils/json-response";
+import { jsonError, jsonSuccess, mergeJsonHeaders } from "../../src/worker/utils/json-response";
 
 test("jsonSuccess wraps payload with metadata and default headers", async () => {
   const response = jsonSuccess(
@@ -18,14 +14,11 @@ test("jsonSuccess wraps payload with metadata and default headers", async () => 
       headers: {
         "x-extra": "value",
       },
-    },
+    }
   );
 
   assert.equal(response.status, 202);
-  assert.equal(
-    response.headers.get("content-type"),
-    "application/json; charset=utf-8",
-  );
+  assert.equal(response.headers.get("content-type"), "application/json; charset=utf-8");
   assert.equal(response.headers.get("x-extra"), "value");
 
   const body = await response.json();
@@ -37,24 +30,16 @@ test("jsonSuccess wraps payload with metadata and default headers", async () => 
 });
 
 test("jsonError encodes error object and preserves headers", async () => {
-  const response = jsonError(
-    415,
-    "unsupported_type",
-    "Only DER or PEM are allowed",
-    {
-      headers: {
-        "x-trace-id": "test-trace",
-        "cache-control": "no-store",
-      },
-      details: { foo: "bar" },
+  const response = jsonError(415, "unsupported_type", "Only DER or PEM are allowed", {
+    headers: {
+      "x-trace-id": "test-trace",
+      "cache-control": "no-store",
     },
-  );
+    details: { foo: "bar" },
+  });
 
   assert.equal(response.status, 415);
-  assert.equal(
-    response.headers.get("content-type"),
-    "application/json; charset=utf-8",
-  );
+  assert.equal(response.headers.get("content-type"), "application/json; charset=utf-8");
   assert.equal(response.headers.get("x-trace-id"), "test-trace");
   assert.equal(response.headers.get("cache-control"), "no-store");
 

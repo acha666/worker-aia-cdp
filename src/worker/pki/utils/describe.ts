@@ -24,12 +24,9 @@ export function describeName(name: pkijs.RelativeDistinguishedNames) {
       value,
     };
   });
-  const dn = rdns
-    .map((part) => `${part.shortName ?? part.oid}=${part.value}`)
-    .join(", ");
+  const dn = rdns.map((part) => `${part.shortName ?? part.oid}=${part.value}`).join(", ");
   const commonName =
-    rdns.find((part) => part.shortName === "CN" || part.name === "commonName")
-      ?.value ?? null;
+    rdns.find((part) => part.shortName === "CN" || part.name === "commonName")?.value ?? null;
   return { dn, rdns, commonName };
 }
 
@@ -38,10 +35,7 @@ export function bitStringBytes(bitString: BitString) {
   return bytes.length > 0 ? bytes.slice(1) : bytes;
 }
 
-export function describeAlgorithm(
-  oid: string,
-  dictionary: Record<string, string>,
-) {
+export function describeAlgorithm(oid: string, dictionary: Record<string, string>) {
   return {
     oid,
     name: dictionary[oid] ?? oid,

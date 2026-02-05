@@ -2,11 +2,7 @@
 import { computed } from "vue";
 import type { CertificateDetail } from "@contracts/schemas";
 import ExtensionView from "./ExtensionView.vue";
-import {
-  formatDateReadable,
-  formatRelativeSeconds,
-  formatTimezoneOffset,
-} from "../utils/dates";
+import { formatDateReadable, formatRelativeSeconds, formatTimezoneOffset } from "../utils/dates";
 import { formatName } from "../utils/x509";
 
 const props = defineProps<{
@@ -78,15 +74,8 @@ function copyToClipboard(text: string) {
   <div class="space-y-6">
     <!-- Basic Info -->
     <section>
-      <h4
-        class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2"
-      >
-        <svg
-          class="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+      <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -108,18 +97,11 @@ function copyToClipboard(text: string) {
           <dd class="text-gray-900 font-mono text-xs break-all">
             {{ certificate.tbsCertificate.serialNumber.hex }}
             <button
-              @click="
-                copyToClipboard(certificate.tbsCertificate.serialNumber.hex)
-              "
+              @click="copyToClipboard(certificate.tbsCertificate.serialNumber.hex)"
               class="ml-1 text-gray-400 hover:text-gray-600"
               title="Copy"
             >
-              <svg
-                class="w-3.5 h-3.5 inline"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -157,15 +139,8 @@ function copyToClipboard(text: string) {
 
     <!-- Validity -->
     <section>
-      <h4
-        class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2"
-      >
-        <svg
-          class="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+      <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -183,13 +158,9 @@ function copyToClipboard(text: string) {
           </span>
         </div>
         <div class="text-gray-600">
-          <span class="font-medium"
-            >{{ certificate.status.validityPeriodDays }} days</span
-          >
+          <span class="font-medium">{{ certificate.status.validityPeriodDays }} days</span>
           total ·
-          <span class="font-medium"
-            >{{ certificate.status.daysRemaining ?? "Expired" }} days</span
-          >
+          <span class="font-medium">{{ certificate.status.daysRemaining ?? "Expired" }} days</span>
           remaining
         </div>
       </div>
@@ -197,15 +168,8 @@ function copyToClipboard(text: string) {
 
     <!-- Public Key -->
     <section>
-      <h4
-        class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2"
-      >
-        <svg
-          class="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+      <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -220,10 +184,8 @@ function copyToClipboard(text: string) {
           <dt class="text-gray-500">Algorithm</dt>
           <dd class="text-gray-900">
             {{
-              certificate.tbsCertificate.subjectPublicKeyInfo.algorithm
-                ?.algorithm?.name ||
-              certificate.tbsCertificate.subjectPublicKeyInfo.algorithm
-                ?.algorithm?.oid ||
+              certificate.tbsCertificate.subjectPublicKeyInfo.algorithm?.algorithm?.name ||
+              certificate.tbsCertificate.subjectPublicKeyInfo.algorithm?.algorithm?.oid ||
               "Unknown"
             }}
           </dd>
@@ -243,15 +205,8 @@ function copyToClipboard(text: string) {
 
     <!-- Fingerprints -->
     <section>
-      <h4
-        class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2"
-      >
-        <svg
-          class="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+      <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -271,12 +226,7 @@ function copyToClipboard(text: string) {
               class="ml-1 text-gray-400 hover:text-gray-600"
               title="Copy"
             >
-              <svg
-                class="w-3.5 h-3.5 inline"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -296,12 +246,7 @@ function copyToClipboard(text: string) {
               class="ml-1 text-gray-400 hover:text-gray-600"
               title="Copy"
             >
-              <svg
-                class="w-3.5 h-3.5 inline"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -317,15 +262,8 @@ function copyToClipboard(text: string) {
 
     <!-- Extensions -->
     <section v-if="certificate.tbsCertificate.extensions?.items?.length">
-      <h4
-        class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2"
-      >
-        <svg
-          class="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+      <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"

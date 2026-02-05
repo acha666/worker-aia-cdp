@@ -14,7 +14,7 @@ export function initializePkijsEngine() {
       name: "cloudflare",
       crypto,
       subtle: crypto.subtle,
-    }),
+    })
   );
 }
 

@@ -4,16 +4,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
-import {
-  decimalFromHex,
-  sha256Hex,
-  toHex,
-} from "../../src/worker/pki/utils/conversion";
+import { decimalFromHex, sha256Hex, toHex } from "../../src/worker/pki/utils/conversion";
 
 const CERT_DER_URL = new URL("../fixtures/test-leaf.cert.der", import.meta.url);
 
-const CERT_SHA256 =
-  "e952f0166f37f68dbb3c020e2bd105ca66dcb00d4bae1a81a96ae8f49ce491f3";
+const CERT_SHA256 = "e952f0166f37f68dbb3c020e2bd105ca66dcb00d4bae1a81a96ae8f49ce491f3";
 const CERT_SERIAL_HEX = "0A46A242EAF2D833B7552DA70D66D81D435123A9";
 const CERT_SERIAL_DEC = "58665094833392972755419431325433790933314380713";
 

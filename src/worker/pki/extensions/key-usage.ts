@@ -14,15 +14,12 @@ export function parseKeyUsageExtension(extension?: pkijs.Extension) {
     }
     const bitString = asn1.result as BitString;
     const bytes =
-      bitString.valueBlock.valueHexView ??
-      new Uint8Array(bitString.valueBlock.valueHex);
+      bitString.valueBlock.valueHexView ?? new Uint8Array(bitString.valueBlock.valueHex);
     if (bytes.length === 0) {
       return undefined;
     }
     const unusedBits =
-      typeof bitString.valueBlock.unusedBits === "number"
-        ? bitString.valueBlock.unusedBits
-        : 0;
+      typeof bitString.valueBlock.unusedBits === "number" ? bitString.valueBlock.unusedBits : 0;
     const totalBits = Math.max(0, bytes.length * 8 - unusedBits);
     const flags: Record<string, boolean> = {};
     const enabled: string[] = [];

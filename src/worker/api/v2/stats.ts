@@ -3,12 +3,7 @@
  */
 
 import type { RouteHandler } from "../../env";
-import type {
-  StatsResult,
-  HealthResult,
-  CertificateStatusState,
-  CrlStatusState,
-} from "./types";
+import type { StatsResult, HealthResult, CertificateStatusState, CrlStatusState } from "./types";
 import { jsonSuccess } from "./response";
 import { getCacheControlHeader } from "../../cache/config";
 
@@ -65,8 +60,7 @@ export const getStats: RouteHandler = async (_req, env) => {
       } as R2ListOptions);
 
       for (const object of list.objects) {
-        const metadata = (object as { customMetadata?: Record<string, string> })
-          .customMetadata;
+        const metadata = (object as { customMetadata?: Record<string, string> }).customMetadata;
         const size = object.size;
 
         // Update storage stats
@@ -90,10 +84,7 @@ export const getStats: RouteHandler = async (_req, env) => {
         }
 
         // Process CRLs
-        if (
-          (prefix === "crl/" || prefix === "dcrl/") &&
-          isCrlFile(object.key)
-        ) {
+        if ((prefix === "crl/" || prefix === "dcrl/") && isCrlFile(object.key)) {
           stats.crls.total++;
 
           if (prefix === "dcrl/") {
@@ -102,10 +93,8 @@ export const getStats: RouteHandler = async (_req, env) => {
             stats.crls.full++;
           }
 
-          const thisUpdate =
-            metadata?.summaryThisUpdate ?? metadata?.thisUpdate;
-          const nextUpdate =
-            metadata?.summaryNextUpdate ?? metadata?.nextUpdate;
+          const thisUpdate = metadata?.summaryThisUpdate ?? metadata?.thisUpdate;
+          const nextUpdate = metadata?.summaryNextUpdate ?? metadata?.nextUpdate;
           const status = computeCrlStatus(now, thisUpdate, nextUpdate);
           stats.crls.byStatus[status]++;
 
@@ -186,7 +175,7 @@ function isCrlFile(key: string): boolean {
 function computeCertStatus(
   now: number,
   notBefore?: string,
-  notAfter?: string,
+  notAfter?: string
 ): CertificateStatusState {
   if (notBefore) {
     const nbDate = new Date(notBefore);
@@ -203,11 +192,7 @@ function computeCertStatus(
   return "valid";
 }
 
-function computeCrlStatus(
-  now: number,
-  thisUpdate?: string,
-  nextUpdate?: string,
-): CrlStatusState {
+function computeCrlStatus(now: number, thisUpdate?: string, nextUpdate?: string): CrlStatusState {
   if (nextUpdate) {
     const nuDate = new Date(nextUpdate);
     if (now > nuDate.getTime()) {

@@ -1,14 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import type {
-  CertificateListItem,
-  CertificateDetail,
-} from "@contracts/schemas";
-import {
-  listCertificates,
-  getCertificate,
-  type ListCertificatesResult,
-} from "../api/client";
+import type { CertificateListItem, CertificateDetail } from "@contracts/schemas";
+import { listCertificates, getCertificate, type ListCertificatesResult } from "../api/client";
 
 export const useCertificatesStore = defineStore("certificates", () => {
   // State
@@ -22,11 +15,9 @@ export const useCertificatesStore = defineStore("certificates", () => {
 
   // Getters
   const isEmpty = computed(() => items.value.length === 0 && !loading.value);
-  const validCount = computed(
-    () => items.value.filter((c) => c.status.state === "valid").length,
-  );
+  const validCount = computed(() => items.value.filter((c) => c.status.state === "valid").length);
   const expiredCount = computed(
-    () => items.value.filter((c) => c.status.state === "expired").length,
+    () => items.value.filter((c) => c.status.state === "expired").length
   );
 
   // Actions
@@ -41,8 +32,7 @@ export const useCertificatesStore = defineStore("certificates", () => {
       hasMore.value = result.hasMore;
       nextCursor.value = result.nextCursor;
     } catch (e) {
-      error.value =
-        e instanceof Error ? e.message : "Failed to load certificates";
+      error.value = e instanceof Error ? e.message : "Failed to load certificates";
       console.error("Failed to fetch certificates:", e);
     } finally {
       loading.value = false;
@@ -62,8 +52,7 @@ export const useCertificatesStore = defineStore("certificates", () => {
       hasMore.value = result.hasMore;
       nextCursor.value = result.nextCursor;
     } catch (e) {
-      error.value =
-        e instanceof Error ? e.message : "Failed to load more certificates";
+      error.value = e instanceof Error ? e.message : "Failed to load more certificates";
     } finally {
       loading.value = false;
     }
@@ -71,8 +60,9 @@ export const useCertificatesStore = defineStore("certificates", () => {
 
   async function fetchDetail(id: string): Promise<CertificateDetail | null> {
     // Check cache first
-    if (detailCache.value.has(id)) {
-      return detailCache.value.get(id)!;
+    const cached = detailCache.value.get(id);
+    if (cached) {
+      return cached;
     }
 
     // Avoid duplicate requests

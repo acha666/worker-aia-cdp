@@ -1,56 +1,56 @@
 {
-	"name": "Worker AIA CDP Development",
-	"image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
-	
-	"features": {
-		"ghcr.io/devcontainers/features/git:1": {},
-		"ghcr.io/devcontainers/features/github-cli:1": {},
-		"ghcr.io/devcontainers/features/docker-in-docker:2": {}
-	},
+  "name": "Worker AIA CDP Development",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
 
-	"customizations": {
-		"vscode": {
-			"extensions": [
-				"dbaeumer.vscode-eslint",
-				"esbenp.prettier-vscode",
-				"ms-vscode.vscode-typescript-next",
-				"bradlc.vscode-tailwindcss",
-				"usernamehw.errorlens",
-				"yoavbls.pretty-ts-errors"
-			],
-			"settings": {
-				"editor.formatOnSave": true,
-				"editor.defaultFormatter": "esbenp.prettier-vscode",
-				"editor.codeActionsOnSave": {
-					"source.fixAll.eslint": "explicit"
-				},
-				"typescript.tsdk": "node_modules/typescript/lib",
-				"files.eol": "\n"
-			}
-		}
-	},
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
 
-	"forwardPorts": [8787, 5173],
-	"portsAttributes": {
-		"8787": {
-			"label": "Wrangler Dev Server",
-			"onAutoForward": "notify"
-		},
-		"5173": {
-			"label": "Vite Dev Server",
-			"onAutoForward": "notify"
-		}
-	},
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-typescript-next",
+        "bradlc.vscode-tailwindcss",
+        "usernamehw.errorlens",
+        "yoavbls.pretty-ts-errors"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        },
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "files.eol": "\n"
+      }
+    }
+  },
 
-	"postCreateCommand": "npm install",
+  "forwardPorts": [8787, 5173],
+  "portsAttributes": {
+    "8787": {
+      "label": "Wrangler Dev Server",
+      "onAutoForward": "notify"
+    },
+    "5173": {
+      "label": "Vite Dev Server",
+      "onAutoForward": "notify"
+    }
+  },
 
-	"remoteUser": "node",
-	
-	"mounts": [
-		"source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/node/.ssh,readonly,type=bind,consistency=cached"
-	],
+  "postCreateCommand": "npm install",
 
-	"remoteEnv": {
-		"BROWSER": "wslview"
-	}
+  "remoteUser": "node",
+
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/node/.ssh,readonly,type=bind,consistency=cached"
+  ],
+
+  "remoteEnv": {
+    "BROWSER": "wslview"
+  }
 }

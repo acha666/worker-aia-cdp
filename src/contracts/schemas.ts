@@ -183,11 +183,7 @@ export const StorageInfoSchema = z.object({
   etag: z.string().optional(),
 });
 
-export const CertificateStatusStateSchema = z.enum([
-  "valid",
-  "expired",
-  "not-yet-valid",
-]);
+export const CertificateStatusStateSchema = z.enum(["valid", "expired", "not-yet-valid"]);
 
 export const CertificateStatusSchema = z.object({
   state: CertificateStatusStateSchema,
@@ -412,7 +408,7 @@ export const HealthResultSchema = z.object({
     z.object({
       status: z.string(),
       latencyMs: z.number().optional(),
-    }),
+    })
   ),
 });
 
@@ -496,9 +492,7 @@ export type SubjectPublicKeyInfo = z.infer<typeof SubjectPublicKeyInfoSchema>;
 export type Extension = z.infer<typeof ExtensionSchema>;
 export type Extensions = z.infer<typeof ExtensionsSchema>;
 export type StorageInfo = z.infer<typeof StorageInfoSchema>;
-export type CertificateStatusState = z.infer<
-  typeof CertificateStatusStateSchema
->;
+export type CertificateStatusState = z.infer<typeof CertificateStatusStateSchema>;
 export type CertificateStatus = z.infer<typeof CertificateStatusSchema>;
 export type CrlStatusState = z.infer<typeof CrlStatusStateSchema>;
 export type CrlType = z.infer<typeof CrlTypeSchema>;

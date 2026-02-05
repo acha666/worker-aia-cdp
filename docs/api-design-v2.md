@@ -2207,13 +2207,8 @@ interface CrlListParams extends ListParams {
 
 interface PkiApiClient {
   // Certificates
-  listCertificates(
-    params?: CertificateListParams,
-  ): Promise<ApiResponse<CertificateListItem[]>>;
-  getCertificate(
-    id: string,
-    include?: string[],
-  ): Promise<ApiResponse<CertificateDetail>>;
+  listCertificates(params?: CertificateListParams): Promise<ApiResponse<CertificateListItem[]>>;
+  getCertificate(id: string, include?: string[]): Promise<ApiResponse<CertificateDetail>>;
 
   // CRLs
   listCrls(params?: CrlListParams): Promise<ApiResponse<CrlListItem[]>>;
@@ -2223,21 +2218,18 @@ interface PkiApiClient {
       include?: string[];
       revocationsLimit?: number;
       revocationsCursor?: number;
-    },
+    }
   ): Promise<ApiResponse<CrlDetail>>;
-  uploadCrl(
-    data: string | ArrayBuffer,
-    contentType: string,
-  ): Promise<ApiResponse<CrlUploadResult>>;
+  uploadCrl(data: string | ArrayBuffer, contentType: string): Promise<ApiResponse<CrlUploadResult>>;
 
   // Revocations
   checkRevocation(
     crlId: string,
-    serialNumber: string,
+    serialNumber: string
   ): Promise<ApiResponse<RevokedCertificate | null>>;
   bulkCheckRevocations(
     crlId: string,
-    serialNumbers: string[],
+    serialNumbers: string[]
   ): Promise<
     ApiResponse<{
       results: Array<{
@@ -2250,10 +2242,7 @@ interface PkiApiClient {
   >;
 
   // Utility
-  search(
-    query: string,
-    type?: "certificate" | "crl",
-  ): Promise<ApiResponse<SearchResult>>;
+  search(query: string, type?: "certificate" | "crl"): Promise<ApiResponse<SearchResult>>;
   getStats(): Promise<ApiResponse<StatsResult>>;
   health(): Promise<ApiResponse<HealthResult>>;
 }

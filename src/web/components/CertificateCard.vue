@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import type {
-  CertificateListItem,
-  CertificateDetail,
-} from "@contracts/schemas";
+import type { CertificateListItem, CertificateDetail } from "@contracts/schemas";
 import { useCertificatesStore } from "../stores/certificates";
 import StatusBadge from "./StatusBadge.vue";
 import CertificateDetails from "./CertificateDetails.vue";
@@ -47,7 +44,7 @@ watch(
   () => store.getDetail(props.certificate.id),
   (cached) => {
     if (cached) detail.value = cached;
-  },
+  }
 );
 
 function formatTimezoneOffset(date: Date): string {
@@ -140,9 +137,7 @@ const downloadUrls = computed(() => {
 
   if (format === "pem") {
     // Current is PEM, derive DER
-    const derUrl = baseUrl
-      .replace(/\.pem$/, "")
-      .replace(/\.(crt|cer)$/, ".der");
+    const derUrl = baseUrl.replace(/\.pem$/, "").replace(/\.(crt|cer)$/, ".der");
     return { der: derUrl, pem: baseUrl };
   } else {
     // Current is DER, derive PEM
@@ -167,10 +162,7 @@ const validityInfo = computed(() => {
 <template>
   <div
     class="overflow-hidden bg-white border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-shadow border-b border-gray-200"
-    :class="[
-      props.isFirst ? 'rounded-t-lg' : '',
-      props.isLast ? 'rounded-b-lg' : '',
-    ]"
+    :class="[props.isFirst ? 'rounded-t-lg' : '', props.isLast ? 'rounded-b-lg' : '']"
   >
     <!-- Header -->
     <div class="p-4 bg-gradient-to-r from-blue-50 to-white">
@@ -192,9 +184,7 @@ const validityInfo = computed(() => {
               <span class="font-medium">From</span> {{ validityInfo.from }} ·
               <span class="font-medium">Until</span> {{ validityInfo.to }}
               <span
-                v-if="
-                  validityInfo.remaining && certificate.status.state === 'valid'
-                "
+                v-if="validityInfo.remaining && certificate.status.state === 'valid'"
                 class="text-green-700"
               >
                 ({{ validityInfo.remaining }})
@@ -214,10 +204,7 @@ const validityInfo = computed(() => {
           title="Toggle details"
         >
           <svg
-            :class="[
-              'w-5 h-5 transition-transform',
-              expanded ? 'rotate-0' : '-rotate-90',
-            ]"
+            :class="['w-5 h-5 transition-transform', expanded ? 'rotate-0' : '-rotate-90']"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -263,11 +250,7 @@ const validityInfo = computed(() => {
       <div v-if="expanded" class="overflow-hidden">
         <div class="border-t border-blue-200 p-4 bg-white">
           <div v-if="isLoading" class="flex items-center justify-center py-8">
-            <svg
-              class="animate-spin h-5 w-5 text-blue-600"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
+            <svg class="animate-spin h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24">
               <circle
                 class="opacity-25"
                 cx="12"
@@ -285,9 +268,7 @@ const validityInfo = computed(() => {
             <span class="ml-2 text-xs text-gray-600">Loading...</span>
           </div>
           <CertificateDetails v-else-if="detail" :certificate="detail" />
-          <div v-else class="text-center py-4 text-xs text-gray-500">
-            Failed to load details
-          </div>
+          <div v-else class="text-center py-4 text-xs text-gray-500">Failed to load details</div>
         </div>
       </div>
     </Transition>

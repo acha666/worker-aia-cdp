@@ -1,17 +1,8 @@
 import { fromBER, Sequence, Integer, OctetString } from "asn1js";
 import * as pkijs from "pkijs";
-import {
-  describeName,
-  bitStringBytes,
-  describeAlgorithm,
-} from "../utils/describe";
+import { describeName, bitStringBytes, describeAlgorithm } from "../utils/describe";
 import { toHex, sha256Hex, sha1Hex, toJSDate } from "../utils/conversion";
-import {
-  KEY_ALG_NAMES,
-  SIGNATURE_ALG_NAMES,
-  CURVE_NAMES,
-  EXTENSION_NAMES,
-} from "../constants";
+import { KEY_ALG_NAMES, SIGNATURE_ALG_NAMES, CURVE_NAMES, EXTENSION_NAMES } from "../constants";
 import { parseBasicConstraints } from "../extensions/basic-constraints";
 import { parseKeyUsageExtension } from "../extensions/key-usage";
 import { parseExtendedKeyUsage } from "../extensions/extended-key-usage";
@@ -77,7 +68,7 @@ export interface CertificateMetadata {
 
 export async function buildCertificateDetails(
   cert: pkijs.Certificate,
-  der: ArrayBuffer,
+  der: ArrayBuffer
 ): Promise<CertificateMetadata> {
   const subjectDescription = describeName(cert.subject);
   const issuerDescription = describeName(cert.issuer);
@@ -88,16 +79,13 @@ export async function buildCertificateDetails(
     : null;
   const signatureAlgorithm = describeAlgorithm(
     cert.signatureAlgorithm.algorithmId,
-    SIGNATURE_ALG_NAMES,
+    SIGNATURE_ALG_NAMES
   );
   const signatureBytes = bitStringBytes(cert.signatureValue);
   const signatureHex = signatureBytes.length ? toHex(signatureBytes) : null;
 
   const spki = cert.subjectPublicKeyInfo;
-  const publicKeyAlgorithm = describeAlgorithm(
-    spki.algorithm.algorithmId,
-    KEY_ALG_NAMES,
-  );
+  const publicKeyAlgorithm = describeAlgorithm(spki.algorithm.algorithmId, KEY_ALG_NAMES);
   const spkiDer = spki.toSchema().toBER(false);
   const spkFingerprintSha256 = await sha256Hex(spkiDer);
   const spkFingerprintSha1 = await sha1Hex(spkiDer);
@@ -194,7 +182,7 @@ type CertificateExtensionParsers = Record<
 >;
 
 function stripCritical<T extends { critical?: boolean }>(
-  value: T | null | undefined,
+  value: T | null | undefined
 ): Omit<T, "critical"> | undefined {
   if (!value || typeof value !== "object") {
     return undefined;
@@ -205,7 +193,7 @@ function stripCritical<T extends { critical?: boolean }>(
 
 function parseSubjectKeyIdentifierExtension(
   extension: pkijs.Extension,
-  certificate: pkijs.Certificate,
+  certificate: pkijs.Certificate
 ) {
   const existing = getSKIHex(certificate);
   if (existing) {
@@ -229,21 +217,15 @@ const CERTIFICATE_EXTENSION_PARSERS: CertificateExtensionParsers = {
   "2.5.29.15": (extension) => stripCritical(parseKeyUsageExtension(extension)),
   "2.5.29.37": (extension) => stripCritical(parseExtendedKeyUsage(extension)),
   "2.5.29.17": (extension) => stripCritical(parseSubjectAltName(extension)),
-  "1.3.6.1.5.5.7.1.1": (extension) =>
-    stripCritical(parseAuthorityInfoAccess(extension)),
-  "2.5.29.31": (extension) =>
-    stripCritical(parseCRLDistributionPoints(extension)),
-  "2.5.29.32": (extension) =>
-    stripCritical(parseCertificatePolicies(extension)),
-  "2.5.29.35": (extension) =>
-    stripCritical(parseAuthorityKeyIdentifier(extension)),
+  "1.3.6.1.5.5.7.1.1": (extension) => stripCritical(parseAuthorityInfoAccess(extension)),
+  "2.5.29.31": (extension) => stripCritical(parseCRLDistributionPoints(extension)),
+  "2.5.29.32": (extension) => stripCritical(parseCertificatePolicies(extension)),
+  "2.5.29.35": (extension) => stripCritical(parseAuthorityKeyIdentifier(extension)),
   "2.5.29.14": (extension, certificate) =>
     parseSubjectKeyIdentifierExtension(extension, certificate),
 };
 
-function buildCertificateExtensionDetails(
-  cert: pkijs.Certificate,
-): ExtensionDetail[] {
+function buildCertificateExtensionDetails(cert: pkijs.Certificate): ExtensionDetail[] {
   const extensions = cert.extensions ?? [];
   return extensions.map((extension) => {
     const oid = extension.extnID;

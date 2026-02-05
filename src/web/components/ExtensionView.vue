@@ -38,9 +38,7 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
       class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
     >
       <div class="flex items-center gap-2">
-        <span class="text-sm font-medium text-gray-900">{{
-          extensionName
-        }}</span>
+        <span class="text-sm font-medium text-gray-900">{{ extensionName }}</span>
         <span
           v-if="extension.critical"
           class="px-1.5 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded"
@@ -55,20 +53,12 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
         </span>
       </div>
       <svg
-        :class="[
-          'w-4 h-4 text-gray-400 transition-transform',
-          expanded ? 'rotate-180' : '',
-        ]"
+        :class="['w-4 h-4 text-gray-400 transition-transform', expanded ? 'rotate-180' : '']"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
       >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M19 9l-7 7-7-7"
-        />
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
       </svg>
     </button>
 
@@ -85,9 +75,7 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
           <!-- OID -->
           <div class="mb-2">
             <span class="text-gray-500">OID:</span>
-            <code class="ml-1 text-xs text-gray-700">{{
-              extension.extnID.oid
-            }}</code>
+            <code class="ml-1 text-xs text-gray-700">{{ extension.extnID.oid }}</code>
           </div>
 
           <!-- Parsed content -->
@@ -97,10 +85,7 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
               <div class="space-y-1">
                 <div>
                   <span class="text-gray-500">CA:</span>
-                  <span
-                    class="ml-1"
-                    :class="parsed.cA ? 'text-green-600' : 'text-gray-600'"
-                  >
+                  <span class="ml-1" :class="parsed.cA ? 'text-green-600' : 'text-gray-600'">
                     {{ parsed.cA ? "Yes" : "No" }}
                   </span>
                 </div>
@@ -154,9 +139,7 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
             </template>
 
             <!-- Authority Key Identifier -->
-            <template
-              v-else-if="parsed.extensionType === 'authorityKeyIdentifier'"
-            >
+            <template v-else-if="parsed.extensionType === 'authorityKeyIdentifier'">
               <div class="space-y-1">
                 <div v-if="parsed.keyIdentifier">
                   <span class="text-gray-500">Key ID:</span>
@@ -168,27 +151,17 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
             </template>
 
             <!-- Subject Key Identifier (has 'keyIdentifier' but it's the only field or no authorityCertIssuer) -->
-            <template
-              v-else-if="parsed.extensionType === 'subjectKeyIdentifier'"
-            >
+            <template v-else-if="parsed.extensionType === 'subjectKeyIdentifier'">
               <div>
                 <span class="text-gray-500">Key ID:</span>
-                <code class="ml-1 text-xs text-gray-700 break-all">{{
-                  parsed.keyIdentifier
-                }}</code>
+                <code class="ml-1 text-xs text-gray-700 break-all">{{ parsed.keyIdentifier }}</code>
               </div>
             </template>
 
             <!-- CRL Distribution Points -->
-            <template
-              v-else-if="parsed.extensionType === 'cRLDistributionPoints'"
-            >
+            <template v-else-if="parsed.extensionType === 'cRLDistributionPoints'">
               <ul class="space-y-2">
-                <li
-                  v-for="(dp, idx) in parsed.distributionPoints || []"
-                  :key="idx"
-                  class="text-xs"
-                >
+                <li v-for="(dp, idx) in parsed.distributionPoints || []" :key="idx" class="text-xs">
                   <template v-if="dp.distributionPoint?.fullName">
                     <div
                       v-for="(name, nidx) in dp.distributionPoint.fullName"
@@ -203,9 +176,7 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
             </template>
 
             <!-- Authority Info Access -->
-            <template
-              v-else-if="parsed.extensionType === 'authorityInfoAccess'"
-            >
+            <template v-else-if="parsed.extensionType === 'authorityInfoAccess'">
               <ul class="space-y-1">
                 <li
                   v-for="(desc, idx) in parsed.accessDescriptions || []"
@@ -213,9 +184,7 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
                   class="text-xs"
                 >
                   <span class="text-gray-500"
-                    >{{
-                      desc.accessMethod.name || desc.accessMethod.oid
-                    }}:</span
+                    >{{ desc.accessMethod.name || desc.accessMethod.oid }}:</span
                   >
                   <span class="ml-1 text-gray-700 font-mono">{{
                     formatGeneralName(desc.accessLocation)
@@ -225,9 +194,7 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
             </template>
 
             <!-- Certificate Policies -->
-            <template
-              v-else-if="parsed.extensionType === 'certificatePolicies'"
-            >
+            <template v-else-if="parsed.extensionType === 'certificatePolicies'">
               <ul class="space-y-1">
                 <li
                   v-for="policy in parsed.policies || []"
@@ -253,18 +220,15 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
             <template v-else-if="parsed.extensionType === 'deltaCRLIndicator'">
               <div>
                 <span class="text-gray-500">Base CRL Number:</span>
-                <span class="ml-1 text-gray-900">{{
-                  parsed.baseCRLNumber
-                }}</span>
+                <span class="ml-1 text-gray-900">{{ parsed.baseCRLNumber }}</span>
               </div>
             </template>
 
             <!-- Generic fallback -->
             <template v-else>
-              <pre
-                class="text-xs text-gray-600 bg-gray-50 p-2 rounded overflow-auto max-h-40"
-                >{{ JSON.stringify(parsed, null, 2) }}</pre
-              >
+              <pre class="text-xs text-gray-600 bg-gray-50 p-2 rounded overflow-auto max-h-40">{{
+                JSON.stringify(parsed, null, 2)
+              }}</pre>
             </template>
           </template>
 

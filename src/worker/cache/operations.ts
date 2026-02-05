@@ -21,7 +21,7 @@ export function getEdgeCache() {
 export function withCacheStatus(
   response: Response,
   status: CacheStatus,
-  headerName = "X-Cache-Status",
+  headerName = "X-Cache-Status"
 ): Response {
   const headers = new Headers(response.headers);
   headers.set(headerName, status);
@@ -30,4 +30,17 @@ export function withCacheStatus(
     statusText: response.statusText,
     headers,
   });
+}
+
+/**
+ * Store a clone of the response in cache and return an annotated copy.
+ */
+export async function cacheResponse(
+  cache: Cache,
+  cacheKey: Request,
+  response: Response,
+  headerName = "X-Cache-Status"
+): Promise<Response> {
+  await cache.put(cacheKey, response.clone());
+  return withCacheStatus(response, "MISS", headerName);
 }

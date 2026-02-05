@@ -3,11 +3,7 @@
  */
 
 import type { RouteHandler } from "../../env";
-import type {
-  CertificateListItem,
-  CertificateDetail,
-  StorageInfo,
-} from "./types";
+import type { CertificateListItem, CertificateDetail, StorageInfo } from "./types";
 import {
   jsonSuccess,
   jsonError,
@@ -84,17 +80,16 @@ export const listCertificates: RouteHandler = async (req, env) => {
       break;
     }
 
-    let metadata = (object as { customMetadata?: Record<string, string> })
-      .customMetadata;
+    let metadata = (object as { customMetadata?: Record<string, string> }).customMetadata;
 
     // Lazy-load summary metadata if missing (for initially-uploaded certificates)
     // When certificates are manually uploaded to R2 (without going through the API),
     // they lack the computed summary metadata. This ensures such certificates get
     // their metadata generated and cached on first access to the list endpoint.
     const hasSummaryMetadata =
-      metadata?.summarySubjectCN ||
-      metadata?.summaryIssuerCN ||
-      metadata?.summaryNotBefore ||
+      metadata?.summarySubjectCN ??
+      metadata?.summaryIssuerCN ??
+      metadata?.summaryNotBefore ??
       metadata?.summaryNotAfter;
 
     if (!hasSummaryMetadata) {
@@ -108,8 +103,7 @@ export const listCertificates: RouteHandler = async (req, env) => {
         if (summary) {
           // Fetch updated metadata after summary generation
           const updated = await env.STORE.head(object.key);
-          metadata = (updated as { customMetadata?: Record<string, string> })
-            ?.customMetadata;
+          metadata = (updated as { customMetadata?: Record<string, string> })?.customMetadata;
         }
       } catch (error) {
         // If metadata generation fails, continue with null summary fields
@@ -177,12 +171,9 @@ export const listCertificates: RouteHandler = async (req, env) => {
 
   const items = Array.from(certMap.values()); // Determine pagination
   const hasMore =
-    list.truncated ||
-    items.length < list.objects.filter((o) => isCertificateFile(o.key)).length;
+    list.truncated || items.length < list.objects.filter((o) => isCertificateFile(o.key)).length;
   const nextCursor =
-    hasMore && list.truncated
-      ? (list as unknown as { cursor: string }).cursor
-      : null;
+    hasMore && list.truncated ? (list as unknown as { cursor: string }).cursor : null;
 
   const pagination = createPaginationMeta({
     cursor: cursor ?? null,
@@ -195,7 +186,7 @@ export const listCertificates: RouteHandler = async (req, env) => {
     url.origin,
     "/api/v2/certificates",
     url.searchParams,
-    nextCursor,
+    nextCursor
   );
 
   return jsonSuccess(items, {
@@ -250,35 +241,25 @@ export const getCertificate: RouteHandler = async (req, env) => {
       const block = extractPEMBlock(
         pemText,
         "-----BEGIN CERTIFICATE-----",
-        "-----END CERTIFICATE-----",
+        "-----END CERTIFICATE-----"
       );
       der = block.slice().buffer as ArrayBuffer;
     } else {
       der = bytes;
     }
   } catch (error) {
-    return jsonError(
-      400,
-      "invalid_certificate",
-      "Failed to read certificate data",
-      {
-        details: error instanceof Error ? error.message : String(error),
-      },
-    );
+    return jsonError(400, "invalid_certificate", "Failed to read certificate data", {
+      details: error instanceof Error ? error.message : String(error),
+    });
   }
 
   let cert;
   try {
     cert = parseCertificate(der);
   } catch (error) {
-    return jsonError(
-      400,
-      "invalid_certificate",
-      "Failed to parse certificate",
-      {
-        details: error instanceof Error ? error.message : String(error),
-      },
-    );
+    return jsonError(400, "invalid_certificate", "Failed to parse certificate", {
+      details: error instanceof Error ? error.message : String(error),
+    });
   }
 
   // Build response
@@ -325,7 +306,7 @@ export const getCertificate: RouteHandler = async (req, env) => {
     detail.signatureAlgorithm = buildAlgorithmIdentifier(
       cert.signatureAlgorithm.algorithmId,
       cert.signatureAlgorithm.algorithmParams,
-      SIGNATURE_ALG_NAMES,
+      SIGNATURE_ALG_NAMES
     );
   }
 
@@ -355,7 +336,7 @@ function isCertificateFile(key: string): boolean {
 function computeCertStatus(
   now: number,
   notBefore?: Date,
-  notAfter?: Date,
+  notAfter?: Date
 ): CertificateListItem["status"] {
   let state: "valid" | "expired" | "not-yet-valid" = "valid";
   let expiresIn: number | undefined;

@@ -7,9 +7,7 @@ export function formatName(name: Name): string {
   return rdns.join(", ");
 }
 
-function formatAttribute(
-  attribute: Name["rdnSequence"][number]["attributes"][number],
-) {
+function formatAttribute(attribute: Name["rdnSequence"][number]["attributes"][number]) {
   const key = attribute.type.name ?? attribute.type.oid;
   const value = attribute.value.string ?? "";
   return `${key}=${value}`;

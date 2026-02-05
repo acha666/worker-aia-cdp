@@ -2,11 +2,7 @@
 import { computed } from "vue";
 import type { CrlDetail, Extension } from "@contracts/schemas";
 import ExtensionView from "./ExtensionView.vue";
-import {
-  formatDateReadable,
-  formatTimezoneOffset,
-  getRelativeTime,
-} from "../utils/dates";
+import { formatDateReadable, formatTimezoneOffset, getRelativeTime } from "../utils/dates";
 import { formatName } from "../utils/x509";
 
 const props = defineProps<{
@@ -65,15 +61,8 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
   <div class="space-y-6">
     <!-- Basic Info -->
     <section>
-      <h4
-        class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2"
-      >
-        <svg
-          class="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+      <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -116,15 +105,8 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
 
     <!-- Validity -->
     <section>
-      <h4
-        class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2"
-      >
-        <svg
-          class="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+      <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -142,13 +124,9 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
           </span>
         </div>
         <div v-if="crl.status.validityPeriodHours" class="text-gray-600">
-          <span class="font-medium"
-            >{{ crl.status.validityPeriodHours }} hours</span
-          >
+          <span class="font-medium">{{ crl.status.validityPeriodHours }} hours</span>
           total ·
-          <span class="font-medium"
-            >{{ crl.status.hoursRemaining ?? "Expired" }} hours</span
-          >
+          <span class="font-medium">{{ crl.status.hoursRemaining ?? "Expired" }} hours</span>
           remaining
         </div>
       </div>
@@ -156,15 +134,8 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
 
     <!-- Fingerprints -->
     <section>
-      <h4
-        class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2"
-      >
-        <svg
-          class="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+      <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -184,12 +155,7 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
               class="ml-1 text-gray-400 hover:text-gray-600"
               title="Copy"
             >
-              <svg
-                class="w-3.5 h-3.5 inline"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -209,12 +175,7 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
               class="ml-1 text-gray-400 hover:text-gray-600"
               title="Copy"
             >
-              <svg
-                class="w-3.5 h-3.5 inline"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -230,15 +191,8 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
 
     <!-- Revoked Certificates -->
     <section v-if="revokedCount > 0">
-      <h4
-        class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2"
-      >
-        <svg
-          class="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+      <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -248,35 +202,24 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
         </svg>
         Revoked Certificates ({{ revokedCount }})
       </h4>
-      <div
-        class="max-h-64 overflow-auto border border-gray-200 rounded bg-white"
-      >
+      <div class="max-h-64 overflow-auto border border-gray-200 rounded bg-white">
         <table class="min-w-full text-sm">
           <thead class="bg-gray-50 sticky top-0">
             <tr>
-              <th
-                class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase"
-              >
+              <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                 Serial Number
               </th>
-              <th
-                class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase"
-              >
+              <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                 Revocation Date
               </th>
-              <th
-                class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase"
-              >
+              <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                 Reason
               </th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
             <tr
-              v-for="cert in crl.tbsCertList.revokedCertificates?.items?.slice(
-                0,
-                100,
-              ) || []"
+              v-for="cert in crl.tbsCertList.revokedCertificates?.items?.slice(0, 100) || []"
               :key="cert.userCertificate.hex"
             >
               <td class="px-3 py-2 font-mono text-xs text-gray-700">
@@ -301,10 +244,7 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
             </tr>
           </tbody>
         </table>
-        <div
-          v-if="revokedCount > 100"
-          class="px-3 py-2 text-xs text-gray-500 bg-gray-50 border-t"
-        >
+        <div v-if="revokedCount > 100" class="px-3 py-2 text-xs text-gray-500 bg-gray-50 border-t">
           Showing first 100 of {{ revokedCount }} revoked certificates
         </div>
       </div>
@@ -312,15 +252,8 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
 
     <!-- Extensions -->
     <section v-if="crl.tbsCertList.crlExtensions?.items?.length">
-      <h4
-        class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2"
-      >
-        <svg
-          class="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+      <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"

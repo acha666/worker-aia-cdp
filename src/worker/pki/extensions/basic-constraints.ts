@@ -2,10 +2,14 @@ import { fromBER } from "asn1js";
 import * as pkijs from "pkijs";
 
 export function parseBasicConstraints(extension?: pkijs.Extension) {
-  if (!extension) {return undefined;}
+  if (!extension) {
+    return undefined;
+  }
   try {
     const asn1 = fromBER(extension.extnValue.valueBlock.valueHex);
-    if (asn1.offset === -1) {return undefined;}
+    if (asn1.offset === -1) {
+      return undefined;
+    }
     const basicConstraints = new pkijs.BasicConstraints({
       schema: asn1.result,
     });

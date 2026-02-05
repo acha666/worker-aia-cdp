@@ -21,11 +21,7 @@ class MemoryCache {
 }
 
 function createEnv(
-  listImpl: (options: {
-    prefix: string;
-    cursor?: string;
-    delimiter?: string;
-  }) => Promise<any>,
+  listImpl: (options: { prefix: string; cursor?: string; delimiter?: string }) => Promise<any>
 ) {
   return {
     STORE: {
@@ -47,7 +43,7 @@ test("cachedListAllWithPrefix returns cached items without hitting R2", async ()
     listCacheKeys.CA,
     new Response(JSON.stringify(cachedItems), {
       headers: { "Content-Type": "application/json" },
-    }),
+    })
   );
   cache.putCalls = [];
 
@@ -111,10 +107,7 @@ test("cachedListAllWithPrefix fetches from R2 and populates cache when missing",
     assert.equal(stored.items[0].uploaded, "2025-09-27T03:04:05.000Z");
     assert.equal(typeof stored.cachedAt, "string");
     const cacheControl = putCall.response.headers.get("cache-control");
-    assert.equal(
-      cacheControl,
-      "public, max-age=60, s-maxage=300, stale-while-revalidate=86400",
-    );
+    assert.equal(cacheControl, "public, max-age=60, s-maxage=300, stale-while-revalidate=86400");
   } finally {
     globalThis.caches = originalCaches;
   }

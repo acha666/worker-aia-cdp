@@ -14,10 +14,7 @@ import {
   createMetaCacheKey,
   listCacheKeys,
 } from "../../src/worker/cache/keys";
-import {
-  getEdgeCache,
-  withCacheStatus,
-} from "../../src/worker/cache/operations";
+import { cacheResponse, getEdgeCache, withCacheStatus } from "../../src/worker/cache/operations";
 
 class MemoryCache {
   readonly store = new Map<string, Response>();
@@ -41,7 +38,7 @@ test("createMetaCacheKey encodes key safely", () => {
   const request = createMetaCacheKey(key);
   assert.equal(
     request.url,
-    "https://r2cache.internal/meta?key=crl%2F%C3%9C%C3%B1%C3%AE%C3%A7%C3%B8d%C3%A9%20value.pem",
+    "https://r2cache.internal/meta?key=crl%2F%C3%9C%C3%B1%C3%AE%C3%A7%C3%B8d%C3%A9%20value.pem"
   );
 });
 
@@ -58,27 +55,15 @@ test("getEdgeCache returns global caches.default", () => {
 });
 
 test("predefined list cache keys point at expected URLs", () => {
-  assert.equal(
-    listCacheKeys.CA.url,
-    "https://r2cache.internal/list?prefix=ca/&delimiter=/",
-  );
-  assert.equal(
-    listCacheKeys.CRL.url,
-    "https://r2cache.internal/list?prefix=crl/&delimiter=/",
-  );
-  assert.equal(
-    listCacheKeys.DCRL.url,
-    "https://r2cache.internal/list?prefix=dcrl/&delimiter=/",
-  );
+  assert.equal(listCacheKeys.CA.url, "https://r2cache.internal/list?prefix=ca/&delimiter=/");
+  assert.equal(listCacheKeys.CRL.url, "https://r2cache.internal/list?prefix=crl/&delimiter=/");
+  assert.equal(listCacheKeys.DCRL.url, "https://r2cache.internal/list?prefix=dcrl/&delimiter=/");
 });
 
 test("createBinaryCacheKey normalizes leading slashes and encodes method", () => {
   const request = createBinaryCacheKey("/ca/root.pem", "head");
   const url = new URL(request.url);
-  assert.equal(
-    `${url.origin}${url.pathname}`,
-    "https://r2cache.internal/binary",
-  );
+  assert.equal(`${url.origin}${url.pathname}`, "https://r2cache.internal/binary");
   assert.equal(url.searchParams.get("key"), "ca/root.pem");
   assert.equal(url.searchParams.get("method"), "HEAD");
   assert.equal(request.method, "GET");
@@ -93,10 +78,7 @@ test("createListCacheKey composes cache key for collections and options", () => 
     limit: 25,
   });
   const url = new URL(request.url);
-  assert.equal(
-    `${url.origin}${url.pathname}`,
-    "https://r2cache.internal/collections/crl/items",
-  );
+  assert.equal(`${url.origin}${url.pathname}`, "https://r2cache.internal/collections/crl/items");
   assert.equal(url.searchParams.get("prefix"), "crl/");
   assert.equal(url.searchParams.get("delimiter"), "/");
   assert.equal(url.searchParams.get("cursor"), "opaque");
@@ -112,24 +94,19 @@ test("getCacheControlHeader exposes directives", () => {
 test("withCacheStatus returns annotated copy without mutating original", () => {
   const original = new Response("payload", { status: 200 });
   const hit = withCacheStatus(original, "HIT");
-  assert.equal(hit.headers.get("X-Worker-Cache"), "HIT");
-  assert.equal(original.headers.get("X-Worker-Cache"), null);
+  assert.equal(hit.headers.get("X-Cache-Status"), "HIT");
+  assert.equal(original.headers.get("X-Cache-Status"), null);
 });
 
-// TODO: Implement cacheResponse function or remove this test
-// test("cacheResponse stores clone and labels outgoing response", async () => {
-//   const memoryCache = new MemoryCache();
-//   const cacheKey = new Request("https://example.test/cache");
-//   const response = new Response("body", { status: 200 });
-//
-//   const result = await cacheResponse(
-//     memoryCache as unknown as Cache,
-//     cacheKey,
-//     response,
-//   );
-//
-//   assert.equal(result.headers.get("X-Worker-Cache"), "MISS");
-//   const stored = memoryCache.store.get(cacheKey.url);
-//   assert.ok(stored);
-//   assert.equal(stored?.headers.get("X-Worker-Cache"), null);
-// });
+test("cacheResponse stores clone and labels outgoing response", async () => {
+  const memoryCache = new MemoryCache();
+  const cacheKey = new Request("https://example.test/cache");
+  const response = new Response("body", { status: 200 });
+
+  const result = await cacheResponse(memoryCache as unknown as Cache, cacheKey, response);
+
+  assert.equal(result.headers.get("X-Cache-Status"), "MISS");
+  const stored = memoryCache.store.get(cacheKey.url);
+  assert.ok(stored);
+  assert.equal(stored?.headers.get("X-Cache-Status"), null);
+});

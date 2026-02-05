@@ -128,8 +128,7 @@ export const listCrls: RouteHandler = async (req, env) => {
         break;
       }
 
-      const metadata = (object as { customMetadata?: Record<string, string> })
-        .customMetadata;
+      const metadata = (object as { customMetadata?: Record<string, string> }).customMetadata;
       const format = "der"; // Always report as DER (the canonical format)
 
       // Determine CRL type from path
@@ -139,10 +138,8 @@ export const listCrls: RouteHandler = async (req, env) => {
       const issuerCN = metadata?.summaryIssuerCN ?? metadata?.issuerCN ?? null;
       const crlNumber = metadata?.crlNumber ?? null;
       const baseCrlNumber = metadata?.baseCRLNumber ?? null;
-      const thisUpdate =
-        metadata?.summaryThisUpdate ?? metadata?.thisUpdate ?? null;
-      const nextUpdate =
-        metadata?.summaryNextUpdate ?? metadata?.nextUpdate ?? null;
+      const thisUpdate = metadata?.summaryThisUpdate ?? metadata?.thisUpdate ?? null;
+      const nextUpdate = metadata?.summaryNextUpdate ?? metadata?.nextUpdate ?? null;
       const revokedCount = parseInt(metadata?.revokedCount ?? "0", 10) || 0;
 
       // Compute status
@@ -204,12 +201,7 @@ export const listCrls: RouteHandler = async (req, env) => {
     pageSize: items.length,
   });
 
-  const links = createPaginationLinks(
-    url.origin,
-    "/api/v2/crls",
-    url.searchParams,
-    nextCursor,
-  );
+  const links = createPaginationLinks(url.origin, "/api/v2/crls", url.searchParams, nextCursor);
 
   return jsonSuccess(items, {
     meta: { pagination, links },
@@ -245,10 +237,8 @@ export const getCrl: RouteHandler = async (req, env) => {
   }
 
   const include = parseIncludeParam(url.searchParams.get("include"));
-  const revocationsLimit =
-    parseInt(url.searchParams.get("revocations.limit") ?? "10", 10) || 10;
-  const revocationsCursor =
-    parseInt(url.searchParams.get("revocations.cursor") ?? "0", 10) || 0;
+  const revocationsLimit = parseInt(url.searchParams.get("revocations.limit") ?? "10", 10) || 10;
+  const revocationsCursor = parseInt(url.searchParams.get("revocations.cursor") ?? "0", 10) || 0;
 
   // Normalize the key - id might be "crl/filename" or "dcrl/filename"
   let key = id;
@@ -273,11 +263,7 @@ export const getCrl: RouteHandler = async (req, env) => {
     const bytes = await object.arrayBuffer();
     if (key.endsWith(".pem")) {
       const pemText = new TextDecoder().decode(bytes);
-      const block = extractPEMBlock(
-        pemText,
-        "-----BEGIN X509 CRL-----",
-        "-----END X509 CRL-----",
-      );
+      const block = extractPEMBlock(pemText, "-----BEGIN X509 CRL-----", "-----END X509 CRL-----");
       der = block.slice().buffer as ArrayBuffer;
     } else {
       der = bytes;
@@ -320,8 +306,7 @@ export const getCrl: RouteHandler = async (req, env) => {
   const status = buildCrlStatus(thisUpdate, nextUpdate);
 
   // Build TBSCertList
-  const includeRevocations =
-    include.size === 0 || include.has("revokedcertificates");
+  const includeRevocations = include.size === 0 || include.has("revokedcertificates");
   const tbsCertList = buildTBSCertList(crl, {
     revocationsLimit: includeRevocations ? revocationsLimit : 0,
     revocationsCursor,
@@ -355,7 +340,7 @@ export const getCrl: RouteHandler = async (req, env) => {
     detail.signatureAlgorithm = buildAlgorithmIdentifier(
       crl.signatureAlgorithm.algorithmId,
       crl.signatureAlgorithm.algorithmParams,
-      SIGNATURE_ALG_NAMES,
+      SIGNATURE_ALG_NAMES
     );
   }
 
@@ -373,13 +358,12 @@ export const getCrl: RouteHandler = async (req, env) => {
  * Upload a new CRL
  */
 export const uploadCrl: RouteHandler = async (req, env) => {
-  const contentType = (req.headers.get("content-type") || "").toLowerCase();
+  const contentType = (req.headers.get("content-type") ?? "").toLowerCase();
 
   // Accept text/plain for PEM or application/pkix-crl for DER
   const isPem = contentType.startsWith("text/");
   const isDer =
-    contentType === "application/pkix-crl" ||
-    contentType === "application/octet-stream";
+    contentType === "application/pkix-crl" || contentType === "application/octet-stream";
 
   if (!isPem && !isDer) {
     return Errors.unsupportedMediaType(contentType || null);
@@ -391,11 +375,7 @@ export const uploadCrl: RouteHandler = async (req, env) => {
   try {
     if (isPem) {
       pemText = await req.text();
-      derBytes = extractPEMBlock(
-        pemText,
-        "-----BEGIN X509 CRL-----",
-        "-----END X509 CRL-----",
-      );
+      derBytes = extractPEMBlock(pemText, "-----BEGIN X509 CRL-----", "-----END X509 CRL-----");
     } else {
       const arrayBuffer = await req.arrayBuffer();
       derBytes = new Uint8Array(arrayBuffer);
@@ -422,17 +402,13 @@ export const uploadCrl: RouteHandler = async (req, env) => {
     return jsonError(
       400,
       "issuer_not_found",
-      "Issuer certificate could not be resolved for this CRL",
+      "Issuer certificate could not be resolved for this CRL"
     );
   }
 
   const signatureOk = await verifyCRLWithIssuer(crl, issuer.cert);
   if (!signatureOk) {
-    return jsonError(
-      400,
-      "invalid_signature",
-      "CRL signature validation failed",
-    );
+    return jsonError(400, "invalid_signature", "CRL signature validation failed");
   }
 
   // Classify and check for existing
@@ -444,7 +420,7 @@ export const uploadCrl: RouteHandler = async (req, env) => {
       "stale_crl",
       classification.isDelta
         ? "Delta CRL is not newer than the stored version"
-        : "CRL is not newer than the stored version",
+        : "CRL is not newer than the stored version"
     );
   }
 
@@ -453,8 +429,8 @@ export const uploadCrl: RouteHandler = async (req, env) => {
   const nextUpdate = toJSDate(crl.nextUpdate);
   const crlNumber = getCRLNumber(crl);
   const deltaBase = getDeltaBaseCRLNumber(crl);
-  const issuerCN = getCN(issuer.cert) || "";
-  const issuerKeyId = getCRLAKIHex(crl) || "";
+  const issuerCN = getCN(issuer.cert) ?? "";
+  const issuerKeyId = getCRLAKIHex(crl) ?? "";
 
   const baseMeta: Record<string, string> = {
     issuerKeyId,
@@ -477,8 +453,7 @@ export const uploadCrl: RouteHandler = async (req, env) => {
   }
 
   // Count revoked certificates
-  const revokedCerts = (crl as { revokedCertificates?: unknown[] })
-    .revokedCertificates;
+  const revokedCerts = (crl as { revokedCertificates?: unknown[] }).revokedCertificates;
   if (revokedCerts) {
     baseMeta.revokedCount = String(revokedCerts.length);
   }
@@ -502,9 +477,7 @@ export const uploadCrl: RouteHandler = async (req, env) => {
   if (existing?.parsed) {
     const oldNumber = getCRLNumber(existing.parsed);
     const oldTag =
-      oldNumber !== undefined
-        ? oldNumber.toString()
-        : (await sha256Hex(existing.der)).slice(0, 16);
+      oldNumber !== undefined ? oldNumber.toString() : (await sha256Hex(existing.der)).slice(0, 16);
     const archivedKey = `${classification.folder}/archive/${classification.friendly}-${oldTag}.crl`;
 
     await archiveExistingCRL(
@@ -512,7 +485,7 @@ export const uploadCrl: RouteHandler = async (req, env) => {
       classification.folder,
       classification.friendly,
       existing as { der: ArrayBuffer; parsed: typeof crl },
-      meta,
+      meta
     );
     replaced = {
       id: classification.logicalDERKey,
@@ -524,18 +497,13 @@ export const uploadCrl: RouteHandler = async (req, env) => {
   // Generate PEM if uploaded as DER
   if (!pemText) {
     const base64 = btoa(String.fromCharCode(...derBytes));
-    const lines = base64.match(/.{1,64}/g) || [];
+    const lines = base64.match(/.{1,64}/g) ?? [];
     pemText = `-----BEGIN X509 CRL-----\n${lines.join("\n")}\n-----END X509 CRL-----\n`;
   }
 
   // Store the CRL
   await putBinary(env, classification.logicalDERKey, derBytes, { meta });
-  await putBinary(
-    env,
-    classification.logicalPEMKey,
-    new TextEncoder().encode(pemText),
-    { meta },
-  );
+  await putBinary(env, classification.logicalPEMKey, new TextEncoder().encode(pemText), { meta });
   if (classification.byAkiKey) {
     await putBinary(env, classification.byAkiKey, derBytes, { meta });
   }
@@ -589,7 +557,7 @@ function isCrlFile(key: string): boolean {
 function computeCrlStatus(
   now: number,
   thisUpdate?: Date,
-  nextUpdate?: Date,
+  nextUpdate?: Date
 ): CrlListItem["status"] {
   let state: CrlStatusState = "current";
   let expiresIn: number | undefined;

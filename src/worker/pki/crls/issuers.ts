@@ -40,10 +40,7 @@ export async function listCACandidates(env: Env): Promise<CACandidate[]> {
   return results;
 }
 
-export async function findIssuerCertForCRL(
-  env: Env,
-  crl: pkijs.CertificateRevocationList,
-) {
+export async function findIssuerCertForCRL(env: Env, crl: pkijs.CertificateRevocationList) {
   const akiHex = getCRLAKIHex(crl);
   const candidates = await listCACandidates(env);
   if (akiHex) {
@@ -70,7 +67,7 @@ export async function findIssuerCertForCRL(
 
 export async function verifyCRLWithIssuer(
   crl: pkijs.CertificateRevocationList,
-  issuer: pkijs.Certificate,
+  issuer: pkijs.Certificate
 ) {
   try {
     return (await crl.verify({ issuerCertificate: issuer })) === true;
@@ -82,7 +79,7 @@ export async function verifyCRLWithIssuer(
 
 export function isNewerCRL(
   incoming: pkijs.CertificateRevocationList,
-  existing?: pkijs.CertificateRevocationList,
+  existing?: pkijs.CertificateRevocationList
 ) {
   if (!existing) {
     return true;
@@ -109,18 +106,13 @@ export function isNewerCRL(
   return false;
 }
 
-export function classifyCRL(
-  crl: pkijs.CertificateRevocationList,
-  issuer: pkijs.Certificate,
-) {
+export function classifyCRL(crl: pkijs.CertificateRevocationList, issuer: pkijs.Certificate) {
   const friendly = friendlyNameFromCert(issuer)
     .replace(/IssuingCA/gi, "IssuingCA")
     .replace(/RootCA/gi, "RootCA");
   const deltaBase = getDeltaBaseCRLNumber(crl);
   const isDelta = deltaBase !== undefined;
-  const logicalBase = /Issuing/i.test(friendly)
-    ? "AchaIssuingCA01"
-    : "AchaRootCA";
+  const logicalBase = /Issuing/i.test(friendly) ? "AchaIssuingCA01" : "AchaRootCA";
   const folder = isDelta ? "dcrl" : "crl";
   const logicalDERKey = `${folder}/${logicalBase}.crl`;
   const logicalPEMKey = `${folder}/${logicalBase}.crl.pem`;
@@ -145,23 +137,16 @@ export async function archiveExistingCRL(
   folder: string,
   friendly: string,
   existing: { der: ArrayBuffer; parsed: pkijs.CertificateRevocationList },
-  meta: Record<string, string>,
+  meta: Record<string, string>
 ) {
   const oldNumber = getCRLNumber(existing.parsed);
   const oldTag =
-    oldNumber !== undefined
-      ? oldNumber.toString()
-      : (await sha256Hex(existing.der)).slice(0, 16);
-  await putBinary(
-    env,
-    `${folder}/archive/${friendly}-${oldTag}.crl`,
-    existing.der,
-    {
-      meta: {
-        ...meta,
-        archivedAt: new Date().toISOString(),
-        kind: folder === "dcrl" ? "delta" : "full",
-      },
+    oldNumber !== undefined ? oldNumber.toString() : (await sha256Hex(existing.der)).slice(0, 16);
+  await putBinary(env, `${folder}/archive/${friendly}-${oldTag}.crl`, existing.der, {
+    meta: {
+      ...meta,
+      archivedAt: new Date().toISOString(),
+      kind: folder === "dcrl" ? "delta" : "full",
     },
-  );
+  });
 }

@@ -29,13 +29,8 @@ onMounted(async () => {
         <!-- Certificates Section -->
         <section>
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-semibold text-gray-900">
-              Certificates (AIA)
-            </h2>
-            <span
-              v-if="!certificatesStore.loading"
-              class="text-sm text-gray-500"
-            >
+            <h2 class="text-xl font-semibold text-gray-900">Certificates (AIA)</h2>
+            <span v-if="!certificatesStore.loading" class="text-sm text-gray-500">
               {{ certificatesStore.items.length }} certificate{{
                 certificatesStore.items.length !== 1 ? "s" : ""
               }}
@@ -44,16 +39,10 @@ onMounted(async () => {
 
           <!-- Loading state -->
           <div
-            v-if="
-              certificatesStore.loading && certificatesStore.items.length === 0
-            "
+            v-if="certificatesStore.loading && certificatesStore.items.length === 0"
             class="flex items-center justify-center py-12"
           >
-            <svg
-              class="animate-spin h-8 w-8 text-blue-600"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
+            <svg class="animate-spin h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24">
               <circle
                 class="opacity-25"
                 cx="12"
@@ -116,9 +105,7 @@ onMounted(async () => {
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-xl font-semibold text-gray-900">CRLs (CDP)</h2>
             <span v-if="!crlsStore.loading" class="text-sm text-gray-500">
-              {{ crlsStore.fullCrls.length }} CRL{{
-                crlsStore.fullCrls.length !== 1 ? "s" : ""
-              }}
+              {{ crlsStore.fullCrls.length }} CRL{{ crlsStore.fullCrls.length !== 1 ? "s" : "" }}
             </span>
           </div>
 
@@ -127,11 +114,7 @@ onMounted(async () => {
             v-if="crlsStore.loading && crlsStore.allCrls.length === 0"
             class="flex items-center justify-center py-12"
           >
-            <svg
-              class="animate-spin h-8 w-8 text-blue-600"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
+            <svg class="animate-spin h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24">
               <circle
                 class="opacity-25"
                 cx="12"
@@ -192,9 +175,7 @@ onMounted(async () => {
         <!-- Delta CRLs Section -->
         <section v-if="crlsStore.deltaCrls.length > 0">
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-semibold text-gray-900">
-              Delta CRLs (Delta-CDP)
-            </h2>
+            <h2 class="text-xl font-semibold text-gray-900">Delta CRLs (Delta-CDP)</h2>
             <span class="text-sm text-gray-500">
               {{ crlsStore.deltaCrls.length }} delta{{
                 crlsStore.deltaCrls.length !== 1 ? "s" : ""

@@ -17,7 +17,7 @@ export async function putBinary(
   env: Env,
   key: string,
   data: ArrayBuffer | Uint8Array,
-  options?: R2PutOptions,
+  options?: R2PutOptions
 ) {
   return env.STORE.put(key, data, {
     httpMetadata: {},
@@ -35,7 +35,9 @@ export async function putBinary(
 export async function getExistingCRL(env: Env, key: string) {
   try {
     const object = await env.STORE.get(key);
-    if (!object) {return undefined;}
+    if (!object) {
+      return undefined;
+    }
 
     const der = await object.arrayBuffer();
     let parsed;
@@ -49,10 +51,7 @@ export async function getExistingCRL(env: Env, key: string) {
         obj: object,
         der,
         parsed: null,
-        parseError:
-          parseError instanceof Error
-            ? parseError
-            : new Error(String(parseError)),
+        parseError: parseError instanceof Error ? parseError : new Error(String(parseError)),
       };
     }
 

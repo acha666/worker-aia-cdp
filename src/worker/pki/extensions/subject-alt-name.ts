@@ -57,8 +57,8 @@ export function parseSubjectAltName(extension?: pkijs.Extension) {
           break;
         case 0:
           otherNames.push({
-            oid: name.value.type || "unknown",
-            valueHex: name.value.valueHex ? name.value.valueHex : "",
+            oid: name.value.type ?? "unknown",
+            valueHex: name.value.valueHex ?? "",
           });
           break;
         case 8:

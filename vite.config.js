@@ -14,6 +14,13 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: true,
       rollupOptions: {
         output: {
+          // Code splitting for better caching
+          manualChunks: {
+            // Vendor chunks
+            vue: ["vue", "vue-router"],
+            state: ["pinia"],
+            // These can be lazy-loaded
+          },
           // Put built assets in js/ to match current structure
           entryFileNames: (chunkInfo) => {
             if (chunkInfo.name === "index") {
@@ -31,7 +38,7 @@ export default defineConfig(({ mode }) => {
         },
       },
       // Ensure compatibility with ES modules
-      target: "es2020",
+      target: "es2022",
       minify: "esbuild",
     },
 

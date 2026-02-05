@@ -17,10 +17,7 @@ const isValid = computed(() => {
 
   // PEM format is valid if it has the proper markers
   const content = pemContent.value.trim();
-  return (
-    content.includes("-----BEGIN X509 CRL-----") &&
-    content.includes("-----END X509 CRL-----")
-  );
+  return content.includes("-----BEGIN X509 CRL-----") && content.includes("-----END X509 CRL-----");
 });
 
 async function handleSubmit() {
@@ -120,15 +117,8 @@ async function processFile(file: File) {
 
 <template>
   <div class="bg-white border border-gray-200 rounded-lg p-6">
-    <h3
-      class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"
-    >
-      <svg
-        class="w-5 h-5 text-blue-600"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
+    <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+      <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
           stroke-linecap="round"
           stroke-linejoin="round"
@@ -161,26 +151,19 @@ async function processFile(file: File) {
         <div>
           <p class="text-sm font-medium text-green-800">
             CRL
-            {{
-              store.lastUploadResult.status === "created"
-                ? "uploaded"
-                : "updated"
-            }}
+            {{ store.lastUploadResult.status === "created" ? "uploaded" : "updated" }}
             successfully
           </p>
           <p class="text-xs text-green-700 mt-1">
-            {{ store.lastUploadResult.type === "delta" ? "Delta" : "Full" }} CRL
-            saved to {{ store.lastUploadResult.id }}
+            {{ store.lastUploadResult.type === "delta" ? "Delta" : "Full" }} CRL saved to
+            {{ store.lastUploadResult.id }}
           </p>
         </div>
       </div>
     </div>
 
     <!-- Error message -->
-    <div
-      v-if="store.uploadError"
-      class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg"
-    >
+    <div v-if="store.uploadError" class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
       <div class="flex items-start gap-3">
         <svg
           class="w-5 h-5 text-red-600 mt-0.5"
@@ -205,9 +188,7 @@ async function processFile(file: File) {
     <form @submit.prevent="handleSubmit" class="space-y-4">
       <!-- Drop zone / textarea -->
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">
-          PEM Content
-        </label>
+        <label class="block text-sm font-medium text-gray-700 mb-2"> PEM Content </label>
         <div
           @dragover="handleDragOver"
           @dragleave="handleDragLeave"
@@ -228,12 +209,7 @@ async function processFile(file: File) {
             class="absolute bottom-2 right-2 p-2 text-gray-500 hover:text-blue-600 cursor-pointer transition-colors"
             title="Click to select a file"
           >
-            <svg
-              class="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -241,12 +217,7 @@ async function processFile(file: File) {
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            <input
-              type="file"
-              accept=".crl,.pem,.der"
-              @change="handleFileSelect"
-              class="hidden"
-            />
+            <input type="file" accept=".crl,.pem,.der" @change="handleFileSelect" class="hidden" />
           </label>
         </div>
       </div>
@@ -260,23 +231,14 @@ async function processFile(file: File) {
           No valid CRL content detected.
         </p>
         <p v-else class="text-sm text-gray-500">
-          {{
-            fileFormat === "der"
-              ? "DER-formatted CRL"
-              : "Paste or drop a PEM-encoded CRL"
-          }}
+          {{ fileFormat === "der" ? "DER-formatted CRL" : "Paste or drop a PEM-encoded CRL" }}
         </p>
         <button
           type="submit"
           :disabled="!isValid || store.uploading"
           class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
         >
-          <svg
-            v-if="store.uploading"
-            class="animate-spin h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
+          <svg v-if="store.uploading" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
             <circle
               class="opacity-25"
               cx="12"

@@ -1,9 +1,5 @@
 import * as pkijs from "pkijs";
-import {
-  describeName,
-  bitStringBytes,
-  describeAlgorithm,
-} from "../utils/describe";
+import { describeName, bitStringBytes, describeAlgorithm } from "../utils/describe";
 import { toHex, sha1Hex, sha256Hex, toJSDate } from "../utils/conversion";
 import { SIGNATURE_ALG_NAMES, EXTENSION_NAMES } from "../constants";
 import { getCRLNumber, getDeltaBaseCRLNumber, getCRLAKIHex } from "../parsers";
@@ -55,7 +51,7 @@ export interface CrlMetadata {
 
 export async function buildCRLDetails(
   crl: pkijs.CertificateRevocationList,
-  der: ArrayBuffer,
+  der: ArrayBuffer
 ): Promise<CrlMetadata> {
   const issuerDescription = describeName(crl.issuer);
   const thisUpdate = toJSDate(crl.thisUpdate);
@@ -63,10 +59,10 @@ export async function buildCRLDetails(
   const crlNumber = getCRLNumber(crl)?.toString() ?? null;
   const baseCRLNumber = getDeltaBaseCRLNumber(crl)?.toString() ?? null;
   const isDelta = baseCRLNumber !== null;
-  const authorityKeyIdentifier = getCRLAKIHex(crl) || null;
+  const authorityKeyIdentifier = getCRLAKIHex(crl) ?? null;
   const signatureAlgorithm = describeAlgorithm(
     crl.signatureAlgorithm.algorithmId,
-    SIGNATURE_ALG_NAMES,
+    SIGNATURE_ALG_NAMES
   );
   const signatureBytes = bitStringBytes(crl.signatureValue);
   const signatureHex = signatureBytes.length ? toHex(signatureBytes) : null;
@@ -74,9 +70,8 @@ export async function buildCRLDetails(
     sha1: await sha1Hex(der),
     sha256: await sha256Hex(der),
   };
-  const revoked = ((
-    crl as unknown as { revokedCertificates?: pkijs.RevokedCertificate[] }
-  ).revokedCertificates ?? []) as pkijs.RevokedCertificate[];
+  const revoked = ((crl as unknown as { revokedCertificates?: pkijs.RevokedCertificate[] })
+    .revokedCertificates ?? []) as pkijs.RevokedCertificate[];
   const sample = revoked.slice(0, 5).map((entry) => {
     const serialHex = entry.userCertificate.valueBlock.valueHex
       ? toHex(entry.userCertificate.valueBlock.valueHex)
@@ -127,7 +122,7 @@ type CrlExtensionParsers = Record<
 >;
 
 function stripCritical<T extends { critical?: boolean }>(
-  value: T | null | undefined,
+  value: T | null | undefined
 ): Omit<T, "critical"> | undefined {
   if (!value || typeof value !== "object") {
     return undefined;
@@ -137,8 +132,7 @@ function stripCritical<T extends { critical?: boolean }>(
 }
 
 const CRL_EXTENSION_PARSERS: CrlExtensionParsers = {
-  "2.5.29.35": (extension) =>
-    stripCritical(parseAuthorityKeyIdentifier(extension)),
+  "2.5.29.35": (extension) => stripCritical(parseAuthorityKeyIdentifier(extension)),
   "2.5.29.20": (_extension, crl) => {
     const number = getCRLNumber(crl);
     return typeof number === "bigint" ? number.toString(10) : undefined;
@@ -149,9 +143,7 @@ const CRL_EXTENSION_PARSERS: CrlExtensionParsers = {
   },
 };
 
-function buildCrlExtensionDetails(
-  crl: pkijs.CertificateRevocationList,
-): ExtensionDetail[] {
+function buildCrlExtensionDetails(crl: pkijs.CertificateRevocationList): ExtensionDetail[] {
   const extensions = crl.crlExtensions?.extensions ?? [];
   return extensions.map((extension) => {
     const oid = extension.extnID;

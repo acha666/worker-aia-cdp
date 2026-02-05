@@ -13,6 +13,7 @@ This directory contains the configuration for developing the Worker AIA CDP proj
 ## VS Code Extensions
 
 The following extensions are automatically installed:
+
 - ESLint for linting
 - Prettier for code formatting
 - TypeScript language support

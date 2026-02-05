@@ -2,16 +2,8 @@
  * API v2 Response Helpers
  */
 
-import type {
-  ApiResponse,
-  ResponseMeta,
-  ApiError,
-  PaginationMeta,
-} from "./types";
-import {
-  withCacheStatus as cacheWithStatus,
-  type CacheStatus,
-} from "../../cache/operations";
+import type { ApiResponse, ResponseMeta, ApiError, PaginationMeta } from "./types";
+import { withCacheStatus as cacheWithStatus, type CacheStatus } from "../../cache/operations";
 
 const DEFAULT_JSON_HEADERS = {
   "Content-Type": "application/json; charset=utf-8",
@@ -43,10 +35,7 @@ function mergeJsonHeaders(extra?: JsonHeaders): Headers {
 /**
  * Create a successful JSON response
  */
-export function jsonSuccess<T>(
-  data: T,
-  options: SuccessOptions = {},
-): Response {
+export function jsonSuccess<T>(data: T, options: SuccessOptions = {}): Response {
   const { status = 200, meta = {}, headers } = options;
 
   const responseMeta: ResponseMeta = {
@@ -73,7 +62,7 @@ export function jsonError(
   status: number,
   code: string,
   message: string,
-  options: ErrorOptions = {},
+  options: ErrorOptions = {}
 ): Response {
   const { headers, details, field } = options;
 
@@ -125,7 +114,7 @@ export function createPaginationLinks(
   baseUrl: string,
   pathname: string,
   params: URLSearchParams,
-  nextCursor: string | null,
+  nextCursor: string | null
 ): Record<string, string> {
   const links: Record<string, string> = {
     self: `${baseUrl}${pathname}${params.toString() ? `?${params.toString()}` : ""}`,
@@ -156,7 +145,7 @@ export function parseIncludeParam(include: string | null): Set<string> {
 export function parseLimitParam(
   limitStr: string | null,
   defaultLimit = 50,
-  maxLimit = 100,
+  maxLimit = 100
 ): number {
   if (!limitStr) {
     return defaultLimit;
@@ -172,10 +161,7 @@ export function parseLimitParam(
  * Add cache status header to response
  * Re-exported from cache module for backward compatibility
  */
-export function withCacheStatus(
-  response: Response,
-  status: CacheStatus,
-): Response {
+export function withCacheStatus(response: Response, status: CacheStatus): Response {
   return cacheWithStatus(response, status, "X-Cache-Status");
 }
 
@@ -183,14 +169,12 @@ export function withCacheStatus(
  * Common error responses
  */
 export const Errors = {
-  notFound: (resource = "Resource") =>
-    jsonError(404, "not_found", `${resource} not found`),
+  notFound: (resource = "Resource") => jsonError(404, "not_found", `${resource} not found`),
 
   badRequest: (message: string, details?: unknown) =>
     jsonError(400, "bad_request", message, { details }),
 
-  invalidPath: (message = "Invalid URL path format") =>
-    jsonError(400, "invalid_path", message),
+  invalidPath: (message = "Invalid URL path format") => jsonError(400, "invalid_path", message),
 
   invalidParameter: (param: string, message: string) =>
     jsonError(400, "invalid_parameter", message, { field: param }),

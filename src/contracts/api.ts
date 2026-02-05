@@ -68,8 +68,7 @@ const crlsContract = c.router({
       200: createApiResponseSchema(z.array(CrlListItemSchema)),
     },
     summary: "List all CRLs",
-    description:
-      "Returns a paginated list of CRLs. Filter by type (full/delta) and status.",
+    description: "Returns a paginated list of CRLs. Filter by type (full/delta) and status.",
   },
 
   get: {
@@ -98,8 +97,7 @@ const crlsContract = c.router({
       409: createApiResponseSchema(z.null()),
     },
     summary: "Upload a new CRL",
-    description:
-      "Upload a CRL in PEM or DER format. The CRL will be validated and stored.",
+    description: "Upload a CRL in PEM or DER format. The CRL will be validated and stored.",
   },
 });
 
@@ -132,8 +130,7 @@ const healthContract = c.router({
       200: createApiResponseSchema(HealthResultSchema),
     },
     summary: "Health check",
-    description:
-      "Returns the health status of the service including dependency checks.",
+    description: "Returns the health status of the service including dependency checks.",
   },
 });
 
@@ -151,7 +148,7 @@ export const apiContract = c.router(
   {
     pathPrefix: "",
     strictStatusCodes: true,
-  },
+  }
 );
 
 // Export the contract type for use in implementations

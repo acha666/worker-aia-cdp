@@ -38,12 +38,8 @@ export function getSKIHex(cert: pkijs.Certificate): string | undefined {
   return toHex(raw.valueBlock.valueHex);
 }
 
-export function getCRLAKIHex(
-  crl: pkijs.CertificateRevocationList,
-): string | undefined {
-  const extension = crl.crlExtensions?.extensions.find(
-    (ext) => ext.extnID === "2.5.29.35",
-  );
+export function getCRLAKIHex(crl: pkijs.CertificateRevocationList): string | undefined {
+  const extension = crl.crlExtensions?.extensions.find((ext) => ext.extnID === "2.5.29.35");
   if (!extension) {
     return undefined;
   }
@@ -53,18 +49,11 @@ export function getCRLAKIHex(
   if (first?.idBlock.tagClass !== 3 || first.idBlock.tagNumber !== 0) {
     return undefined;
   }
-  return toHex(
-    (first as unknown as { valueBlock: { valueHex: ArrayBuffer } }).valueBlock
-      .valueHex,
-  );
+  return toHex((first as unknown as { valueBlock: { valueHex: ArrayBuffer } }).valueBlock.valueHex);
 }
 
-export function getCRLNumber(
-  crl: pkijs.CertificateRevocationList,
-): bigint | undefined {
-  const extension = crl.crlExtensions?.extensions.find(
-    (ext) => ext.extnID === "2.5.29.20",
-  );
+export function getCRLNumber(crl: pkijs.CertificateRevocationList): bigint | undefined {
+  const extension = crl.crlExtensions?.extensions.find((ext) => ext.extnID === "2.5.29.20");
   if (!extension) {
     return undefined;
   }
@@ -78,12 +67,8 @@ export function getCRLNumber(
   return value;
 }
 
-export function getDeltaBaseCRLNumber(
-  crl: pkijs.CertificateRevocationList,
-): bigint | undefined {
-  const extension = crl.crlExtensions?.extensions.find(
-    (ext) => ext.extnID === "2.5.29.27",
-  );
+export function getDeltaBaseCRLNumber(crl: pkijs.CertificateRevocationList): bigint | undefined {
+  const extension = crl.crlExtensions?.extensions.find((ext) => ext.extnID === "2.5.29.27");
   if (!extension) {
     return undefined;
   }

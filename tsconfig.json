@@ -3,14 +3,8 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": [
-      "ES2022",
-      "WebWorker"
-    ],
-    "types": [
-      "@cloudflare/workers-types",
-      "node"
-    ],
+    "lib": ["ES2022", "WebWorker"],
+    "types": ["@cloudflare/workers-types", "node"],
     "strict": true,
     "isolatedModules": true,
     "noEmit": true,
@@ -26,22 +20,15 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@contracts/*": [
-        "src/contracts/*"
-      ]
+      "@contracts/*": ["src/contracts/*"]
     }
   },
   "include": [
     "src/worker",
     "src/contracts",
     "worker-env.d.ts",
-    "tests/worker/**/*.ts"
+    "tests/worker/**/*.ts",
+    "tests/backend/**/*.ts"
   ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "build",
-    ".wrangler",
-    "tests/web/**"
-  ]
+  "exclude": ["node_modules", "dist", "build", ".wrangler", "tests/web/**"]
 }

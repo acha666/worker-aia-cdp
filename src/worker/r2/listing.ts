@@ -22,7 +22,7 @@ export async function listAllWithPrefix(env: Env, prefix: string) {
 
 export async function cachedListAllWithPrefix(
   env: Env,
-  prefix: "ca/" | "crl/" | "dcrl/",
+  prefix: "ca/" | "crl/" | "dcrl/"
 ): Promise<R2Object[]> {
   const cache = getEdgeCache();
   const key =
@@ -37,15 +37,13 @@ export async function cachedListAllWithPrefix(
     const json = (await hit.json()) as unknown as {
       items: { key: string; size: number; uploaded?: string }[];
     };
-    return (
-      json.items as { key: string; size: number; uploaded?: string }[]
-    ).map(
+    return (json.items as { key: string; size: number; uploaded?: string }[]).map(
       (item) =>
         ({
           key: item.key,
           size: item.size,
           uploaded: item.uploaded ? new Date(item.uploaded) : undefined,
-        }) as unknown as R2Object,
+        }) as unknown as R2Object
     );
   }
 
@@ -59,8 +57,7 @@ export async function cachedListAllWithPrefix(
     items: typedObjects.map((obj) => ({
       key: obj.key,
       size: obj.size ?? 0,
-      uploaded:
-        obj.uploaded instanceof Date ? obj.uploaded.toISOString() : undefined,
+      uploaded: obj.uploaded instanceof Date ? obj.uploaded.toISOString() : undefined,
     })),
     cachedAt: new Date().toISOString(),
   });

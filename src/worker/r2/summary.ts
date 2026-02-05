@@ -46,7 +46,7 @@ const PEM_MARKERS = {
 function bufferFromMaybePem(
   bytes: Uint8Array,
   key: string,
-  markers: { begin: string; end: string },
+  markers: { begin: string; end: string }
 ): ArrayBuffer {
   if (!/\.pem$/i.test(key)) {
     return bytes.slice().buffer;
@@ -57,9 +57,7 @@ function bufferFromMaybePem(
   return copy.buffer as ArrayBuffer;
 }
 
-function issuerCommonNameFromCertificate(
-  cert: ReturnType<typeof parseCertificate>,
-): string | null {
+function issuerCommonNameFromCertificate(cert: ReturnType<typeof parseCertificate>): string | null {
   for (const tv of cert.issuer.typesAndValues) {
     if (tv.type === "2.5.4.3") {
       return tv.value.valueBlock.value;
@@ -68,9 +66,7 @@ function issuerCommonNameFromCertificate(
   return null;
 }
 
-function issuerCommonNameFromCrl(
-  crl: ReturnType<typeof parseCRL>,
-): string | null {
+function issuerCommonNameFromCrl(crl: ReturnType<typeof parseCRL>): string | null {
   for (const tv of crl.issuer.typesAndValues) {
     if (tv.type === "2.5.4.3") {
       return tv.value.valueBlock.value;
@@ -81,7 +77,7 @@ function issuerCommonNameFromCrl(
 
 async function createCertificateSummary(
   bytes: Uint8Array,
-  key: string,
+  key: string
 ): Promise<ObjectSummary | null> {
   const der = bufferFromMaybePem(bytes, key, PEM_MARKERS.certificate);
   const cert = parseCertificate(der);
@@ -89,8 +85,7 @@ async function createCertificateSummary(
   const issuer = issuerCommonNameFromCertificate(cert);
   const notBefore = toJSDate(cert.notBefore.value)?.toISOString() ?? null;
   const notAfter = toJSDate(cert.notAfter.value)?.toISOString() ?? null;
-  const displayName =
-    subject ?? issuer ?? fallbackDisplayName(key, "certificate");
+  const displayName = subject ?? issuer ?? fallbackDisplayName(key, "certificate");
   return {
     kind: "certificate",
     displayName,
@@ -104,10 +99,7 @@ async function createCertificateSummary(
   };
 }
 
-async function createCrlSummary(
-  bytes: Uint8Array,
-  key: string,
-): Promise<ObjectSummary | null> {
+async function createCrlSummary(bytes: Uint8Array, key: string): Promise<ObjectSummary | null> {
   const der = bufferFromMaybePem(bytes, key, PEM_MARKERS.crl);
   const crl = parseCRL(der);
   const issuer = issuerCommonNameFromCrl(crl);
@@ -137,13 +129,19 @@ function normalizeEtag(value: string | null | undefined): string | null {
     return null;
   }
   // Drop weak validators and surrounding quotes per R2 conditional write docs.
-  const withoutWeakPrefix = trimmed.startsWith("W/")
-    ? trimmed.slice(2)
-    : trimmed;
+  const withoutWeakPrefix = trimmed.startsWith("W/") ? trimmed.slice(2) : trimmed;
   if (withoutWeakPrefix.startsWith('"') && withoutWeakPrefix.endsWith('"')) {
     return withoutWeakPrefix.slice(1, -1);
   }
   return withoutWeakPrefix;
+}
+
+function readOptionalEtag(source: unknown): string | null {
+  if (!source || typeof source !== "object") {
+    return null;
+  }
+  const candidate = (source as Record<string, unknown>).etag;
+  return typeof candidate === "string" ? candidate : null;
 }
 
 export function detectSummaryKind(key: string): SummaryKind {
@@ -157,17 +155,14 @@ export function detectSummaryKind(key: string): SummaryKind {
 }
 
 export function readSummaryFromMetadata(
-  meta?: Record<string, string | undefined> | null,
+  meta?: Record<string, string | undefined> | null
 ): ObjectSummary | null {
   if (!meta) {
     return null;
   }
   const kind = (meta[SUMMARY_KEYS.kind] as SummaryKind | undefined) ?? null;
   const subjectCommonName =
-    meta[SUMMARY_KEYS.subject] ??
-    meta.subjectCommonName ??
-    meta.subjectCN ??
-    null;
+    meta[SUMMARY_KEYS.subject] ?? meta.subjectCommonName ?? meta.subjectCN ?? null;
   const issuerCommonName =
     meta[SUMMARY_KEYS.issuer] ?? meta.issuerCommonName ?? meta.issuerCN ?? null;
   const notBefore = meta[SUMMARY_KEYS.notBefore] ?? meta.notBefore ?? null;
@@ -240,7 +235,7 @@ interface SummaryComputationContext {
 }
 
 export async function ensureSummaryMetadata(
-  context: SummaryComputationContext,
+  context: SummaryComputationContext
 ): Promise<ObjectSummary | null> {
   const { env, key } = context;
   const kind = context.kind ?? detectSummaryKind(key);
@@ -262,11 +257,11 @@ export async function ensureSummaryMetadata(
 
     const newMetadata = buildSummaryMetadata(
       summary,
-      object.customMetadata ?? context.existingMeta ?? {},
+      object.customMetadata ?? context.existingMeta ?? {}
     );
 
     const etagMatch =
-      normalizeEtag((object as any).etag) ??
+      normalizeEtag(readOptionalEtag(object)) ??
       normalizeEtag(object.httpEtag) ??
       normalizeEtag(context.expectedEtag);
 
@@ -285,7 +280,7 @@ export async function ensureSummaryMetadata(
 
 export function buildSummaryMetadata(
   summary: ObjectSummary,
-  base: Record<string, string | undefined>,
+  base: Record<string, string | undefined>
 ): Record<string, string> {
   const output: Record<string, string> = {};
   for (const [key, value] of Object.entries(base)) {
@@ -326,7 +321,7 @@ export function buildSummaryMetadata(
 async function computeSummaryFromBody(
   buffer: ArrayBuffer,
   key: string,
-  kind: SummaryKind,
+  kind: SummaryKind
 ): Promise<ObjectSummary | null> {
   const bytes = new Uint8Array(buffer);
   if (!bytes.byteLength) {
@@ -344,11 +339,9 @@ async function computeSummaryFromBody(
 
 export function fallbackDisplayName(
   key: string,
-  kind: SummaryKind = detectSummaryKind(key),
+  kind: SummaryKind = detectSummaryKind(key)
 ): string {
-  const base = key
-    .replace(/^[^/]+\//, "")
-    .replace(/\.(crt|cer|crl)(\.pem)?$/i, "");
+  const base = key.replace(/^[^/]+\//, "").replace(/\.(crt|cer|crl)(\.pem)?$/i, "");
   if (kind === "certificate") {
     return base;
   }
@@ -357,7 +350,7 @@ export function fallbackDisplayName(
 
 export function mergeSummaryWithMetadata(
   meta: Record<string, string> | undefined,
-  summary: ObjectSummary | null,
+  summary: ObjectSummary | null
 ): Record<string, string> | undefined {
   if (!summary) {
     return meta;

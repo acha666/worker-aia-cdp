@@ -9,25 +9,31 @@ export default [
       "build/**",
       ".wrangler/**",
       "coverage/**",
-      "src/web/**",
       "public/**",
       "tests/web/**",
+      "src/web/**/*.vue", // Vue files require vue-eslint-parser; not configured
     ],
   },
   js.configs.recommended,
   ...typescriptEslint.configs.recommended,
   ...typescriptEslint.configs.stylistic,
   {
-    files: ["**/*.ts"],
+    languageOptions: {
+      globals: {
+        console: "readonly",
+        process: "readonly",
+      },
+    },
+  },
+  {
+    // Worker and contract TypeScript files
+    files: ["src/worker/**/*.ts", "src/contracts/**/*.ts", "tests/**/*.ts"],
     languageOptions: {
       parser: typescriptEslint.parser,
       parserOptions: {
         ecmaVersion: 2022,
         sourceType: "module",
         project: "./tsconfig.json",
-      },
-      globals: {
-        console: "readonly",
       },
     },
     rules: {
@@ -39,7 +45,7 @@ export default [
       "prefer-const": "error",
       "no-var": "error",
       eqeqeq: ["error", "always"],
-      "prefer-template": "warn",
+      "prefer-template": "error",
       curly: ["error", "all"],
       semi: ["error", "always"],
 
@@ -56,13 +62,13 @@ export default [
       "@typescript-eslint/explicit-function-return-types": "off",
       "@typescript-eslint/explicit-module-boundary-types": "off",
       "@typescript-eslint/no-explicit-any": [
-        "warn",
+        "error",
         {
           ignoreRestArgs: true,
           fixToUnknown: false,
         },
       ],
-      "@typescript-eslint/no-non-null-assertion": "warn",
+      "@typescript-eslint/no-non-null-assertion": "error",
       "@typescript-eslint/no-require-imports": "error",
       "@typescript-eslint/naming-convention": [
         "warn",
@@ -70,6 +76,12 @@ export default [
           selector: "default",
           format: ["camelCase"],
           leadingUnderscore: "allow",
+        },
+        {
+          selector: "variable",
+          format: ["camelCase", "UPPER_CASE", "PascalCase"],
+          leadingUnderscore: "allow",
+          modifiers: ["const"],
         },
         {
           selector: "variable",
@@ -86,16 +98,18 @@ export default [
           format: ["PascalCase"],
         },
         {
+          selector: "typeProperty",
+          format: ["camelCase", "UPPER_CASE"],
+        },
+        {
           selector: "enumMember",
           format: ["UPPER_CASE"],
         },
         {
-          // Allow OID notation (1.2.3.4) in object literal methods
           selector: "objectLiteralMethod",
           format: [],
         },
         {
-          // Allow special headers like Content-Type
           selector: "objectLiteralProperty",
           format: [],
         },
@@ -106,7 +120,16 @@ export default [
     },
   },
   {
-    // Relax rules for test files
+    // Web frontend TypeScript files (basic linting only, no type-aware checking)
+    files: ["src/web/**/*.ts", "src/web/**/*.tsx"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-non-null-assertion": "warn",
+      "@typescript-eslint/prefer-nullish-coalescing": "off",
+      "@typescript-eslint/prefer-optional-chain": "off",
+    },
+  },
+  {
     files: ["tests/**/*.ts"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
@@ -117,13 +140,6 @@ export default [
   {
     // Config files (JS only, no TypeScript parsing)
     files: ["vite.config.js", "eslint.config.js"],
-    languageOptions: {
-      parser: undefined,
-      globals: {
-        console: "readonly",
-        process: "readonly",
-      },
-    },
     rules: {
       "no-undef": "off",
     },

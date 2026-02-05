@@ -44,10 +44,7 @@ export function parseCRLDistributionPoints(extension?: pkijs.Extension) {
           for (const generalName of distribution.distributionPoint) {
             handleGeneralName(generalName);
           }
-        } else if (
-          distribution.distributionPoint instanceof
-          pkijs.RelativeDistinguishedNames
-        ) {
+        } else if (distribution.distributionPoint instanceof pkijs.RelativeDistinguishedNames) {
           const description = describeName(distribution.distributionPoint);
           pointDirectoryNames.push(description.dn);
           directoryNames.add(description.dn);
@@ -72,9 +69,7 @@ export function parseCRLDistributionPoints(extension?: pkijs.Extension) {
       critical: extension.critical ?? false,
       urls: [...urls],
       directoryNames: [...directoryNames],
-      distributionPoints: distributionPoints.length
-        ? distributionPoints
-        : undefined,
+      distributionPoints: distributionPoints.length ? distributionPoints : undefined,
     };
   } catch (error) {
     console.warn("crlDistributionPoints parse error", error);
