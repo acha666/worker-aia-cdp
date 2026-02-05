@@ -211,25 +211,48 @@ export async function getCrl(
 }
 
 export async function uploadCrl(pem: string): Promise<CrlUploadResult> {
-  const response = await api.crls.upload({
-    body: pem,
-    extraHeaders: {
-      "Content-Type": "text/plain",
-    },
+  // Convert PEM string to File object
+  const file = new File([new TextEncoder().encode(pem)], "crl.pem", {
+    type: "application/octet-stream",
   });
-
-  return handleApiResponse(response);
+  return uploadCrlFile(file);
 }
 
 export async function uploadCrlBinary(data: ArrayBuffer): Promise<CrlUploadResult> {
-  const response = await api.crls.upload({
-    body: data,
-    extraHeaders: {
-      "Content-Type": "application/pkix-crl",
-    },
+  // Convert ArrayBuffer to File object
+  const file = new File([new Uint8Array(data)], "crl.der", { type: "application/octet-stream" });
+  return uploadCrlFile(file);
+}
+
+async function uploadCrlFile(file: File): Promise<CrlUploadResult> {
+  // Build FormData with file
+  const formData = new FormData();
+  formData.append("crl", file);
+
+  // Make direct request (not through ts-rest for better binary support)
+  const response = await fetch("/api/v2/crls", {
+    method: "POST",
+    body: formData, // Automatically sets Content-Type: multipart/form-data
   });
 
-  return handleApiResponse(response);
+  const body = (await response.json()) as {
+    data: CrlUploadResult | null;
+    error: {
+      code: string;
+      message: string;
+      details?: Record<string, unknown>;
+    } | null;
+  };
+
+  if (body.error) {
+    throw new ApiError(body.error.code, body.error.message, body.error.details);
+  }
+
+  if (body.data === null || body.data === undefined) {
+    throw new ApiError("empty_response", "Empty response data", { status: response.status });
+  }
+
+  return body.data;
 }
 
 // =============================================================================

@@ -330,29 +330,76 @@ export const getCrl: RouteHandler = async (req, env) => {
 /**
  * POST /api/v2/crls
  * Upload a new CRL
+ *
+ * Accepts multipart/form-data with a "crl" field containing the CRL file
+ * Format (PEM or DER) is auto-detected from file content
+ *
+ * Example using curl:
+ *   curl -X POST -F "crl=@root-ca.crl" https://api.example.com/api/v2/crls
+ *   curl -X POST -F "crl=@root-ca.crl.pem" https://api.example.com/api/v2/crls
  */
 export const uploadCrl: RouteHandler = async (req, env) => {
   const contentType = (req.headers.get("content-type") ?? "").toLowerCase();
 
-  // Accept text/plain for PEM or application/pkix-crl for DER
-  const isPem = contentType.startsWith("text/");
-  const isDer =
-    contentType === "application/pkix-crl" || contentType === "application/octet-stream";
-
-  if (!isPem && !isDer) {
+  // Accept multipart/form-data
+  if (!contentType.includes("multipart/form-data")) {
     return Errors.unsupportedMediaType(contentType || null);
   }
 
   let derBytes: Uint8Array;
   let pemText: string | undefined;
+  let filename = "unknown.crl";
 
   try {
-    if (isPem) {
-      pemText = await req.text();
+    const formData = await req.formData();
+    const crlFile = formData.get("crl");
+
+    if (!crlFile) {
+      return Errors.badRequest("Missing required field: crl");
+    }
+
+    if (typeof crlFile === "string") {
+      return Errors.badRequest("Field 'crl' must be a file, not a string");
+    }
+
+    // Extract filename for format detection
+    const file = crlFile as File;
+    filename = file.name;
+    const fileExt = filename.toLowerCase();
+
+    // Read file content
+    const arrayBuffer = await file.arrayBuffer();
+
+    // Try to detect format from filename and content
+    const isPemFilename = fileExt.endsWith(".pem");
+    const isDerFilename = fileExt.endsWith(".der") || fileExt.endsWith(".crl");
+
+    if (isPemFilename && !isDerFilename) {
+      // Explicit PEM file based on extension
+      const text = new TextDecoder().decode(arrayBuffer);
+      pemText = text.trim();
       derBytes = extractPEMBlock(pemText, "-----BEGIN X509 CRL-----", "-----END X509 CRL-----");
-    } else {
-      const arrayBuffer = await req.arrayBuffer();
+    } else if (isDerFilename && !isPemFilename) {
+      // Explicit DER file based on extension
       derBytes = new Uint8Array(arrayBuffer);
+    } else {
+      // Ambiguous extension (.crl could be either), detect from content
+      try {
+        const text = new TextDecoder().decode(arrayBuffer);
+        const trimmedText = text.trim();
+
+        if (trimmedText.includes("-----BEGIN X509 CRL-----")) {
+          // It's PEM
+          pemText = trimmedText;
+          derBytes = extractPEMBlock(pemText, "-----BEGIN X509 CRL-----", "-----END X509 CRL-----");
+        } else {
+          // Try as DER binary
+          derBytes = new Uint8Array(arrayBuffer);
+        }
+      } catch {
+        // Failed to decode as text, treat as DER binary
+        derBytes = new Uint8Array(arrayBuffer);
+      }
     }
   } catch (error) {
     return jsonError(400, "invalid_body", "Failed to read request body", {

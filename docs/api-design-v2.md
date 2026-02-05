@@ -1203,61 +1203,182 @@ interface FreshestCRLValue {
 POST /api/v2/crls
 ```
 
+**Purpose:** Upload a new CRL in PEM or DER format. Format is auto-detected from file content.
+
 **Request Headers:**
-| Header | Required | Description |
-|--------|----------|-------------|
-| `Content-Type` | Yes | `text/plain` for PEM, `application/pkix-crl` for DER |
+| Header | Required | Value | Notes |
+|--------|----------|-------|-------|
+| `Content-Type` | Auto | `multipart/form-data` | Automatically set by browsers and most HTTP clients |
 
 **Request Body:**
 
-- PEM-encoded CRL text, or
-- DER-encoded CRL binary
+Multipart form-data with one required field:
+
+| Field | Required | Type | Description                                                                                                        |
+| ----- | -------- | ---- | ------------------------------------------------------------------------------------------------------------------ |
+| `crl` | Yes      | File | CRL file in PEM or DER format. File extension (.pem or .der) is used to hint format, but content is auto-detected. |
+
+**Format Detection:**
+
+- Filename ending in `.pem`: treated as PEM
+- Filename ending in `.der` or `.crl`: binary content checked first
+  - If starts with `-----BEGIN X509 CRL-----`: treated as PEM
+  - Otherwise: treated as DER binary
+- If ambiguous filename: file content is inspected to determine format
+
+**Examples:**
+
+<details>
+<summary>Browser (JavaScript)</summary>
+
+```javascript
+// Using fetch API with FormData
+const file = document.getElementById("fileInput").files[0];
+const formData = new FormData();
+formData.append("crl", file);
+
+const response = await fetch("/api/v2/crls", {
+  method: "POST",
+  body: formData, // Content-Type is automatically set
+});
+
+const result = await response.json();
+if (result.data) {
+  console.log("Upload successful:", result.data.id);
+} else {
+  console.error("Upload failed:", result.error);
+}
+```
+
+</details>
+
+<details>
+<summary>curl Command</summary>
+
+```bash
+# Upload PEM file
+curl -X POST \
+  -F "crl=@root-ca.crl.pem" \
+  https://api.example.com/api/v2/crls
+
+# Upload DER file
+curl -X POST \
+  -F "crl=@root-ca.crl" \
+  https://api.example.com/api/v2/crls
+```
+
+</details>
+
+<details>
+<summary>Python</summary>
+
+```python
+import requests
+
+with open('root-ca.crl', 'rb') as f:
+    files = {'crl': f}
+    response = requests.post(
+        'https://api.example.com/api/v2/crls',
+        files=files
+    )
+
+result = response.json()
+if result['data']:
+    print(f"Upload successful: {result['data']['id']}")
+else:
+    print(f"Upload failed: {result['error']}")
+```
+
+</details>
+
+<details>
+<summary>PowerShell</summary>
+
+```powershell
+$file = 'C:\path\to\root-ca.crl'
+$uri = 'https://api.example.com/api/v2/crls'
+
+$fileStream = [System.IO.File]::OpenRead($file)
+$boundary = [System.Guid]::NewGuid().ToString()
+$body = @"
+--$boundary
+Content-Disposition: form-data; name="crl"; filename="$(Split-Path $file -Leaf)"
+Content-Type: application/octet-stream
+
+$(Get-Content $file -Raw)
+--$boundary--
+"@
+
+$response = Invoke-WebRequest -Uri $uri `
+  -Method Post `
+  -ContentType "multipart/form-data; boundary=$boundary" `
+  -Body $body
+
+$result = $response.Content | ConvertFrom-Json
+if ($result.data) {
+    Write-Host "Upload successful: $($result.data.id)"
+} else {
+    Write-Host "Upload failed: $($result.error.message)"
+}
+```
+
+</details>
 
 **Response (201 Created):**
 
-```typescript
-interface CrlUploadResponse {
-  id: string;
-  type: "crl";
-  href: string;
-  downloadUrl: string;
-
-  attributes: {
-    crlType: "full" | "delta";
-    crlNumber: string | null;
-    baseCrlNumber: string | null;
-    thisUpdate: string;
-    nextUpdate: string | null;
-
-    issuer: {
-      cn: string | null;
-      keyId: string | null;
-    };
-
-    stored: {
-      der: string; // Path to DER file
-      pem: string; // Path to PEM file
-      byKeyId?: string; // Path to AKI-indexed copy
-    };
-
-    replaced?: {
-      id: string;
-      crlNumber: string | null;
-      archivedTo: string;
-    };
-  };
+```json
+{
+  "data": {
+    "id": "crl/AchaRootCA.crl",
+    "type": "crl",
+    "href": "/api/v2/crls/crl%2FAchaRootCA.crl",
+    "downloadUrl": "/crl/AchaRootCA.crl",
+    "crlType": "full",
+    "crlNumber": "1",
+    "baseCrlNumber": null,
+    "thisUpdate": "2025-12-10T12:00:00Z",
+    "nextUpdate": "2026-01-10T12:00:00Z",
+    "issuer": {
+      "commonName": "Acha Root CA",
+      "keyIdentifier": "a1b2c3d4e5f6g7h8"
+    },
+    "stored": {
+      "der": "crl/AchaRootCA.crl",
+      "pem": "crl/AchaRootCA.crl.pem",
+      "byKeyId": "crl/by-keyid/a1b2c3d4e5f6g7h8.crl"
+    },
+    "replaced": null
+  },
+  "meta": null,
+  "error": null
 }
 ```
 
 **Error Responses:**
-| Status | Code | Description |
-|--------|------|-------------|
-| 400 | `invalid_content_type` | Unsupported Content-Type |
-| 400 | `invalid_pem` | Malformed PEM block |
-| 400 | `invalid_der` | Malformed ASN.1/DER data |
-| 400 | `issuer_not_found` | No matching CA certificate |
-| 400 | `invalid_signature` | CRL signature verification failed |
-| 409 | `stale_crl` | CRL is older than existing version |
+
+| Status | Code                     | Message                            | Details Example                                 |
+| ------ | ------------------------ | ---------------------------------- | ----------------------------------------------- |
+| 400    | `unsupported_media_type` | Unsupported Content-Type           | `"Content-Type must be multipart/form-data"`    |
+| 400    | `bad_request`            | Missing required field             | `"Missing required field: crl"`                 |
+| 400    | `bad_request`            | Field is not a file                | `"Field 'crl' must be a file, not a string"`    |
+| 400    | `invalid_body`           | Failed to read request body        | `"details": "Invalid UTF-8"`                    |
+| 400    | `invalid_crl`            | Failed to parse CRL                | `"details": "Bad CRL DER"`                      |
+| 400    | `issuer_not_found`       | Issuer certificate not found       | `"No CA certificate matches this CRL's issuer"` |
+| 400    | `invalid_signature`      | CRL signature verification failed  | `"Signature mismatch"`                          |
+| 409    | `stale_crl`              | CRL is older than existing version | Full CRL or Delta CRL conflict                  |
+
+**Notes:**
+
+1. **Auto-Detection is Robust**: Even if you name a DER file with `.pem` extension, the backend will detect it's actually binary DER and handle it correctly.
+
+2. **Idempotent**: Uploading the same CRL twice is safe. The first successful upload creates the object; subsequent uploads with identical content are rejected with a 409 Conflict (stale CRL).
+
+3. **Version Management**: When a newer version of a CRL is uploaded, the old version is automatically archived in the `archive/` subdirectory.
+
+4. **Multiple Formats Stored**: Once a CRL is stored, both DER and PEM formats are available:
+   - DER: `/crl/{filename.crl}`
+   - PEM: `/crl/{filename.crl.pem}`
+   - By AKI: `/crl/by-keyid/{aki}.crl` (for direct lookup by Authority Key Identifier)
 
 ---
 
