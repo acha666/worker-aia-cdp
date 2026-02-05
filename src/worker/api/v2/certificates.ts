@@ -16,12 +16,10 @@ import {
 import {
   buildTBSCertificate,
   buildCertificateFingerprints,
-  buildCertificateStatus,
   buildAlgorithmIdentifier,
   buildBitString,
 } from "./builders";
 import { parseCertificate } from "../../pki/parsers";
-import { toJSDate } from "../../pki/utils/conversion";
 import { extractPEMBlock } from "../../pki/crls/pem";
 import { getCacheControlHeader } from "../../cache/config";
 import { SIGNATURE_ALG_NAMES } from "../../pki/constants";
@@ -44,7 +42,6 @@ export const listCertificates: RouteHandler = async (req, env) => {
   // Parse query parameters
   const cursor = url.searchParams.get("cursor") ?? undefined;
   const limit = parseLimitParam(url.searchParams.get("limit"), 50, 100);
-  const status = url.searchParams.get("status");
   const search = url.searchParams.get("search")?.toLowerCase();
 
   // List objects from R2
@@ -58,7 +55,6 @@ export const listCertificates: RouteHandler = async (req, env) => {
   // Use a Map to deduplicate certificates by their base filename
   // Key: baseFilename, Value: CertificateListItem
   const certMap = new Map<string, CertificateListItem>();
-  const now = Date.now();
 
   for (const object of list.objects) {
     // Only include certificate files
@@ -121,15 +117,6 @@ export const listCertificates: RouteHandler = async (req, env) => {
     const notAfter = metadata?.summaryNotAfter ?? metadata?.notAfter ?? null;
     const serialNumber = metadata?.serialNumber ?? null;
 
-    // Compute status
-    const notBeforeDate = notBefore ? new Date(notBefore) : undefined;
-    const notAfterDate = notAfter ? new Date(notAfter) : undefined;
-    const certStatus = computeCertStatus(now, notBeforeDate, notAfterDate);
-
-    // Apply filters
-    if (status && certStatus.state !== status) {
-      continue;
-    }
     if (search) {
       const searchable = `${subjectCN ?? ""} ${issuerCN ?? ""}`.toLowerCase();
       if (!searchable.includes(search)) {
@@ -162,7 +149,6 @@ export const listCertificates: RouteHandler = async (req, env) => {
         notBefore,
         notAfter,
       },
-      status: certStatus,
       fingerprints: { sha1, sha256 },
     };
 
@@ -278,10 +264,6 @@ export const getCertificate: RouteHandler = async (req, env) => {
 
   const fingerprints = await buildCertificateFingerprints(der);
 
-  const notBefore = toJSDate(cert.notBefore);
-  const notAfter = toJSDate(cert.notAfter);
-  const status = buildCertificateStatus(notBefore, notAfter);
-
   const tbsCertificate = await buildTBSCertificate(cert);
 
   // Optionally exclude extensions if not requested
@@ -296,7 +278,6 @@ export const getCertificate: RouteHandler = async (req, env) => {
     downloadUrl: `/${CERT_PREFIX}${baseId}`,
     storage,
     fingerprints,
-    status,
     tbsCertificate,
     relationships: {},
   };
@@ -331,27 +312,4 @@ function isCertificateFile(key: string): boolean {
     key.endsWith(".crt.pem") ||
     key.endsWith(".cer.pem")
   );
-}
-
-function computeCertStatus(
-  now: number,
-  notBefore?: Date,
-  notAfter?: Date
-): CertificateListItem["status"] {
-  let state: "valid" | "expired" | "not-yet-valid" = "valid";
-  let expiresIn: number | undefined;
-  let expiredAgo: number | undefined;
-  let startsIn: number | undefined;
-
-  if (notBefore && now < notBefore.getTime()) {
-    state = "not-yet-valid";
-    startsIn = Math.floor((notBefore.getTime() - now) / 1000);
-  } else if (notAfter && now > notAfter.getTime()) {
-    state = "expired";
-    expiredAgo = Math.floor((now - notAfter.getTime()) / 1000);
-  } else if (notAfter) {
-    expiresIn = Math.floor((notAfter.getTime() - now) / 1000);
-  }
-
-  return { state, expiresIn, expiredAgo, startsIn };
 }

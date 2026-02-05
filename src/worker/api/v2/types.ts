@@ -353,18 +353,6 @@ export interface UnknownExtensionValue {
 // Certificate Types
 // =============================================================================
 
-export type CertificateStatusState = "valid" | "expired" | "not-yet-valid";
-
-export interface CertificateStatus {
-  state: CertificateStatusState;
-  validFrom: string;
-  validUntil: string;
-  expiresIn?: number;
-  expiredAgo?: number;
-  startsIn?: number;
-  expiresInHuman?: string;
-}
-
 export interface StorageInfo {
   filename: string;
   format: "der";
@@ -397,12 +385,6 @@ export interface CertificateListItem {
     notBefore: string | null;
     notAfter: string | null;
   };
-  status: {
-    state: CertificateStatusState;
-    expiresIn?: number;
-    expiredAgo?: number;
-    startsIn?: number;
-  };
   fingerprints: Fingerprints;
 }
 
@@ -429,7 +411,6 @@ export interface CertificateDetail {
   downloadUrl: string;
   storage: StorageInfo;
   fingerprints: Fingerprints;
-  status: CertificateStatus;
   tbsCertificate: TBSCertificate;
   signatureAlgorithm?: AlgorithmIdentifier;
   signatureValue?: BitString;
@@ -443,17 +424,7 @@ export interface CertificateDetail {
 // CRL Types
 // =============================================================================
 
-export type CrlStatusState = "current" | "stale" | "expired";
 export type CrlType = "full" | "delta";
-
-export interface CrlStatus {
-  state: CrlStatusState;
-  thisUpdate: string;
-  nextUpdate: string | null;
-  expiresIn?: number;
-  expiredAgo?: number;
-  expiresInHuman?: string;
-}
 
 export interface CrlListItem {
   id: string;
@@ -469,11 +440,6 @@ export interface CrlListItem {
     thisUpdate: string | null;
     nextUpdate: string | null;
     revokedCount: number;
-  };
-  status: {
-    state: CrlStatusState;
-    expiresIn?: number;
-    expiredAgo?: number;
   };
   fingerprints: Fingerprints;
 }
@@ -511,7 +477,6 @@ export interface CrlDetail {
   downloadUrl: string;
   storage: StorageInfo;
   fingerprints: Fingerprints;
-  status: CrlStatus;
   crlType: CrlType;
   tbsCertList: TBSCertList;
   signatureAlgorithm?: AlgorithmIdentifier;
@@ -556,13 +521,11 @@ export interface CrlUploadResult {
 export interface StatsResult {
   certificates: {
     total: number;
-    byStatus: Record<CertificateStatusState, number>;
   };
   crls: {
     total: number;
     full: number;
     delta: number;
-    byStatus: Record<CrlStatusState, number>;
     totalRevocations: number;
   };
   storage: {

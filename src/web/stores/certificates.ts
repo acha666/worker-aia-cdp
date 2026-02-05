@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import type { CertificateListItem, CertificateDetail } from "@contracts/schemas";
 import { listCertificates, getCertificate, type ListCertificatesResult } from "../api/client";
+import { computeCertificateStatus } from "../utils/status";
 
 export const useCertificatesStore = defineStore("certificates", () => {
   // State
@@ -15,9 +16,17 @@ export const useCertificatesStore = defineStore("certificates", () => {
 
   // Getters
   const isEmpty = computed(() => items.value.length === 0 && !loading.value);
-  const validCount = computed(() => items.value.filter((c) => c.status.state === "valid").length);
+  const validCount = computed(
+    () =>
+      items.value.filter(
+        (c) => computeCertificateStatus(c.summary.notBefore, c.summary.notAfter).state === "valid"
+      ).length
+  );
   const expiredCount = computed(
-    () => items.value.filter((c) => c.status.state === "expired").length
+    () =>
+      items.value.filter(
+        (c) => computeCertificateStatus(c.summary.notBefore, c.summary.notAfter).state === "expired"
+      ).length
   );
 
   // Actions

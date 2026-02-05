@@ -3,14 +3,7 @@
  */
 
 import type { RouteHandler } from "../../env";
-import type {
-  CrlListItem,
-  CrlDetail,
-  CrlUploadResult,
-  StorageInfo,
-  CrlType,
-  CrlStatusState,
-} from "./types";
+import type { CrlListItem, CrlDetail, CrlUploadResult, StorageInfo, CrlType } from "./types";
 import {
   jsonSuccess,
   jsonError,
@@ -23,7 +16,6 @@ import {
 import {
   buildTBSCertList,
   buildCrlFingerprints,
-  buildCrlStatus,
   determineCrlType,
   buildAlgorithmIdentifier,
   buildBitString,
@@ -75,7 +67,6 @@ export const listCrls: RouteHandler = async (req, env) => {
   const cursor = url.searchParams.get("cursor") ?? undefined;
   const limit = parseLimitParam(url.searchParams.get("limit"), 50, 100);
   const typeFilter = url.searchParams.get("type") as CrlType | null;
-  const statusFilter = url.searchParams.get("status") as CrlStatusState | null;
 
   // Determine which prefixes to search
   const prefixes: string[] = [];
@@ -89,7 +80,6 @@ export const listCrls: RouteHandler = async (req, env) => {
   // Use a Map to deduplicate CRLs by their base filename
   // Key: "prefix:baseFilename", Value: CrlListItem
   const crlMap = new Map<string, CrlListItem>();
-  const now = Date.now();
   let nextCursor: string | null = null;
   let truncated = false;
 
@@ -142,16 +132,6 @@ export const listCrls: RouteHandler = async (req, env) => {
       const nextUpdate = metadata?.summaryNextUpdate ?? metadata?.nextUpdate ?? null;
       const revokedCount = parseInt(metadata?.revokedCount ?? "0", 10) || 0;
 
-      // Compute status
-      const thisUpdateDate = thisUpdate ? new Date(thisUpdate) : undefined;
-      const nextUpdateDate = nextUpdate ? new Date(nextUpdate) : undefined;
-      const crlStatus = computeCrlStatus(now, thisUpdateDate, nextUpdateDate);
-
-      // Apply filters
-      if (statusFilter && crlStatus.state !== statusFilter) {
-        continue;
-      }
-
       // Get fingerprints from metadata
       const sha1 = metadata?.fingerprintSha1 ?? "";
       const sha256 = metadata?.fingerprintSha256 ?? "";
@@ -179,7 +159,6 @@ export const listCrls: RouteHandler = async (req, env) => {
           nextUpdate,
           revokedCount,
         },
-        status: crlStatus,
         fingerprints: { sha1, sha256 },
       };
 
@@ -301,10 +280,6 @@ export const getCrl: RouteHandler = async (req, env) => {
 
   const fingerprints = await buildCrlFingerprints(der);
 
-  const thisUpdate = toJSDate(crl.thisUpdate);
-  const nextUpdate = toJSDate(crl.nextUpdate);
-  const status = buildCrlStatus(thisUpdate, nextUpdate);
-
   // Build TBSCertList
   const includeRevocations = include.size === 0 || include.has("revokedcertificates");
   const tbsCertList = buildTBSCertList(crl, {
@@ -329,7 +304,6 @@ export const getCrl: RouteHandler = async (req, env) => {
     downloadUrl: `/${baseKey}`,
     storage,
     fingerprints,
-    status,
     crlType,
     tbsCertList,
     relationships: {},
@@ -552,33 +526,4 @@ export const uploadCrl: RouteHandler = async (req, env) => {
 
 function isCrlFile(key: string): boolean {
   return key.endsWith(".crl") || key.endsWith(".crl.pem");
-}
-
-function computeCrlStatus(
-  now: number,
-  thisUpdate?: Date,
-  nextUpdate?: Date
-): CrlListItem["status"] {
-  let state: CrlStatusState = "current";
-  let expiresIn: number | undefined;
-  let expiredAgo: number | undefined;
-
-  if (nextUpdate) {
-    if (now > nextUpdate.getTime()) {
-      state = "expired";
-      expiredAgo = Math.floor((now - nextUpdate.getTime()) / 1000);
-    } else {
-      // Check if stale (past 80% of validity)
-      if (thisUpdate) {
-        const validityPeriod = nextUpdate.getTime() - thisUpdate.getTime();
-        const elapsed = now - thisUpdate.getTime();
-        if (elapsed > validityPeriod * 0.8) {
-          state = "stale";
-        }
-      }
-      expiresIn = Math.floor((nextUpdate.getTime() - now) / 1000);
-    }
-  }
-
-  return { state, expiresIn, expiredAgo };
 }

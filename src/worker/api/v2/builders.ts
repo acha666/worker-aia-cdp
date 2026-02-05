@@ -54,8 +54,6 @@ import type {
   TBSCertList,
   RevokedCertificate,
   Fingerprints,
-  CertificateStatus,
-  CrlStatus,
   CrlType,
 } from "./types";
 
@@ -892,42 +890,6 @@ export async function buildCertificateFingerprints(der: ArrayBuffer): Promise<Fi
   };
 }
 
-export function buildCertificateStatus(
-  notBefore: Date | undefined,
-  notAfter: Date | undefined
-): CertificateStatus {
-  const now = Date.now();
-  const validFrom = notBefore?.toISOString() ?? "";
-  const validUntil = notAfter?.toISOString() ?? "";
-
-  let state: CertificateStatus["state"] = "valid";
-  let expiresIn: number | undefined;
-  let expiredAgo: number | undefined;
-  let startsIn: number | undefined;
-
-  if (notBefore && now < notBefore.getTime()) {
-    state = "not-yet-valid";
-    startsIn = Math.floor((notBefore.getTime() - now) / 1000);
-  } else if (notAfter && now > notAfter.getTime()) {
-    state = "expired";
-    expiredAgo = Math.floor((now - notAfter.getTime()) / 1000);
-  } else if (notAfter) {
-    expiresIn = Math.floor((notAfter.getTime() - now) / 1000);
-  }
-
-  const expiresInHuman = expiresIn ? formatDuration(expiresIn) : undefined;
-
-  return {
-    state,
-    validFrom,
-    validUntil,
-    expiresIn,
-    expiredAgo,
-    startsIn,
-    expiresInHuman,
-  };
-}
-
 // =============================================================================
 // CRL Builder
 // =============================================================================
@@ -1008,77 +970,7 @@ export async function buildCrlFingerprints(der: ArrayBuffer): Promise<Fingerprin
   };
 }
 
-export function buildCrlStatus(
-  thisUpdate: Date | undefined,
-  nextUpdate: Date | undefined
-): CrlStatus {
-  const now = Date.now();
-  const thisUpdateIso = thisUpdate?.toISOString() ?? "";
-  const nextUpdateIso = nextUpdate?.toISOString() ?? null;
-
-  let state: CrlStatus["state"] = "current";
-  let expiresIn: number | undefined;
-  let expiredAgo: number | undefined;
-
-  if (nextUpdate) {
-    if (now > nextUpdate.getTime()) {
-      state = "expired";
-      expiredAgo = Math.floor((now - nextUpdate.getTime()) / 1000);
-    } else {
-      // Check if it's stale (past 80% of validity period)
-      if (thisUpdate) {
-        const validityPeriod = nextUpdate.getTime() - thisUpdate.getTime();
-        const elapsed = now - thisUpdate.getTime();
-        if (elapsed > validityPeriod * 0.8) {
-          state = "stale";
-        }
-      }
-      expiresIn = Math.floor((nextUpdate.getTime() - now) / 1000);
-    }
-  }
-
-  const expiresInHuman = expiresIn ? formatDuration(expiresIn) : undefined;
-
-  return {
-    state,
-    thisUpdate: thisUpdateIso,
-    nextUpdate: nextUpdateIso,
-    expiresIn,
-    expiredAgo,
-    expiresInHuman,
-  };
-}
-
 export function determineCrlType(crl: pkijs.CertificateRevocationList): CrlType {
   const deltaCrlIndicator = crl.crlExtensions?.extensions.find((ext) => ext.extnID === "2.5.29.27");
   return deltaCrlIndicator ? "delta" : "full";
-}
-
-// =============================================================================
-// Utility Functions
-// =============================================================================
-
-function formatDuration(seconds: number): string {
-  if (seconds < 60) {
-    return `${seconds} seconds`;
-  }
-  if (seconds < 3600) {
-    return `${Math.floor(seconds / 60)} minutes`;
-  }
-  if (seconds < 86400) {
-    return `${Math.floor(seconds / 3600)} hours`;
-  }
-  if (seconds < 2592000) {
-    return `${Math.floor(seconds / 86400)} days`;
-  }
-  if (seconds < 31536000) {
-    return `${Math.floor(seconds / 2592000)} months`;
-  }
-
-  const years = Math.floor(seconds / 31536000);
-  const remainingMonths = Math.floor((seconds % 31536000) / 2592000);
-  if (remainingMonths === 0) {
-    return `${years} years`;
-  }
-  return `${years} years, ${remainingMonths} months`;
 }

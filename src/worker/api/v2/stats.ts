@@ -3,7 +3,7 @@
  */
 
 import type { RouteHandler } from "../../env";
-import type { StatsResult, HealthResult, CertificateStatusState, CrlStatusState } from "./types";
+import type { StatsResult, HealthResult } from "./types";
 import { jsonSuccess } from "./response";
 import { getCacheControlHeader } from "../../cache/config";
 
@@ -14,27 +14,15 @@ const VERSION = "2.0.0";
  * Get statistics about stored objects
  */
 export const getStats: RouteHandler = async (_req, env) => {
-  const now = Date.now();
-
   // Initialize counters
   const stats: StatsResult = {
     certificates: {
       total: 0,
-      byStatus: {
-        valid: 0,
-        expired: 0,
-        "not-yet-valid": 0,
-      },
     },
     crls: {
       total: 0,
       full: 0,
       delta: 0,
-      byStatus: {
-        current: 0,
-        stale: 0,
-        expired: 0,
-      },
       totalRevocations: 0,
     },
     storage: {
@@ -76,11 +64,6 @@ export const getStats: RouteHandler = async (_req, env) => {
         // Process certificates
         if (prefix === "ca/" && isCertFile(object.key)) {
           stats.certificates.total++;
-
-          const notBefore = metadata?.summaryNotBefore ?? metadata?.notBefore;
-          const notAfter = metadata?.summaryNotAfter ?? metadata?.notAfter;
-          const status = computeCertStatus(now, notBefore, notAfter);
-          stats.certificates.byStatus[status]++;
         }
 
         // Process CRLs
@@ -92,11 +75,6 @@ export const getStats: RouteHandler = async (_req, env) => {
           } else {
             stats.crls.full++;
           }
-
-          const thisUpdate = metadata?.summaryThisUpdate ?? metadata?.thisUpdate;
-          const nextUpdate = metadata?.summaryNextUpdate ?? metadata?.nextUpdate;
-          const status = computeCrlStatus(now, thisUpdate, nextUpdate);
-          stats.crls.byStatus[status]++;
 
           // Count revocations
           const revokedCount = parseInt(metadata?.revokedCount ?? "0", 10) || 0;
@@ -170,43 +148,4 @@ function isCertFile(key: string): boolean {
 
 function isCrlFile(key: string): boolean {
   return key.endsWith(".crl") || key.endsWith(".crl.pem");
-}
-
-function computeCertStatus(
-  now: number,
-  notBefore?: string,
-  notAfter?: string
-): CertificateStatusState {
-  if (notBefore) {
-    const nbDate = new Date(notBefore);
-    if (now < nbDate.getTime()) {
-      return "not-yet-valid";
-    }
-  }
-  if (notAfter) {
-    const naDate = new Date(notAfter);
-    if (now > naDate.getTime()) {
-      return "expired";
-    }
-  }
-  return "valid";
-}
-
-function computeCrlStatus(now: number, thisUpdate?: string, nextUpdate?: string): CrlStatusState {
-  if (nextUpdate) {
-    const nuDate = new Date(nextUpdate);
-    if (now > nuDate.getTime()) {
-      return "expired";
-    }
-
-    if (thisUpdate) {
-      const tuDate = new Date(thisUpdate);
-      const validityPeriod = nuDate.getTime() - tuDate.getTime();
-      const elapsed = now - tuDate.getTime();
-      if (elapsed > validityPeriod * 0.8) {
-        return "stale";
-      }
-    }
-  }
-  return "current";
 }

@@ -3,6 +3,7 @@ import { computed } from "vue";
 import type { CrlDetail, Extension } from "@contracts/schemas";
 import ExtensionView from "./ExtensionView.vue";
 import { formatDateReadable, formatTimezoneOffset, getRelativeTime } from "../utils/dates";
+import { computeCrlValidity } from "../utils/status";
 import { formatName } from "../utils/x509";
 import { copyToClipboard, formatHex } from "../utils/format";
 
@@ -33,6 +34,12 @@ const validityInfo = computed(() => {
   }
 
   return { display, relative };
+});
+
+const validityStats = computed(() => {
+  const thisUpdate = props.crl.tbsCertList.thisUpdate?.iso;
+  const nextUpdate = props.crl.tbsCertList.nextUpdate?.iso;
+  return computeCrlValidity(thisUpdate, nextUpdate);
 });
 
 function getCrlReasonName(extension: Extension): string | null {
@@ -114,10 +121,10 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
             ({{ validityInfo.relative }})
           </span>
         </div>
-        <div v-if="crl.status.validityPeriodHours" class="text-gray-600">
-          <span class="font-medium">{{ crl.status.validityPeriodHours }} hours</span>
+        <div v-if="validityStats.validityPeriodHours" class="text-gray-600">
+          <span class="font-medium">{{ validityStats.validityPeriodHours }} hours</span>
           total ·
-          <span class="font-medium">{{ crl.status.hoursRemaining ?? "Expired" }} hours</span>
+          <span class="font-medium">{{ validityStats.hoursRemaining ?? "Expired" }} hours</span>
           remaining
         </div>
       </div>

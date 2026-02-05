@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import type { CrlListItem, CrlDetail } from "@contracts/schemas";
 import { listCrls, getCrl, uploadCrl, uploadCrlBinary, type UploadCrlResult } from "../api/client";
+import { computeCrlStatus } from "../utils/status";
 
 export const useCrlsStore = defineStore("crls", () => {
   // State
@@ -21,11 +22,22 @@ export const useCrlsStore = defineStore("crls", () => {
   const allCrls = computed(() => [...fullCrls.value, ...deltaCrls.value]);
   const totalCount = computed(() => fullCrls.value.length + deltaCrls.value.length);
   const currentCount = computed(
-    () => allCrls.value.filter((c) => c.status.state === "current").length
+    () =>
+      allCrls.value.filter(
+        (c) => computeCrlStatus(c.summary.thisUpdate, c.summary.nextUpdate).state === "current"
+      ).length
   );
-  const staleCount = computed(() => allCrls.value.filter((c) => c.status.state === "stale").length);
+  const staleCount = computed(
+    () =>
+      allCrls.value.filter(
+        (c) => computeCrlStatus(c.summary.thisUpdate, c.summary.nextUpdate).state === "stale"
+      ).length
+  );
   const expiredCount = computed(
-    () => allCrls.value.filter((c) => c.status.state === "expired").length
+    () =>
+      allCrls.value.filter(
+        (c) => computeCrlStatus(c.summary.thisUpdate, c.summary.nextUpdate).state === "expired"
+      ).length
   );
   const totalRevocations = computed(() =>
     allCrls.value.reduce((sum, crl) => sum + crl.summary.revokedCount, 0)

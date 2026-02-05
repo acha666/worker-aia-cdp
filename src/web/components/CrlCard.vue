@@ -5,6 +5,7 @@ import { useCrlsStore } from "../stores/crls";
 import StatusBadge from "./StatusBadge.vue";
 import CrlDetails from "./CrlDetails.vue";
 import { formatDateDay, getRelativeTime } from "../utils/dates";
+import { computeCrlStatus } from "../utils/status";
 
 const props = defineProps<{
   crl: CrlListItem;
@@ -61,6 +62,10 @@ const updateInfo = computed(() => {
     remaining: nextUpdate ? getRelativeTime(nextUpdate) : null,
   };
 });
+
+const status = computed(() =>
+  computeCrlStatus(props.crl.summary.thisUpdate, props.crl.summary.nextUpdate)
+);
 </script>
 
 <template>
@@ -85,7 +90,7 @@ const updateInfo = computed(() => {
             <h3 class="text-base font-bold text-gray-900 truncate">
               {{ displayName }}
             </h3>
-            <StatusBadge :state="crl.status.state" type="crl" />
+            <StatusBadge :state="status.state" type="crl" />
           </div>
           <p class="text-xs text-gray-600 mb-3">
             <span v-if="crl.summary.crlNumber">CRL #{{ crl.summary.crlNumber }}</span>
@@ -100,7 +105,7 @@ const updateInfo = computed(() => {
               <span class="font-medium">Next update</span>
               {{ updateInfo.expires }}
               <span
-                v-if="crl.status.state === 'current' && updateInfo.remaining"
+                v-if="status.state === 'current' && updateInfo.remaining"
                 :class="[
                   'ml-1',
                   crl.summary.crlType === 'delta' ? 'text-green-700' : 'text-purple-700',

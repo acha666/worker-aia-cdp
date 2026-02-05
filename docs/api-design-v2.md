@@ -139,12 +139,13 @@ GET /api/v2/certificates
 |-----------|------|---------|-------------|
 | `cursor` | string | - | Pagination cursor |
 | `limit` | number | 50 | Items per page (1-100) |
-| `status` | string | - | Filter by status: `valid`, `expired`, `not-yet-valid` |
 | `search` | string | - | Search by subject/issuer CN |
 
 **Notes:**
 
 - Results are returned in storage key order. Explicit sorting is not currently supported.
+- Status and expiry timing are computed client-side from `summary.thisUpdate` and `summary.nextUpdate`.
+- Status and expiry timing are computed client-side from `summary.notBefore` and `summary.notAfter`.
 
 **Response:**
 
@@ -168,13 +169,6 @@ interface CertificateListItem {
     notBefore: string | null;
     notAfter: string | null;
     serialNumber: string | null;
-  };
-
-  status: {
-    state: "valid" | "expired" | "not-yet-valid";
-    expiresIn?: number; // Seconds until expiry (if valid)
-    expiredAgo?: number; // Seconds since expiry (if expired)
-    startsIn?: number; // Seconds until valid (if not-yet-valid)
   };
 
   fingerprints: {
@@ -222,10 +216,6 @@ Example:
         "notBefore": "2024-01-01T00:00:00Z",
         "notAfter": "2034-01-01T00:00:00Z",
         "serialNumber": "01"
-      },
-      "status": {
-        "state": "valid",
-        "expiresIn": 283824000
       },
       "fingerprints": {
         "sha1": "...",
@@ -281,6 +271,7 @@ GET /api/v2/certificates/{id}
 - `tbsCertificate` is always included.
 - If `include` is omitted, the response includes extensions and signature fields by default.
 - If `include` is provided, only the listed optional sections are included.
+- Status and expiry timing are computed client-side from `tbsCertificate.validity`.
 
 **Response Structure (X.509 Aligned):**
 
@@ -316,8 +307,6 @@ interface CertificateDetail {
     sha1: string;
     sha256: string;
   };
-
-  status: CertificateStatus;
 
   // === X.509 TBSCertificate (RFC 5280 §4.1.2) ===
   tbsCertificate: {
@@ -646,23 +635,6 @@ interface UnknownExtensionValue {
   // Only raw hex available
 }
 
-// === Status (Computed) ===
-interface CertificateStatus {
-  state: "valid" | "expired" | "not-yet-valid";
-
-  // Timing info
-  validFrom: string; // ISO 8601
-  validUntil: string; // ISO 8601
-
-  // Relative timing (seconds)
-  expiresIn?: number; // Positive if valid
-  expiredAgo?: number; // If expired
-  startsIn?: number; // If not yet valid
-
-  // Human-readable duration
-  expiresInHuman?: string; // e.g., "45 days"
-}
-
 interface RelationshipLink {
   id: string;
   type: string;
@@ -689,13 +661,6 @@ interface RelationshipLink {
     "fingerprints": {
       "sha1": "A1B2C3D4E5...",
       "sha256": "1234567890ABCDEF..."
-    },
-    "status": {
-      "state": "valid",
-      "validFrom": "2024-01-01T00:00:00Z",
-      "validUntil": "2034-01-01T00:00:00Z",
-      "expiresIn": 283824000,
-      "expiresInHuman": "8 years, 11 months"
     },
     "tbsCertificate": {
       "version": { "raw": 2, "display": "v3" },
@@ -851,7 +816,6 @@ GET /api/v2/crls
 | `cursor` | string | - | Pagination cursor |
 | `limit` | number | 50 | Items per page (1-100) |
 | `type` | string | - | Filter: `full`, `delta` |
-| `status` | string | - | Filter: `current`, `stale`, `expired` |
 
 **Notes:**
 
@@ -886,12 +850,6 @@ interface CrlListItem {
     thisUpdate: string | null;
     nextUpdate: string | null;
     revokedCount: number;
-  };
-
-  status: {
-    state: "current" | "stale" | "expired";
-    expiresIn?: number;
-    expiredAgo?: number;
   };
 
   fingerprints: {
@@ -947,6 +905,7 @@ GET /api/v2/crls/{id}
 - `tbsCertList` is always included.
 - If `include` is omitted, the response includes extensions, signature fields, and revoked certificates by default.
 - If `include` is provided, only the listed optional sections are included.
+- Status and expiry timing are computed client-side from `tbsCertList.thisUpdate` and `tbsCertList.nextUpdate`.
 
 **Response Structure (X.509 CRL Aligned):**
 
@@ -982,8 +941,6 @@ interface CrlDetail {
     sha1: string;
     sha256: string;
   };
-
-  status: CrlStatus;
 
   // Derived classification
   crlType: "full" | "delta";
@@ -1126,20 +1083,6 @@ interface FreshestCRLValue {
   extensionType: "freshestCRL";
   distributionPoints: DistributionPoint[];
 }
-
-// === CRL Status (Computed) ===
-interface CrlStatus {
-  state: "current" | "stale" | "expired";
-  thisUpdate: string;
-  nextUpdate: string | null;
-
-  // Relative timing
-  expiresIn?: number;
-  expiredAgo?: number;
-
-  // Human-readable
-  expiresInHuman?: string;
-}
 ```
 
 **Example Response:**
@@ -1161,13 +1104,6 @@ interface CrlStatus {
     "fingerprints": {
       "sha1": "...",
       "sha256": "..."
-    },
-    "status": {
-      "state": "current",
-      "thisUpdate": "2026-02-01T00:00:00Z",
-      "nextUpdate": "2026-02-08T00:00:00Z",
-      "expiresIn": 345600,
-      "expiresInHuman": "4 days"
     },
     "crlType": "full",
     "tbsCertList": {
@@ -1481,22 +1417,12 @@ GET /api/v2/stats
 {
   "data": {
     "certificates": {
-      "total": 5,
-      "byStatus": {
-        "valid": 4,
-        "expired": 1,
-        "notYetValid": 0
-      }
+      "total": 5
     },
     "crls": {
       "total": 8,
       "full": 4,
       "delta": 4,
-      "byStatus": {
-        "current": 6,
-        "stale": 1,
-        "expired": 1
-      },
       "totalRevocations": 156
     },
     "storage": {
@@ -1948,16 +1874,6 @@ interface UnknownExtensionValue {
 // Certificate Types
 // =============================================================================
 
-interface CertificateStatus {
-  state: "valid" | "expired" | "not-yet-valid";
-  validFrom: string;
-  validUntil: string;
-  expiresIn?: number;
-  expiredAgo?: number;
-  startsIn?: number;
-  expiresInHuman?: string;
-}
-
 interface CertificateListItem {
   id: string;
   type: "certificate";
@@ -1975,11 +1891,6 @@ interface CertificateListItem {
     serialNumber: string | null;
     notBefore: string | null;
     notAfter: string | null;
-  };
-  status: {
-    state: "valid" | "expired" | "not-yet-valid";
-    expiresIn?: number;
-    expiredAgo?: number;
   };
   fingerprints: {
     sha1: string;
@@ -2003,7 +1914,6 @@ interface CertificateDetail {
     sha1: string;
     sha256: string;
   };
-  status: CertificateStatus;
   tbsCertificate: {
     version: X509Version;
     serialNumber: SerialNumber;
@@ -2031,15 +1941,6 @@ interface CertificateDetail {
 // CRL Types
 // =============================================================================
 
-interface CrlStatus {
-  state: "current" | "stale" | "expired";
-  thisUpdate: string;
-  nextUpdate: string | null;
-  expiresIn?: number;
-  expiredAgo?: number;
-  expiresInHuman?: string;
-}
-
 interface CrlListItem {
   id: string;
   type: "crl";
@@ -2059,11 +1960,6 @@ interface CrlListItem {
     thisUpdate: string | null;
     nextUpdate: string | null;
     revokedCount: number;
-  };
-  status: {
-    state: "current" | "stale" | "expired";
-    expiresIn?: number;
-    expiredAgo?: number;
   };
   fingerprints: {
     sha1: string;
@@ -2096,7 +1992,6 @@ interface CrlDetail {
     sha1: string;
     sha256: string;
   };
-  status: CrlStatus;
   crlType: "full" | "delta";
   tbsCertList: {
     version?: X509Version;
@@ -2165,13 +2060,11 @@ interface SearchResult {
 interface StatsResult {
   certificates: {
     total: number;
-    byStatus: Record<string, number>;
   };
   crls: {
     total: number;
     full: number;
     delta: number;
-    byStatus: Record<string, number>;
     totalRevocations: number;
   };
   storage: {
@@ -2196,13 +2089,11 @@ interface ListParams {
 }
 
 interface CertificateListParams extends ListParams {
-  status?: "valid" | "expired" | "not-yet-valid";
   search?: string;
 }
 
 interface CrlListParams extends ListParams {
   type?: "full" | "delta";
-  status?: "current" | "stale" | "expired";
 }
 
 interface PkiApiClient {
@@ -2252,15 +2143,15 @@ interface PkiApiClient {
 
 ## Caching Strategy
 
-| Endpoint Pattern                 | Cache TTL | Cache Key Components                  |
-| -------------------------------- | --------- | ------------------------------------- |
-| `GET /api/v2/certificates`       | 60s       | prefix, cursor, limit, status, search |
-| `GET /api/v2/certificates/{id}`  | 300s      | id, include                           |
-| `GET /api/v2/crls`               | 60s       | prefix, cursor, limit, type, status   |
-| `GET /api/v2/crls/{id}`          | 300s      | id, include                           |
-| `GET /ca/*`, `/crl/*`, `/dcrl/*` | 3600s     | path                                  |
-| `GET /api/v2/stats`              | 60s       | -                                     |
-| `GET /api/v2/health`             | 10s       | -                                     |
+| Endpoint Pattern                 | Cache TTL | Cache Key Components          |
+| -------------------------------- | --------- | ----------------------------- |
+| `GET /api/v2/certificates`       | 60s       | prefix, cursor, limit, search |
+| `GET /api/v2/certificates/{id}`  | 300s      | id, include                   |
+| `GET /api/v2/crls`               | 60s       | prefix, cursor, limit, type   |
+| `GET /api/v2/crls/{id}`          | 300s      | id, include                   |
+| `GET /ca/*`, `/crl/*`, `/dcrl/*` | 3600s     | path                          |
+| `GET /api/v2/stats`              | 60s       | -                             |
+| `GET /api/v2/health`             | 10s       | -                             |
 
 ---
 

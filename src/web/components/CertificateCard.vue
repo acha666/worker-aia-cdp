@@ -5,6 +5,7 @@ import { useCertificatesStore } from "../stores/certificates";
 import StatusBadge from "./StatusBadge.vue";
 import CertificateDetails from "./CertificateDetails.vue";
 import { formatDateDay, getRelativeTime } from "../utils/dates";
+import { computeCertificateStatus } from "../utils/status";
 
 const props = defineProps<{
   certificate: CertificateListItem;
@@ -65,6 +66,10 @@ const validityInfo = computed(() => {
     remaining: getRelativeTime(notAfter),
   };
 });
+
+const status = computed(() =>
+  computeCertificateStatus(props.certificate.summary.notBefore, props.certificate.summary.notAfter)
+);
 </script>
 
 <template>
@@ -80,7 +85,7 @@ const validityInfo = computed(() => {
             <h3 class="text-base font-bold text-gray-900 truncate">
               {{ displayName }}
             </h3>
-            <StatusBadge :state="certificate.status.state" type="certificate" />
+            <StatusBadge :state="status.state" type="certificate" />
           </div>
           <p class="text-xs text-gray-600 truncate mb-3">
             Issuer: {{ certificate.summary.issuerCN || "Unknown" }}
@@ -92,7 +97,7 @@ const validityInfo = computed(() => {
               <span class="font-medium">From</span> {{ validityInfo.from }} ·
               <span class="font-medium">Until</span> {{ validityInfo.to }}
               <span
-                v-if="validityInfo.remaining && certificate.status.state === 'valid'"
+                v-if="validityInfo.remaining && status.state === 'valid'"
                 class="text-green-700"
               >
                 ({{ validityInfo.remaining }})

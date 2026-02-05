@@ -183,29 +183,7 @@ export const StorageInfoSchema = z.object({
   etag: z.string().optional(),
 });
 
-export const CertificateStatusStateSchema = z.enum(["valid", "expired", "not-yet-valid"]);
-
-export const CertificateStatusSchema = z.object({
-  state: CertificateStatusStateSchema,
-  validFrom: z.string(),
-  validUntil: z.string(),
-  expiresIn: z.number().optional(),
-  expiredAgo: z.number().optional(),
-  startsIn: z.number().optional(),
-  expiresInHuman: z.string().optional(),
-});
-
-export const CrlStatusStateSchema = z.enum(["current", "stale", "expired"]);
 export const CrlTypeSchema = z.enum(["full", "delta"]);
-
-export const CrlStatusSchema = z.object({
-  state: CrlStatusStateSchema,
-  thisUpdate: z.string(),
-  nextUpdate: z.string().nullable(),
-  expiresIn: z.number().optional(),
-  expiredAgo: z.number().optional(),
-  expiresInHuman: z.string().optional(),
-});
 
 // =============================================================================
 // Relationship Schema
@@ -234,12 +212,6 @@ export const CertificateListItemSchema = z.object({
     notBefore: z.string().nullable(),
     notAfter: z.string().nullable(),
   }),
-  status: z.object({
-    state: CertificateStatusStateSchema,
-    expiresIn: z.number().optional(),
-    expiredAgo: z.number().optional(),
-    startsIn: z.number().optional(),
-  }),
   fingerprints: FingerprintsSchema,
 });
 
@@ -266,7 +238,6 @@ export const CertificateDetailSchema = z.object({
   downloadUrl: z.string(),
   storage: StorageInfoSchema,
   fingerprints: FingerprintsSchema,
-  status: CertificateStatusSchema,
   tbsCertificate: TBSCertificateSchema,
   signatureAlgorithm: AlgorithmIdentifierSchema.optional(),
   signatureValue: BitStringSchema.optional(),
@@ -323,11 +294,6 @@ export const CrlListItemSchema = z.object({
     nextUpdate: z.string().nullable(),
     revokedCount: z.number(),
   }),
-  status: z.object({
-    state: CrlStatusStateSchema,
-    expiresIn: z.number().optional(),
-    expiredAgo: z.number().optional(),
-  }),
   fingerprints: FingerprintsSchema,
 });
 
@@ -338,7 +304,6 @@ export const CrlDetailSchema = z.object({
   downloadUrl: z.string(),
   storage: StorageInfoSchema,
   fingerprints: FingerprintsSchema,
-  status: CrlStatusSchema,
   crlType: CrlTypeSchema,
   tbsCertList: TBSCertListSchema,
   signatureAlgorithm: AlgorithmIdentifierSchema.optional(),
@@ -385,13 +350,11 @@ export const CrlUploadResultSchema = z.object({
 export const StatsResultSchema = z.object({
   certificates: z.object({
     total: z.number(),
-    byStatus: z.record(CertificateStatusStateSchema, z.number()),
   }),
   crls: z.object({
     total: z.number(),
     full: z.number(),
     delta: z.number(),
-    byStatus: z.record(CrlStatusStateSchema, z.number()),
     totalRevocations: z.number(),
   }),
   storage: z.object({
@@ -455,7 +418,6 @@ export function createApiResponseSchema<T extends z.ZodTypeAny>(dataSchema: T) {
 export const ListCertificatesQuerySchema = z.object({
   cursor: z.string().optional(),
   limit: z.coerce.number().min(1).max(100).optional().default(50),
-  status: CertificateStatusStateSchema.optional(),
   search: z.string().optional(),
 });
 
@@ -467,7 +429,6 @@ export const ListCrlsQuerySchema = z.object({
   cursor: z.string().optional(),
   limit: z.coerce.number().min(1).max(100).optional().default(50),
   type: CrlTypeSchema.optional(),
-  status: CrlStatusStateSchema.optional(),
 });
 
 export const GetCrlQuerySchema = z.object({
@@ -492,11 +453,7 @@ export type SubjectPublicKeyInfo = z.infer<typeof SubjectPublicKeyInfoSchema>;
 export type Extension = z.infer<typeof ExtensionSchema>;
 export type Extensions = z.infer<typeof ExtensionsSchema>;
 export type StorageInfo = z.infer<typeof StorageInfoSchema>;
-export type CertificateStatusState = z.infer<typeof CertificateStatusStateSchema>;
-export type CertificateStatus = z.infer<typeof CertificateStatusSchema>;
-export type CrlStatusState = z.infer<typeof CrlStatusStateSchema>;
 export type CrlType = z.infer<typeof CrlTypeSchema>;
-export type CrlStatus = z.infer<typeof CrlStatusSchema>;
 export type RelationshipLink = z.infer<typeof RelationshipLinkSchema>;
 export type CertificateListItem = z.infer<typeof CertificateListItemSchema>;
 export type TBSCertificate = z.infer<typeof TBSCertificateSchema>;

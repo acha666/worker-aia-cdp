@@ -3,6 +3,7 @@ import { computed } from "vue";
 import type { CertificateDetail } from "@contracts/schemas";
 import ExtensionView from "./ExtensionView.vue";
 import { formatDateReadable, formatTimezoneOffset, getRelativeTime } from "../utils/dates";
+import { computeCertificateValidity } from "../utils/status";
 import { formatName } from "../utils/x509";
 import { copyToClipboard, formatHex } from "../utils/format";
 
@@ -46,6 +47,11 @@ const validityInfo = computed(() => {
   const display = `${before} · ${after} (${tz})`;
 
   return { display, relative };
+});
+
+const validityStats = computed(() => {
+  const { notBefore, notAfter } = props.certificate.tbsCertificate.validity;
+  return computeCertificateValidity(notBefore?.iso, notAfter?.iso);
 });
 </script>
 
@@ -137,9 +143,9 @@ const validityInfo = computed(() => {
           </span>
         </div>
         <div class="text-gray-600">
-          <span class="font-medium">{{ certificate.status.validityPeriodDays }} days</span>
+          <span class="font-medium">{{ validityStats.validityPeriodDays ?? "N/A" }} days</span>
           total ·
-          <span class="font-medium">{{ certificate.status.daysRemaining ?? "Expired" }} days</span>
+          <span class="font-medium">{{ validityStats.daysRemaining ?? "Expired" }} days</span>
           remaining
         </div>
       </div>
