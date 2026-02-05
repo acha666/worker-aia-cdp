@@ -14,13 +14,13 @@
  */
 
 // List cache durations: Full directory listings (CAs, CRLs)
-const LIST_CACHE_TTL = 60; // browser: 1 minute - listings change infrequently
-const LIST_CACHE_SMAXAGE = 300; // CDN: 5 minutes - higher reliability threshold
-const LIST_CACHE_SWR = 86400; // stale-while-revalidate: 24 hours
+const LIST_CACHE_TTL = 30; // browser: 30s - list includes time-sensitive status
+const LIST_CACHE_SMAXAGE = 60; // CDN: 60s - keep status reasonably fresh
+const LIST_CACHE_SWR = 0; // avoid serving stale status from SWR
 
 // Metadata cache durations: Certificate/CRL metadata (subject, issuer, dates)
-const META_CACHE_TTL = 60; // browser: 1 minute - same as list for consistency
-const META_CACHE_SMAXAGE = 300; // CDN: 5 minutes - metadata is immutable per object
+const META_CACHE_TTL = 30; // browser: 30s - status fields are time-sensitive
+const META_CACHE_SMAXAGE = 60; // CDN: 60s - keep time-based fields accurate
 
 // Binary cache durations: Actual certificate/CRL files (immutable by R2 key)
 const BINARY_CACHE_TTL = 31536000; // browser: 1 year - immutable content

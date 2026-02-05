@@ -2,7 +2,7 @@ function contentTypeByKey(key: string) {
   if (key.endsWith(".pem") || key.endsWith(".crt.pem") || key.endsWith(".crl.pem")) {
     return "text/plain; charset=utf-8";
   }
-  if (key.endsWith(".crt")) {
+  if (key.endsWith(".crt") || key.endsWith(".cer") || key.endsWith(".der")) {
     return "application/pkix-cert";
   }
   if (key.endsWith(".crl")) {
@@ -11,7 +11,26 @@ function contentTypeByKey(key: string) {
   return "application/octet-stream";
 }
 
-export function buildHeadersForObject(obj: R2ObjectBody | R2Object, key: string) {
+function readNextUpdate(metadata?: Record<string, string>): Date | null {
+  if (!metadata) {
+    return null;
+  }
+  const raw = metadata.summaryNextUpdate ?? metadata.nextUpdate;
+  if (!raw) {
+    return null;
+  }
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed;
+}
+
+export function buildHeadersForObject(
+  obj: R2ObjectBody | R2Object,
+  key: string,
+  metadata?: Record<string, string>
+) {
   const headers = new Headers();
   headers.set("Content-Type", contentTypeByKey(key));
 
@@ -29,16 +48,16 @@ export function buildHeadersForObject(obj: R2ObjectBody | R2Object, key: string)
     headers.set("Last-Modified", uploaded.toUTCString());
   }
 
-  if (key.endsWith(".crt") || key.endsWith(".crt.pem")) {
+  if (/(\.crt|\.cer|\.der)(\.pem)?$/i.test(key)) {
     headers.set(
       "Cache-Control",
       "public, max-age=31536000, immutable, s-maxage=31536000, stale-while-revalidate=604800"
     );
   } else if (key.endsWith(".crl") || key.endsWith(".crl.pem")) {
-    headers.set(
-      "Cache-Control",
-      "public, max-age=3600, must-revalidate, s-maxage=86400, stale-while-revalidate=604800"
-    );
+    const nextUpdate = readNextUpdate(metadata);
+    const now = Date.now();
+    const maxAge = nextUpdate ? Math.max(0, Math.floor((nextUpdate.getTime() - now) / 1000)) : 300;
+    headers.set("Cache-Control", `public, max-age=${maxAge}, s-maxage=${maxAge}, must-revalidate`);
   } else {
     headers.set(
       "Cache-Control",

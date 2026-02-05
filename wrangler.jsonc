@@ -41,11 +41,7 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "include": [
-      "index.html"
-    ],
-    "exclude": [
-      "*.map"
-    ],
-  }
+    "include": ["index.html"],
+    "exclude": ["*.map"],
+  },
 }
