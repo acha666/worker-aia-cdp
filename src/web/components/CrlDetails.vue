@@ -2,10 +2,10 @@
 import { computed } from "vue";
 import type { CrlDetail, Extension } from "@contracts/schemas";
 import ExtensionView from "./ExtensionView.vue";
+import HexValue from "./HexValue.vue";
 import { formatDateReadable, formatTimezoneOffset, getRelativeTime } from "../utils/dates";
 import { computeCrlValidity } from "../utils/status";
 import { formatName } from "../utils/x509";
-import { copyToClipboard, formatHex } from "../utils/format";
 
 const props = defineProps<{
   crl: CrlDetail;
@@ -146,42 +146,14 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
       <dl class="space-y-2 text-sm">
         <div>
           <dt class="text-gray-500">SHA-1</dt>
-          <dd class="text-gray-900 font-mono text-xs break-all">
-            {{ formatHex(crl.fingerprints.sha1) }}
-            <button
-              @click="copyToClipboard(crl.fingerprints.sha1)"
-              class="ml-1 text-gray-400 hover:text-gray-600"
-              title="Copy"
-            >
-              <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                />
-              </svg>
-            </button>
+          <dd class="text-gray-900">
+            <HexValue :value="crl.fingerprints.sha1" variant="grouped" />
           </dd>
         </div>
         <div>
           <dt class="text-gray-500">SHA-256</dt>
-          <dd class="text-gray-900 font-mono text-xs break-all">
-            {{ formatHex(crl.fingerprints.sha256) }}
-            <button
-              @click="copyToClipboard(crl.fingerprints.sha256)"
-              class="ml-1 text-gray-400 hover:text-gray-600"
-              title="Copy"
-            >
-              <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                />
-              </svg>
-            </button>
+          <dd class="text-gray-900">
+            <HexValue :value="crl.fingerprints.sha256" variant="grouped" />
           </dd>
         </div>
       </dl>
@@ -220,8 +192,12 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
               v-for="cert in crl.tbsCertList.revokedCertificates?.items?.slice(0, 100) || []"
               :key="cert.userCertificate.hex"
             >
-              <td class="px-3 py-2 font-mono text-xs text-gray-700">
-                {{ cert.userCertificate.hex }}
+              <td class="px-3 py-2 text-gray-700">
+                <HexValue
+                  :value="cert.userCertificate.hex"
+                  variant="plain"
+                  value-class="font-mono text-xs break-all"
+                />
               </td>
               <td class="px-3 py-2 text-gray-600">
                 {{ cert.revocationDate.iso }}

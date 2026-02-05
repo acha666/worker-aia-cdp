@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import type { Extension } from "@contracts/schemas";
+import HexValue from "./HexValue.vue";
 
 const props = defineProps<{
   extension: Extension;
@@ -143,9 +144,12 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
               <div class="space-y-1">
                 <div v-if="parsed.keyIdentifier">
                   <span class="text-gray-500">Key ID:</span>
-                  <code class="ml-1 text-xs text-gray-700 break-all">{{
-                    parsed.keyIdentifier
-                  }}</code>
+                  <HexValue
+                    class="ml-1"
+                    :value="parsed.keyIdentifier"
+                    variant="grouped"
+                    value-class="text-xs text-gray-700 break-all font-mono"
+                  />
                 </div>
               </div>
             </template>
@@ -154,7 +158,12 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
             <template v-else-if="parsed.extensionType === 'subjectKeyIdentifier'">
               <div>
                 <span class="text-gray-500">Key ID:</span>
-                <code class="ml-1 text-xs text-gray-700 break-all">{{ parsed.keyIdentifier }}</code>
+                <HexValue
+                  class="ml-1"
+                  :value="parsed.keyIdentifier"
+                  variant="grouped"
+                  value-class="text-xs text-gray-700 break-all font-mono"
+                />
               </div>
             </template>
 
@@ -241,11 +250,13 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
               <summary class="cursor-pointer text-gray-500 hover:text-gray-700">
                 Raw value (hex)
               </summary>
-              <code
-                class="block mt-1 p-2 bg-gray-50 rounded text-gray-600 break-all max-h-32 overflow-auto"
-              >
-                {{ extension.extnValue.hex }}
-              </code>
+              <HexValue
+                block
+                class="mt-1 p-2 bg-gray-50 rounded text-gray-600 break-all max-h-32 overflow-auto"
+                :value="extension.extnValue.hex"
+                variant="grouped"
+                value-class="text-xs font-mono"
+              />
             </details>
           </template>
         </div>

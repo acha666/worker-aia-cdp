@@ -2,10 +2,10 @@
 import { computed } from "vue";
 import type { CertificateDetail } from "@contracts/schemas";
 import ExtensionView from "./ExtensionView.vue";
+import HexValue from "./HexValue.vue";
 import { formatDateReadable, formatTimezoneOffset, getRelativeTime } from "../utils/dates";
 import { computeCertificateValidity } from "../utils/status";
 import { formatName } from "../utils/x509";
-import { copyToClipboard, formatHex } from "../utils/format";
 
 const props = defineProps<{
   certificate: CertificateDetail;
@@ -79,22 +79,12 @@ const validityStats = computed(() => {
         </div>
         <div>
           <dt class="text-gray-500">Serial Number</dt>
-          <dd class="text-gray-900 font-mono text-xs break-all">
-            {{ certificate.tbsCertificate.serialNumber.hex }}
-            <button
-              @click="copyToClipboard(certificate.tbsCertificate.serialNumber.hex)"
-              class="ml-1 text-gray-400 hover:text-gray-600"
-              title="Copy"
-            >
-              <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                />
-              </svg>
-            </button>
+          <dd class="text-gray-900">
+            <HexValue
+              :value="certificate.tbsCertificate.serialNumber.hex"
+              variant="plain"
+              value-class="font-mono text-xs break-all"
+            />
           </dd>
         </div>
         <div class="md:col-span-2">
@@ -204,42 +194,22 @@ const validityStats = computed(() => {
       <dl class="space-y-2 text-sm">
         <div>
           <dt class="text-gray-500">SHA-1</dt>
-          <dd class="text-gray-900 font-mono text-xs break-all">
-            {{ formatHex(certificate.fingerprints.sha1) }}
-            <button
-              @click="copyToClipboard(certificate.fingerprints.sha1)"
-              class="ml-1 text-gray-400 hover:text-gray-600"
-              title="Copy"
-            >
-              <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                />
-              </svg>
-            </button>
+          <dd class="text-gray-900">
+            <HexValue
+              :value="certificate.fingerprints.sha1"
+              variant="grouped"
+              value-class="font-mono text-xs break-all"
+            />
           </dd>
         </div>
         <div>
           <dt class="text-gray-500">SHA-256</dt>
-          <dd class="text-gray-900 font-mono text-xs break-all">
-            {{ formatHex(certificate.fingerprints.sha256) }}
-            <button
-              @click="copyToClipboard(certificate.fingerprints.sha256)"
-              class="ml-1 text-gray-400 hover:text-gray-600"
-              title="Copy"
-            >
-              <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                />
-              </svg>
-            </button>
+          <dd class="text-gray-900">
+            <HexValue
+              :value="certificate.fingerprints.sha256"
+              variant="grouped"
+              value-class="font-mono text-xs break-all"
+            />
           </dd>
         </div>
       </dl>
