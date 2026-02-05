@@ -23,6 +23,23 @@ export function formatDateReadable(iso: string | null): string {
   }
 }
 
+export function formatDateTimeWithZone(iso: string | null): string {
+  if (!iso) return "N/A";
+  try {
+    const date = new Date(iso);
+    const month = MONTH_NAMES[date.getMonth()];
+    const day = String(date.getDate()).padStart(2, "0");
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
+    const tz = formatTimezoneOffset(date);
+    return `${month} ${day} ${year} ${hours}:${minutes}:${seconds} (${tz})`;
+  } catch {
+    return iso;
+  }
+}
+
 export function formatDateDay(iso: string | null): string {
   if (!iso) return "N/A";
   try {
@@ -84,6 +101,35 @@ export function getRelativeTime(iso: string | null): string {
     const now = new Date();
     const diffSeconds = Math.floor((date.getTime() - now.getTime()) / 1000);
     return formatRelativeSeconds(diffSeconds);
+  } catch {
+    return "";
+  }
+}
+
+export function formatRelativeDetailedSeconds(seconds: number): string {
+  if (!Number.isFinite(seconds)) return "";
+  const sign = seconds >= 0 ? 1 : -1;
+  const absSeconds = Math.abs(seconds);
+  const totalMinutes = Math.max(1, Math.round(absSeconds / 60));
+  const days = Math.floor(totalMinutes / (24 * 60));
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+  const minutes = totalMinutes % 60;
+
+  const segments = [] as string[];
+  if (days > 0) segments.push(`${days}d`);
+  if (hours > 0) segments.push(`${hours}h`);
+  if (minutes > 0 || segments.length === 0) segments.push(`${minutes}m`);
+
+  return sign >= 0 ? `in ${segments.join(" ")}` : `${segments.join(" ")} ago`;
+}
+
+export function getRelativeTimeDetailed(iso: string | null): string {
+  if (!iso) return "";
+  try {
+    const date = new Date(iso);
+    const now = new Date();
+    const diffSeconds = Math.floor((date.getTime() - now.getTime()) / 1000);
+    return formatRelativeDetailedSeconds(diffSeconds);
   } catch {
     return "";
   }

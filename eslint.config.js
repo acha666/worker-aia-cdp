@@ -1,5 +1,7 @@
 import js from "@eslint/js";
 import typescriptEslint from "typescript-eslint";
+import vueEslintParser from "vue-eslint-parser";
+import vuePlugin from "eslint-plugin-vue";
 
 export default [
   {
@@ -11,7 +13,6 @@ export default [
       "coverage/**",
       "public/**",
       "tests/web/**",
-      "src/web/**/*.vue", // Vue files require vue-eslint-parser; not configured
     ],
   },
   js.configs.recommended,
@@ -22,6 +23,32 @@ export default [
       globals: {
         console: "readonly",
         process: "readonly",
+      },
+    },
+  },
+  {
+    // Browser globals for Vue frontend
+    files: ["src/web/**/*.ts", "src/web/**/*.tsx", "src/web/**/*.vue"],
+    languageOptions: {
+      globals: {
+        // Browser APIs
+        window: "readonly",
+        document: "readonly",
+        navigator: "readonly",
+        HTMLElement: "readonly",
+        HTMLTextAreaElement: "readonly",
+        HTMLInputElement: "readonly",
+        DragEvent: "readonly",
+        Event: "readonly",
+        File: "readonly",
+        FileList: "readonly",
+        TextDecoder: "readonly",
+        Blob: "readonly",
+        Uint8Array: "readonly",
+        fetch: "readonly",
+        localStorage: "readonly",
+        sessionStorage: "readonly",
+        console: "readonly",
       },
     },
   },
@@ -142,6 +169,31 @@ export default [
     files: ["vite.config.js", "eslint.config.js"],
     rules: {
       "no-undef": "off",
+    },
+  },
+  {
+    // Vue single-file components
+    files: ["src/web/**/*.vue"],
+    languageOptions: {
+      parser: vueEslintParser,
+      parserOptions: {
+        parser: typescriptEslint.parser,
+        ecmaVersion: 2022,
+        sourceType: "module",
+      },
+      globals: {
+        console: "readonly",
+      },
+    },
+    plugins: {
+      vue: vuePlugin,
+    },
+    rules: {
+      ...vuePlugin.configs.recommended.rules,
+      "vue/multi-word-component-names": "off",
+      "vue/no-v-html": "warn",
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-non-null-assertion": "warn",
     },
   },
 ];

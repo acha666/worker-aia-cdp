@@ -8,6 +8,7 @@ const pemContent = ref("");
 const binaryData = ref<ArrayBuffer | null>(null);
 const dragActive = ref(false);
 const fileFormat = ref<"pem" | "der" | "unknown">("unknown");
+const textareaRef = ref<HTMLTextAreaElement | null>(null);
 
 const isValid = computed(() => {
   // DER format is valid if we have binary data
@@ -113,6 +114,10 @@ async function processFile(file: File) {
     store.uploadError = "Failed to read file";
   }
 }
+
+function focusTextarea() {
+  textareaRef.value?.focus();
+}
 </script>
 
 <template>
@@ -185,23 +190,25 @@ async function processFile(file: File) {
       </div>
     </div>
 
-    <form @submit.prevent="handleSubmit" class="space-y-4">
+    <form class="space-y-4" @submit.prevent="handleSubmit">
       <!-- Drop zone / textarea -->
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-2"> PEM Content </label>
         <div
+          class="relative rounded-lg"
           @dragover="handleDragOver"
           @dragleave="handleDragLeave"
           @drop="handleDrop"
-          :class="[
-            'relative border-2 border-dashed rounded-lg transition-colors',
-            dragActive ? 'border-blue-400 bg-blue-50' : 'border-gray-300',
-          ]"
+          @click="focusTextarea"
         >
           <textarea
+            ref="textareaRef"
             v-model="pemContent"
             rows="8"
-            class="w-full px-3 py-2 text-sm font-mono bg-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg"
+            :class="[
+              'w-full px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg outline outline-2 outline-dashed outline-offset-[-1px] transition-colors',
+              dragActive ? 'outline-blue-400 bg-blue-50' : 'outline-gray-300 bg-white',
+            ]"
             placeholder="Paste or drag and drop a .crl/.pem/.der file here, or type PEM content directly"
           ></textarea>
           <!-- Hidden file upload input - positioned in corner -->
@@ -217,7 +224,7 @@ async function processFile(file: File) {
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            <input type="file" accept=".crl,.pem,.der" @change="handleFileSelect" class="hidden" />
+            <input type="file" accept=".crl,.pem,.der" class="hidden" @change="handleFileSelect" />
           </label>
         </div>
       </div>
@@ -227,7 +234,7 @@ async function processFile(file: File) {
         <p v-if="!isValid && pemContent.trim()" class="text-sm text-red-600">
           Invalid PEM format. Must contain X509 CRL markers.
         </p>
-        <p v-else-if="!isValid && !binaryData" class="text-sm text-red-600">
+        <p v-else-if="!isValid && !binaryData && pemContent.trim()" class="text-sm text-red-600">
           No valid CRL content detected.
         </p>
         <p v-else class="text-sm text-gray-500">

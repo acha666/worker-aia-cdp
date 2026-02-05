@@ -15,6 +15,7 @@ const extensionName = computed(() => {
 
 const isParsed = computed(() => props.extension.parseStatus === "parsed");
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ParsedExtension = Record<string, any> & { extensionType?: string };
 
 const parsed = computed<ParsedExtension | null>(() => {
@@ -35,8 +36,8 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
 <template>
   <div class="border border-gray-200 rounded bg-white">
     <button
-      @click="expanded = !expanded"
       class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+      @click="expanded = !expanded"
     >
       <div class="flex items-center gap-2">
         <span class="text-sm font-medium text-gray-900">{{ extensionName }}</span>
@@ -54,7 +55,10 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
         </span>
       </div>
       <svg
-        :class="['w-4 h-4 text-gray-400 transition-transform', expanded ? 'rotate-180' : '']"
+        :class="[
+          'w-4 h-4 text-gray-400 transition-transform',
+          expanded ? 'rotate-0' : '-rotate-90',
+        ]"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -76,7 +80,7 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
           <!-- OID -->
           <div class="mb-2">
             <span class="text-gray-500">OID:</span>
-            <code class="ml-1 text-xs text-gray-700">{{ extension.extnID.oid }}</code>
+            <code class="ml-1 text-sm text-gray-700">{{ extension.extnID.oid }}</code>
           </div>
 
           <!-- Parsed content -->
@@ -148,7 +152,7 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
                     class="ml-1"
                     :value="parsed.keyIdentifier"
                     variant="grouped"
-                    value-class="text-xs text-gray-700 break-all font-mono"
+                    value-class="text-sm text-gray-700 break-all font-mono"
                   />
                 </div>
               </div>
@@ -162,7 +166,7 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
                   class="ml-1"
                   :value="parsed.keyIdentifier"
                   variant="grouped"
-                  value-class="text-xs text-gray-700 break-all font-mono"
+                  value-class="text-sm text-gray-700 break-all font-mono"
                 />
               </div>
             </template>
@@ -255,7 +259,7 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
                 class="mt-1 p-2 bg-gray-50 rounded text-gray-600 break-all max-h-32 overflow-auto"
                 :value="extension.extnValue.hex"
                 variant="grouped"
-                value-class="text-xs font-mono"
+                value-class="text-sm font-mono"
               />
             </details>
           </template>

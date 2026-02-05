@@ -19,7 +19,7 @@ const props = withDefaults(
     separator: ":",
     showCopy: true,
     block: false,
-    valueClass: "font-mono text-xs break-all",
+    valueClass: "font-mono text-sm break-all",
     fallback: "",
   }
 );
@@ -40,7 +40,7 @@ const copyValue = computed(() => {
 const rootTag = computed(() => (props.block ? "div" : "span"));
 const rootClasses = computed(() => [
   props.block ? "flex" : "inline-flex",
-  "items-start",
+  "items-baseline",
   "gap-1",
   "min-w-0",
 ]);
@@ -52,9 +52,9 @@ const rootClasses = computed(() => [
     <button
       v-if="showCopy && copyValue"
       type="button"
-      @click="copyToClipboard(copyValue)"
-      class="text-gray-400 hover:text-gray-600"
+      class="inline-flex items-baseline leading-none text-gray-400 hover:text-gray-600"
       title="Copy"
+      @click="copyToClipboard(copyValue)"
     >
       <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path

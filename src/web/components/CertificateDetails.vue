@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { CertificateDetail } from "@contracts/schemas";
+import type { CertificateDetail, Name } from "@contracts/schemas";
 import ExtensionView from "./ExtensionView.vue";
 import HexValue from "./HexValue.vue";
-import { formatDateReadable, formatTimezoneOffset, getRelativeTime } from "../utils/dates";
-import { computeCertificateValidity } from "../utils/status";
-import { formatName } from "../utils/x509";
+import { formatDateTimeWithZone, getRelativeTimeDetailed } from "../utils/dates";
+import { computeCertificateStatus } from "../utils/status";
 
 const props = defineProps<{
   certificate: CertificateDetail;
@@ -30,34 +29,74 @@ const publicKeyInfo = computed(() => {
   return { type: parsed.type ?? "unknown" };
 });
 
-const validityInfo = computed(() => {
+const EMPTY_VALUE = "(empty)";
+
+function displayValue(value?: string | null): string {
+  if (!value) return EMPTY_VALUE;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : EMPTY_VALUE;
+}
+
+function mapNameFields(name: Name) {
+  return [
+    { label: "Common Name", value: displayValue(name.commonName) },
+    { label: "Organization", value: displayValue(name.organization) },
+    { label: "Organizational Unit", value: displayValue(name.organizationalUnit) },
+    { label: "Country Name", value: displayValue(name.country) },
+    { label: "State/Province", value: displayValue(name.stateOrProvince) },
+    { label: "Locality", value: displayValue(name.locality) },
+  ];
+}
+
+const subjectFields = computed(() => mapNameFields(props.certificate.tbsCertificate.subject));
+const issuerFields = computed(() => mapNameFields(props.certificate.tbsCertificate.issuer));
+
+const validityDates = computed(() => {
   const { notBefore, notAfter } = props.certificate.tbsCertificate.validity;
-  if (!notBefore?.iso || !notAfter?.iso) {
-    return { display: "N/A", relative: "" };
-  }
-
-  const beforeDate = new Date(notBefore.iso);
-  const afterDate = new Date(notAfter.iso);
-  const tz = formatTimezoneOffset(beforeDate);
-
-  const before = formatDateReadable(notBefore.iso);
-  const after = formatDateReadable(notAfter.iso);
-  const relative = getRelativeTime(notAfter.iso);
-
-  const display = `${before} · ${after} (${tz})`;
-
-  return { display, relative };
+  return {
+    notBefore: formatDateTimeWithZone(notBefore?.iso ?? null),
+    notAfter: formatDateTimeWithZone(notAfter?.iso ?? null),
+  };
 });
 
-const validityStats = computed(() => {
+const validityStatus = computed(() => {
   const { notBefore, notAfter } = props.certificate.tbsCertificate.validity;
-  return computeCertificateValidity(notBefore?.iso, notAfter?.iso);
+  const status = computeCertificateStatus(notBefore?.iso, notAfter?.iso);
+  if (status.state === "expired") {
+    return {
+      label: "Expired",
+      detail: getRelativeTimeDetailed(notAfter?.iso ?? null),
+      state: status.state,
+    };
+  }
+  if (status.state === "not-yet-valid") {
+    return {
+      label: "Not yet valid",
+      detail: getRelativeTimeDetailed(notBefore?.iso ?? null),
+      state: status.state,
+    };
+  }
+  return {
+    label: "Active",
+    detail: getRelativeTimeDetailed(notAfter?.iso ?? null),
+    state: status.state,
+  };
+});
+
+const sortedExtensions = computed(() => {
+  const items = props.certificate.tbsCertificate.extensions?.items ?? [];
+  return [...items].sort((a, b) => {
+    if (a.critical !== b.critical) return a.critical ? -1 : 1;
+    const aName = a.extnID.name || a.extnID.oid;
+    const bName = b.extnID.name || b.extnID.oid;
+    return aName.localeCompare(bName);
+  });
 });
 </script>
 
 <template>
   <div class="space-y-6">
-    <!-- Basic Info -->
+    <!-- Certificate Information -->
     <section>
       <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -70,46 +109,61 @@ const validityStats = computed(() => {
         </svg>
         Certificate Information
       </h4>
-      <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-        <div>
-          <dt class="text-gray-500">Version</dt>
-          <dd class="text-gray-900 font-mono">
-            {{ certificate.tbsCertificate.version.display }}
-          </dd>
+      <div class="space-y-4">
+        <dl class="space-y-2 text-sm">
+          <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">X.509 Version</dt>
+            <dd class="text-gray-900 font-medium">
+              {{ certificate.tbsCertificate.version.display }}
+            </dd>
+          </div>
+          <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Serial Number</dt>
+            <dd class="text-gray-900">
+              <HexValue
+                :value="certificate.tbsCertificate.serialNumber.hex"
+                variant="plain"
+                value-class="font-mono text-sm break-all"
+              />
+            </dd>
+          </div>
+        </dl>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="border border-gray-200 rounded bg-gray-50/60 p-3">
+            <h5 class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+              Subject
+            </h5>
+            <dl class="space-y-2 text-sm">
+              <div
+                v-for="field in subjectFields"
+                :key="field.label"
+                class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline"
+              >
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  {{ field.label }}
+                </dt>
+                <dd class="text-gray-900 font-medium">{{ field.value }}</dd>
+              </div>
+            </dl>
+          </div>
+          <div class="border border-gray-200 rounded bg-gray-50/60 p-3">
+            <h5 class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Issuer</h5>
+            <dl class="space-y-2 text-sm">
+              <div
+                v-for="field in issuerFields"
+                :key="field.label"
+                class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline"
+              >
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  {{ field.label }}
+                </dt>
+                <dd class="text-gray-900 font-medium">{{ field.value }}</dd>
+              </div>
+            </dl>
+          </div>
         </div>
-        <div>
-          <dt class="text-gray-500">Serial Number</dt>
-          <dd class="text-gray-900">
-            <HexValue
-              :value="certificate.tbsCertificate.serialNumber.hex"
-              variant="plain"
-              value-class="font-mono text-xs break-all"
-            />
-          </dd>
-        </div>
-        <div class="md:col-span-2">
-          <dt class="text-gray-500">Subject</dt>
-          <dd class="text-gray-900 font-mono text-xs break-all">
-            {{ formatName(certificate.tbsCertificate.subject) }}
-          </dd>
-        </div>
-        <div class="md:col-span-2">
-          <dt class="text-gray-500">Issuer</dt>
-          <dd class="text-gray-900 font-mono text-xs break-all">
-            {{ formatName(certificate.tbsCertificate.issuer) }}
-          </dd>
-        </div>
-        <div>
-          <dt class="text-gray-500">Signature Algorithm</dt>
-          <dd class="text-gray-900">
-            {{
-              certificate.signatureAlgorithm?.algorithm?.name ||
-              certificate.signatureAlgorithm?.algorithm?.oid ||
-              "Unknown"
-            }}
-          </dd>
-        </div>
-      </dl>
+      </div>
     </section>
 
     <!-- Validity -->
@@ -123,25 +177,32 @@ const validityStats = computed(() => {
             d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
           />
         </svg>
-        Validity Period
+        Validity
       </h4>
-      <div class="text-sm text-gray-700 space-y-1">
-        <div>
-          From {{ validityInfo.display }}
-          <span v-if="validityInfo.relative" class="text-blue-700 ml-1">
-            ({{ validityInfo.relative }})
-          </span>
+      <dl class="space-y-2 text-sm">
+        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Not Before</dt>
+          <dd class="text-gray-900 font-medium">{{ validityDates.notBefore }}</dd>
         </div>
-        <div class="text-gray-600">
-          <span class="font-medium">{{ validityStats.validityPeriodDays ?? "N/A" }} days</span>
-          total ·
-          <span class="font-medium">{{ validityStats.daysRemaining ?? "Expired" }} days</span>
-          remaining
+        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Not After</dt>
+          <dd class="text-gray-900 font-medium">{{ validityDates.notAfter }}</dd>
         </div>
-      </div>
+        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</dt>
+          <dd class="text-gray-900 font-medium">
+            <span :class="validityStatus.state === 'valid' ? 'text-green-700' : 'text-gray-900'">
+              {{ validityStatus.label }}
+            </span>
+            <span v-if="validityStatus.detail" class="text-gray-600">
+              ({{ validityStatus.detail }})
+            </span>
+          </dd>
+        </div>
+      </dl>
     </section>
 
-    <!-- Public Key -->
+    <!-- Cryptography -->
     <section>
       <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -152,12 +213,26 @@ const validityStats = computed(() => {
             d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
           />
         </svg>
-        Public Key
+        Cryptography
       </h4>
-      <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-        <div>
-          <dt class="text-gray-500">Algorithm</dt>
-          <dd class="text-gray-900">
+      <dl class="space-y-2 text-sm">
+        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+            Signature Algorithm
+          </dt>
+          <dd class="text-gray-900 font-medium">
+            {{
+              certificate.signatureAlgorithm?.algorithm?.name ||
+              certificate.signatureAlgorithm?.algorithm?.oid ||
+              "Unknown"
+            }}
+          </dd>
+        </div>
+        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+            Public Key Algorithm
+          </dt>
+          <dd class="text-gray-900 font-medium">
             {{
               certificate.tbsCertificate.subjectPublicKeyInfo.algorithm?.algorithm?.name ||
               certificate.tbsCertificate.subjectPublicKeyInfo.algorithm?.algorithm?.oid ||
@@ -165,15 +240,39 @@ const validityStats = computed(() => {
             }}
           </dd>
         </div>
-        <div v-if="publicKeyInfo">
+        <div v-if="publicKeyInfo" class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
           <template v-if="publicKeyInfo.type === 'RSA'">
-            <dt class="text-gray-500">Key Size</dt>
-            <dd class="text-gray-900">{{ publicKeyInfo.keySize }} bits</dd>
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Key Size</dt>
+            <dd class="text-gray-900 font-medium">{{ publicKeyInfo.keySize }} bits</dd>
           </template>
           <template v-else-if="publicKeyInfo.type === 'EC'">
-            <dt class="text-gray-500">Curve</dt>
-            <dd class="text-gray-900">{{ publicKeyInfo.curve }}</dd>
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Curve</dt>
+            <dd class="text-gray-900 font-medium">{{ publicKeyInfo.curve }}</dd>
           </template>
+        </div>
+        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+            Public Key SHA-1
+          </dt>
+          <dd class="text-gray-900">
+            <HexValue
+              :value="certificate.tbsCertificate.subjectPublicKeyInfo.fingerprints.sha1"
+              variant="grouped"
+              value-class="font-mono text-sm break-all"
+            />
+          </dd>
+        </div>
+        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+            Public Key SHA-256
+          </dt>
+          <dd class="text-gray-900">
+            <HexValue
+              :value="certificate.tbsCertificate.subjectPublicKeyInfo.fingerprints.sha256"
+              variant="grouped"
+              value-class="font-mono text-sm break-all"
+            />
+          </dd>
         </div>
       </dl>
     </section>
@@ -192,23 +291,23 @@ const validityStats = computed(() => {
         Fingerprints
       </h4>
       <dl class="space-y-2 text-sm">
-        <div>
-          <dt class="text-gray-500">SHA-1</dt>
+        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">SHA-1</dt>
           <dd class="text-gray-900">
             <HexValue
               :value="certificate.fingerprints.sha1"
               variant="grouped"
-              value-class="font-mono text-xs break-all"
+              value-class="font-mono text-sm break-all"
             />
           </dd>
         </div>
-        <div>
-          <dt class="text-gray-500">SHA-256</dt>
+        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">SHA-256</dt>
           <dd class="text-gray-900">
             <HexValue
               :value="certificate.fingerprints.sha256"
               variant="grouped"
-              value-class="font-mono text-xs break-all"
+              value-class="font-mono text-sm break-all"
             />
           </dd>
         </div>
@@ -216,7 +315,7 @@ const validityStats = computed(() => {
     </section>
 
     <!-- Extensions -->
-    <section v-if="certificate.tbsCertificate.extensions?.items?.length">
+    <section v-if="sortedExtensions.length">
       <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -226,14 +325,10 @@ const validityStats = computed(() => {
             d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
           />
         </svg>
-        Extensions ({{ certificate.tbsCertificate.extensions?.items?.length }})
+        Extensions ({{ sortedExtensions.length }})
       </h4>
       <div class="space-y-2">
-        <ExtensionView
-          v-for="ext in certificate.tbsCertificate.extensions?.items ?? []"
-          :key="ext.extnID.oid"
-          :extension="ext"
-        />
+        <ExtensionView v-for="ext in sortedExtensions" :key="ext.extnID.oid" :extension="ext" />
       </div>
     </section>
   </div>

@@ -111,10 +111,10 @@ const status = computed(() =>
       <div class="mt-3 flex items-center justify-between gap-2">
         <!-- Expand button -->
         <button
-          @click="toggle"
           class="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
           :aria-expanded="expanded"
           title="Toggle details"
+          @click="toggle"
         >
           <svg
             :class="['w-5 h-5 transition-transform', expanded ? 'rotate-0' : '-rotate-90']"

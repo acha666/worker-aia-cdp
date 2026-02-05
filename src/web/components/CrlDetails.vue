@@ -1,45 +1,66 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { CrlDetail, Extension } from "@contracts/schemas";
+import type { CrlDetail, Extension, Name } from "@contracts/schemas";
 import ExtensionView from "./ExtensionView.vue";
 import HexValue from "./HexValue.vue";
-import { formatDateReadable, formatTimezoneOffset, getRelativeTime } from "../utils/dates";
-import { computeCrlValidity } from "../utils/status";
-import { formatName } from "../utils/x509";
+import { formatDateTimeWithZone, getRelativeTimeDetailed } from "../utils/dates";
+import { computeCrlStatus } from "../utils/status";
 
 const props = defineProps<{
   crl: CrlDetail;
 }>();
 
-const validityInfo = computed(() => {
-  const thisUpdate = props.crl.tbsCertList.thisUpdate?.iso;
-  const nextUpdate = props.crl.tbsCertList.nextUpdate?.iso;
+const EMPTY_VALUE = "(empty)";
 
-  if (!thisUpdate) {
-    return { display: "N/A", relative: "" };
-  }
+function displayValue(value?: string | null): string {
+  if (!value) return EMPTY_VALUE;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : EMPTY_VALUE;
+}
 
-  const thisDate = new Date(thisUpdate);
-  const tz = formatTimezoneOffset(thisDate);
+function mapNameFields(name: Name) {
+  return [
+    { label: "Common Name", value: displayValue(name.commonName) },
+    { label: "Organization", value: displayValue(name.organization) },
+    { label: "Organizational Unit", value: displayValue(name.organizationalUnit) },
+    { label: "Country Name", value: displayValue(name.country) },
+    { label: "State/Province", value: displayValue(name.stateOrProvince) },
+    { label: "Locality", value: displayValue(name.locality) },
+  ];
+}
 
-  const issued = formatDateReadable(thisUpdate);
-  const expires = nextUpdate ? formatDateReadable(nextUpdate) : "N/A";
-  const relative = nextUpdate ? getRelativeTime(nextUpdate) : "";
+const issuerFields = computed(() => mapNameFields(props.crl.tbsCertList.issuer));
 
-  let display = `Issued ${issued}`;
-  if (nextUpdate) {
-    display += ` · Until ${expires} (${tz})`;
-  } else {
-    display += ` (${tz})`;
-  }
-
-  return { display, relative };
+const validityDates = computed(() => {
+  const thisUpdate = props.crl.tbsCertList.thisUpdate?.iso ?? null;
+  const nextUpdate = props.crl.tbsCertList.nextUpdate?.iso ?? null;
+  return {
+    thisUpdate: formatDateTimeWithZone(thisUpdate),
+    nextUpdate: formatDateTimeWithZone(nextUpdate),
+  };
 });
 
-const validityStats = computed(() => {
-  const thisUpdate = props.crl.tbsCertList.thisUpdate?.iso;
-  const nextUpdate = props.crl.tbsCertList.nextUpdate?.iso;
-  return computeCrlValidity(thisUpdate, nextUpdate);
+const validityStatus = computed(() => {
+  const thisUpdate = props.crl.tbsCertList.thisUpdate?.iso ?? null;
+  const nextUpdate = props.crl.tbsCertList.nextUpdate?.iso ?? null;
+  const status = computeCrlStatus(thisUpdate, nextUpdate);
+  if (status.state === "expired") {
+    return { label: "Expired", detail: getRelativeTimeDetailed(nextUpdate) };
+  }
+  if (status.state === "stale") {
+    return { label: "Stale", detail: getRelativeTimeDetailed(nextUpdate) };
+  }
+  return { label: "Current", detail: getRelativeTimeDetailed(nextUpdate) };
+});
+
+const sortedExtensions = computed(() => {
+  const items = props.crl.tbsCertList.crlExtensions?.items ?? [];
+  return [...items].sort((a, b) => {
+    if (a.critical !== b.critical) return a.critical ? -1 : 1;
+    const aName = a.extnID.name || a.extnID.oid;
+    const bName = b.extnID.name || b.extnID.oid;
+    return aName.localeCompare(bName);
+  });
 });
 
 function getCrlReasonName(extension: Extension): string | null {
@@ -57,7 +78,7 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
 
 <template>
   <div class="space-y-6">
-    <!-- Basic Info -->
+    <!-- CRL Information -->
     <section>
       <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -70,35 +91,41 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
         </svg>
         CRL Information
       </h4>
-      <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-        <div v-if="crl.tbsCertList.version">
-          <dt class="text-gray-500">Version</dt>
-          <dd class="text-gray-900 font-mono">
-            {{ crl.tbsCertList.version.display }}
-          </dd>
-        </div>
+      <div class="space-y-4">
+        <dl class="space-y-2 text-sm">
+          <div
+            v-if="crl.tbsCertList.version"
+            class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline"
+          >
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Version</dt>
+            <dd class="text-gray-900 font-medium">
+              {{ crl.tbsCertList.version.display }}
+            </dd>
+          </div>
+          <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              Revoked Certificates
+            </dt>
+            <dd class="text-gray-900 font-medium">{{ revokedCount }}</dd>
+          </div>
+        </dl>
 
-        <div class="md:col-span-2">
-          <dt class="text-gray-500">Issuer</dt>
-          <dd class="text-gray-900 font-mono text-xs break-all">
-            {{ formatName(crl.tbsCertList.issuer) }}
-          </dd>
+        <div class="border border-gray-200 rounded bg-gray-50/60 p-3">
+          <h5 class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Issuer</h5>
+          <dl class="space-y-2 text-sm">
+            <div
+              v-for="field in issuerFields"
+              :key="field.label"
+              class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline"
+            >
+              <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                {{ field.label }}
+              </dt>
+              <dd class="text-gray-900 font-medium">{{ field.value }}</dd>
+            </div>
+          </dl>
         </div>
-        <div>
-          <dt class="text-gray-500">Signature Algorithm</dt>
-          <dd class="text-gray-900">
-            {{
-              crl.signatureAlgorithm?.algorithm?.name ||
-              crl.signatureAlgorithm?.algorithm?.oid ||
-              "Unknown"
-            }}
-          </dd>
-        </div>
-        <div>
-          <dt class="text-gray-500">Revoked Certificates</dt>
-          <dd class="text-gray-900">{{ revokedCount }}</dd>
-        </div>
-      </dl>
+      </div>
     </section>
 
     <!-- Validity -->
@@ -112,22 +139,56 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
             d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
           />
         </svg>
-        Validity Period
+        Validity
       </h4>
-      <div class="text-sm text-gray-700 space-y-1">
-        <div>
-          {{ validityInfo.display }}
-          <span v-if="validityInfo.relative" class="text-purple-700 ml-1">
-            ({{ validityInfo.relative }})
-          </span>
+      <dl class="space-y-2 text-sm">
+        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">This Update</dt>
+          <dd class="text-gray-900 font-medium">{{ validityDates.thisUpdate }}</dd>
         </div>
-        <div v-if="validityStats.validityPeriodHours" class="text-gray-600">
-          <span class="font-medium">{{ validityStats.validityPeriodHours }} hours</span>
-          total ·
-          <span class="font-medium">{{ validityStats.hoursRemaining ?? "Expired" }} hours</span>
-          remaining
+        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Next Update</dt>
+          <dd class="text-gray-900 font-medium">{{ validityDates.nextUpdate }}</dd>
         </div>
-      </div>
+        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</dt>
+          <dd class="text-gray-900 font-medium">
+            {{ validityStatus.label }}
+            <span v-if="validityStatus.detail" class="text-gray-600">
+              ({{ validityStatus.detail }})
+            </span>
+          </dd>
+        </div>
+      </dl>
+    </section>
+
+    <!-- Cryptography -->
+    <section>
+      <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+          />
+        </svg>
+        Cryptography
+      </h4>
+      <dl class="space-y-2 text-sm">
+        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+            Signature Algorithm
+          </dt>
+          <dd class="text-gray-900 font-medium">
+            {{
+              crl.signatureAlgorithm?.algorithm?.name ||
+              crl.signatureAlgorithm?.algorithm?.oid ||
+              "Unknown"
+            }}
+          </dd>
+        </div>
+      </dl>
     </section>
 
     <!-- Fingerprints -->
@@ -144,14 +205,14 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
         Fingerprints
       </h4>
       <dl class="space-y-2 text-sm">
-        <div>
-          <dt class="text-gray-500">SHA-1</dt>
+        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">SHA-1</dt>
           <dd class="text-gray-900">
             <HexValue :value="crl.fingerprints.sha1" variant="grouped" />
           </dd>
         </div>
-        <div>
-          <dt class="text-gray-500">SHA-256</dt>
+        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-start">
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">SHA-256</dt>
           <dd class="text-gray-900">
             <HexValue :value="crl.fingerprints.sha256" variant="grouped" />
           </dd>
@@ -196,7 +257,7 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
                 <HexValue
                   :value="cert.userCertificate.hex"
                   variant="plain"
-                  value-class="font-mono text-xs break-all"
+                  value-class="font-mono text-sm break-all"
                 />
               </td>
               <td class="px-3 py-2 text-gray-600">
@@ -225,7 +286,7 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
     </section>
 
     <!-- Extensions -->
-    <section v-if="crl.tbsCertList.crlExtensions?.items?.length">
+    <section v-if="sortedExtensions.length">
       <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -235,14 +296,10 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
             d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
           />
         </svg>
-        Extensions ({{ crl.tbsCertList.crlExtensions?.items?.length }})
+        Extensions ({{ sortedExtensions.length }})
       </h4>
       <div class="space-y-2">
-        <ExtensionView
-          v-for="ext in crl.tbsCertList.crlExtensions?.items || []"
-          :key="ext.extnID.oid"
-          :extension="ext"
-        />
+        <ExtensionView v-for="ext in sortedExtensions" :key="ext.extnID.oid" :extension="ext" />
       </div>
     </section>
   </div>
