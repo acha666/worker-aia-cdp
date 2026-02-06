@@ -5,37 +5,31 @@ export default {
   theme: {
     extend: {
       colors: {
-        // PKI-themed colors
-        pki: {
-          50: "#f0fdf4",
-          100: "#dcfce7",
-          200: "#bbf7d0",
-          300: "#86efac",
-          400: "#4ade80",
-          500: "#22c55e",
-          600: "#16a34a",
-          700: "#15803d",
-          800: "#166534",
-          900: "#14532d",
+        // Dark mode theme
+        dark: {
+          bg: "#0d1117",
+          surface: "#161b22",
+          border: "#30363d",
+          text: "#c9d1d9",
+          textMuted: "#8b949e",
         },
-      },
-      spacing: {
-        "safe-top": "env(safe-area-inset-top)",
-        "safe-bottom": "env(safe-area-inset-bottom)",
-        "safe-left": "env(safe-area-inset-left)",
-        "safe-right": "env(safe-area-inset-right)",
       },
     },
   },
   plugins: [],
   safelist: [
-    // Ensure dynamic classes are not purged
-    "text-yellow-600",
-    "text-green-600",
-    "text-red-600",
-    "text-gray-600",
-    "bg-yellow-50",
-    "bg-green-50",
-    "bg-red-50",
+    // Dynamic status badge colors (StatusBadge component)
+    "bg-green-100",
+    "text-green-700",
+    "border-green-300",
+    "bg-green-600",
+    "bg-red-100",
+    "text-red-700",
+    "border-red-300",
+    "bg-red-600",
+    "bg-yellow-100",
+    "text-yellow-700",
+    "border-yellow-300",
+    "bg-yellow-600",
   ],
 };

@@ -54,6 +54,8 @@ Individual checks are also available.
 
 ```bash
 npm run type-check
+npm run type-check:worker
+npm run type-check:web
 npm run lint
 npm run lint:fix
 npm run format:check

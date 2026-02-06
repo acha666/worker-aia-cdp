@@ -9,7 +9,11 @@ const props = defineProps<{
 
 <template>
   <div v-if="props.showLoading" class="flex items-center justify-center py-12">
-    <svg class="animate-spin h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24">
+    <svg
+      class="animate-spin h-8 w-8 text-blue-600 dark:text-blue-400"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
       <circle
         class="opacity-25"
         cx="12"
@@ -26,16 +30,19 @@ const props = defineProps<{
     </svg>
   </div>
 
-  <div v-else-if="props.error" class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+  <div
+    v-else-if="props.error"
+    class="bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded-lg p-4 text-red-700 dark:text-red-200"
+  >
     {{ props.error }}
   </div>
 
   <div
     v-else-if="props.isEmpty"
-    class="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center"
+    class="bg-gray-50 dark:bg-dark-surface border-rounded-base p-8 text-center"
   >
     <slot name="empty-icon" />
-    <p class="text-gray-500">{{ props.emptyText }}</p>
+    <p class="text-gray-500 dark:text-gray-400">{{ props.emptyText }}</p>
   </div>
 
   <div v-else>

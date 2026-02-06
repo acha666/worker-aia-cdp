@@ -42,20 +42,12 @@ const displayName = computed(() => {
 
 const downloadUrls = computed(() => {
   const baseUrl = props.certificate.downloadUrl;
-  const format = props.certificate.storage.format;
-
-  if (format === "pem") {
-    // Current is PEM, derive DER
-    const derUrl = baseUrl.replace(/\.pem$/, "").replace(/\.(crt|cer)$/, ".der");
-    return { der: derUrl, pem: baseUrl };
-  } else {
-    // Current is DER, derive PEM
-    const pemUrl = baseUrl
-      .replace(/\.der$/, ".der.pem")
-      .replace(/\.crt$/, ".crt.pem")
-      .replace(/\.cer$/, ".cer.pem");
-    return { der: baseUrl, pem: pemUrl };
-  }
+  // API reports canonical DER storage; derive PEM variant by extension.
+  const pemUrl = baseUrl
+    .replace(/\.der$/, ".der.pem")
+    .replace(/\.crt$/, ".crt.pem")
+    .replace(/\.cer$/, ".cer.pem");
+  return { der: baseUrl, pem: pemUrl };
 });
 
 const validityInfo = computed(() => {
@@ -74,31 +66,33 @@ const status = computed(() =>
 
 <template>
   <div
-    class="overflow-hidden bg-white border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-shadow border-b border-gray-200"
+    class="overflow-hidden bg-white dark:bg-dark-surface border-l-4 border-l-blue-500 dark:border-l-blue-400 shadow-sm hover:shadow-md transition-shadow border-b border-gray-200 dark:border-dark-border"
     :class="[props.isFirst ? 'rounded-t-lg' : '', props.isLast ? 'rounded-b-lg' : '']"
   >
     <!-- Header -->
-    <div class="p-4 bg-gradient-to-r from-blue-50 to-white">
+    <div
+      class="p-4 bg-gradient-to-r from-blue-50 dark:from-blue-950/30 to-white dark:to-dark-surface"
+    >
       <div class="flex items-start justify-between gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-2">
-            <h3 class="text-base font-bold text-gray-900 truncate">
+            <h3 class="text-base font-bold text-gray-900 dark:text-white truncate">
               {{ displayName }}
             </h3>
             <StatusBadge :state="status.state" type="certificate" />
           </div>
-          <p class="text-xs text-gray-600 truncate mb-3">
+          <p class="text-xs text-gray-600 dark:text-gray-400 truncate mb-3">
             Issuer: {{ certificate.summary.issuerCN || "Unknown" }}
           </p>
 
           <!-- Validity info - collapsed view only shows dates -->
-          <div class="text-xs text-gray-700 space-y-1">
+          <div class="text-xs text-gray-700 dark:text-dark-textMuted space-y-1">
             <div>
               <span class="font-medium">From</span> {{ validityInfo.from }} ·
               <span class="font-medium">Until</span> {{ validityInfo.to }}
               <span
                 v-if="validityInfo.remaining && status.state === 'valid'"
-                class="text-green-700"
+                class="text-green-700 dark:text-green-400"
               >
                 ({{ validityInfo.remaining }})
               </span>
@@ -111,7 +105,7 @@ const status = computed(() =>
       <div class="mt-3 flex items-center justify-between gap-2">
         <!-- Expand button -->
         <button
-          class="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+          class="inline-flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
           :aria-expanded="expanded"
           title="Toggle details"
           @click="toggle"
@@ -135,14 +129,14 @@ const status = computed(() =>
         <div class="flex items-center gap-2">
           <a
             :href="downloadUrls.der"
-            class="inline-flex items-center px-2.5 py-1 text-xs font-medium text-blue-600 border border-blue-600 rounded hover:bg-blue-50 transition-colors"
+            class="inline-flex items-center px-2.5 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 border border-blue-600 dark:border-blue-400 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
             download
           >
             DER
           </a>
           <a
             :href="downloadUrls.pem"
-            class="inline-flex items-center px-2.5 py-1 text-xs font-medium text-blue-600 border border-blue-600 rounded hover:bg-blue-50 transition-colors"
+            class="inline-flex items-center px-2.5 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 border border-blue-600 dark:border-blue-400 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
             download
           >
             PEM
@@ -161,9 +155,15 @@ const status = computed(() =>
       leave-to-class="opacity-0 max-h-0"
     >
       <div v-if="expanded" class="overflow-hidden">
-        <div class="border-t border-blue-200 p-4 bg-white">
+        <div
+          class="border-t border-blue-200 dark:border-blue-900/50 p-4 bg-white dark:bg-dark-surface"
+        >
           <div v-if="isLoading" class="flex items-center justify-center py-8">
-            <svg class="animate-spin h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24">
+            <svg
+              class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
               <circle
                 class="opacity-25"
                 cx="12"
@@ -178,10 +178,12 @@ const status = computed(() =>
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
               ></path>
             </svg>
-            <span class="ml-2 text-xs text-gray-600">Loading...</span>
+            <span class="ml-2 text-xs text-gray-600 dark:text-gray-400">Loading...</span>
           </div>
           <CertificateDetails v-else-if="detail" :certificate="detail" />
-          <div v-else class="text-center py-4 text-xs text-gray-500">Failed to load details</div>
+          <div v-else class="text-center py-4 text-xs text-gray-500 dark:text-gray-400">
+            Failed to load details
+          </div>
         </div>
       </div>
     </Transition>

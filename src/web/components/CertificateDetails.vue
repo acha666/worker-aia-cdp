@@ -98,7 +98,9 @@ const sortedExtensions = computed(() => {
   <div class="space-y-6">
     <!-- Certificate Information -->
     <section>
-      <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+      <h4
+        class="text-sm font-semibold text-gray-700 dark:text-dark-text mb-3 flex items-center gap-2"
+      >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
@@ -112,14 +114,22 @@ const sortedExtensions = computed(() => {
       <div class="space-y-4">
         <dl class="space-y-2 text-sm">
           <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">X.509 Version</dt>
-            <dd class="text-gray-900 font-medium">
+            <dt
+              class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
+            >
+              X.509 Version
+            </dt>
+            <dd class="text-gray-900 dark:text-white font-medium">
               {{ certificate.tbsCertificate.version.display }}
             </dd>
           </div>
           <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Serial Number</dt>
-            <dd class="text-gray-900">
+            <dt
+              class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
+            >
+              Serial Number
+            </dt>
+            <dd class="text-gray-900 dark:text-white">
               <HexValue
                 :value="certificate.tbsCertificate.serialNumber.hex"
                 variant="plain"
@@ -130,8 +140,12 @@ const sortedExtensions = computed(() => {
         </dl>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div class="border border-gray-200 rounded bg-gray-50/60 p-3">
-            <h5 class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+          <div
+            class="border border-gray-200 dark:border-dark-border rounded dark:bg-dark-surface/30 bg-gray-50/60 p-3"
+          >
+            <h5
+              class="text-xs font-semibold text-gray-700 dark:text-dark-text uppercase tracking-wide mb-2"
+            >
               Subject
             </h5>
             <dl class="space-y-2 text-sm">
@@ -140,25 +154,35 @@ const sortedExtensions = computed(() => {
                 :key="field.label"
                 class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline"
               >
-                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                <dt
+                  class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
+                >
                   {{ field.label }}
                 </dt>
-                <dd class="text-gray-900 font-medium">{{ field.value }}</dd>
+                <dd class="text-gray-900 dark:text-white font-medium">{{ field.value }}</dd>
               </div>
             </dl>
           </div>
-          <div class="border border-gray-200 rounded bg-gray-50/60 p-3">
-            <h5 class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Issuer</h5>
+          <div
+            class="border border-gray-200 dark:border-dark-border rounded dark:bg-dark-surface/30 bg-gray-50/60 p-3"
+          >
+            <h5
+              class="text-xs font-semibold text-gray-700 dark:text-dark-text uppercase tracking-wide mb-2"
+            >
+              Issuer
+            </h5>
             <dl class="space-y-2 text-sm">
               <div
                 v-for="field in issuerFields"
                 :key="field.label"
                 class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline"
               >
-                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                <dt
+                  class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
+                >
                   {{ field.label }}
                 </dt>
-                <dd class="text-gray-900 font-medium">{{ field.value }}</dd>
+                <dd class="text-gray-900 dark:text-white font-medium">{{ field.value }}</dd>
               </div>
             </dl>
           </div>
@@ -168,7 +192,9 @@ const sortedExtensions = computed(() => {
 
     <!-- Validity -->
     <section>
-      <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+      <h4
+        class="text-sm font-semibold text-gray-700 dark:text-dark-text mb-3 flex items-center gap-2"
+      >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
@@ -181,20 +207,32 @@ const sortedExtensions = computed(() => {
       </h4>
       <dl class="space-y-2 text-sm">
         <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Not Before</dt>
-          <dd class="text-gray-900 font-medium">{{ validityDates.notBefore }}</dd>
+          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            Not Before
+          </dt>
+          <dd class="text-gray-900 dark:text-white font-medium">{{ validityDates.notBefore }}</dd>
         </div>
         <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Not After</dt>
-          <dd class="text-gray-900 font-medium">{{ validityDates.notAfter }}</dd>
+          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            Not After
+          </dt>
+          <dd class="text-gray-900 dark:text-white font-medium">{{ validityDates.notAfter }}</dd>
         </div>
         <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</dt>
-          <dd class="text-gray-900 font-medium">
-            <span :class="validityStatus.state === 'valid' ? 'text-green-700' : 'text-gray-900'">
+          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            Status
+          </dt>
+          <dd class="text-gray-900 dark:text-white font-medium">
+            <span
+              :class="
+                validityStatus.state === 'valid'
+                  ? 'text-green-700 dark:text-green-400'
+                  : 'text-gray-900 dark:text-white'
+              "
+            >
               {{ validityStatus.label }}
             </span>
-            <span v-if="validityStatus.detail" class="text-gray-600">
+            <span v-if="validityStatus.detail" class="text-gray-600 dark:text-gray-400">
               ({{ validityStatus.detail }})
             </span>
           </dd>
@@ -204,7 +242,9 @@ const sortedExtensions = computed(() => {
 
     <!-- Cryptography -->
     <section>
-      <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+      <h4
+        class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2"
+      >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
@@ -217,10 +257,10 @@ const sortedExtensions = computed(() => {
       </h4>
       <dl class="space-y-2 text-sm">
         <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
             Signature Algorithm
           </dt>
-          <dd class="text-gray-900 font-medium">
+          <dd class="text-gray-900 dark:text-white font-medium">
             {{
               certificate.signatureAlgorithm?.algorithm?.name ||
               certificate.signatureAlgorithm?.algorithm?.oid ||
@@ -229,10 +269,10 @@ const sortedExtensions = computed(() => {
           </dd>
         </div>
         <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
             Public Key Algorithm
           </dt>
-          <dd class="text-gray-900 font-medium">
+          <dd class="text-gray-900 dark:text-white font-medium">
             {{
               certificate.tbsCertificate.subjectPublicKeyInfo.algorithm?.algorithm?.name ||
               certificate.tbsCertificate.subjectPublicKeyInfo.algorithm?.algorithm?.oid ||
@@ -242,19 +282,29 @@ const sortedExtensions = computed(() => {
         </div>
         <div v-if="publicKeyInfo" class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
           <template v-if="publicKeyInfo.type === 'RSA'">
-            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Key Size</dt>
-            <dd class="text-gray-900 font-medium">{{ publicKeyInfo.keySize }} bits</dd>
+            <dt
+              class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
+            >
+              Key Size
+            </dt>
+            <dd class="text-gray-900 dark:text-white font-medium">
+              {{ publicKeyInfo.keySize }} bits
+            </dd>
           </template>
           <template v-else-if="publicKeyInfo.type === 'EC'">
-            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Curve</dt>
-            <dd class="text-gray-900 font-medium">{{ publicKeyInfo.curve }}</dd>
+            <dt
+              class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
+            >
+              Curve
+            </dt>
+            <dd class="text-gray-900 dark:text-white font-medium">{{ publicKeyInfo.curve }}</dd>
           </template>
         </div>
         <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
             Public Key SHA-1
           </dt>
-          <dd class="text-gray-900">
+          <dd class="text-gray-900 dark:text-white">
             <HexValue
               :value="certificate.tbsCertificate.subjectPublicKeyInfo.fingerprints.sha1"
               variant="grouped"
@@ -263,10 +313,10 @@ const sortedExtensions = computed(() => {
           </dd>
         </div>
         <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
             Public Key SHA-256
           </dt>
-          <dd class="text-gray-900">
+          <dd class="text-gray-900 dark:text-white">
             <HexValue
               :value="certificate.tbsCertificate.subjectPublicKeyInfo.fingerprints.sha256"
               variant="grouped"
@@ -279,7 +329,9 @@ const sortedExtensions = computed(() => {
 
     <!-- Fingerprints -->
     <section>
-      <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+      <h4
+        class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2"
+      >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
@@ -292,8 +344,10 @@ const sortedExtensions = computed(() => {
       </h4>
       <dl class="space-y-2 text-sm">
         <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">SHA-1</dt>
-          <dd class="text-gray-900">
+          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            SHA-1
+          </dt>
+          <dd class="text-gray-900 dark:text-white">
             <HexValue
               :value="certificate.fingerprints.sha1"
               variant="grouped"
@@ -302,8 +356,10 @@ const sortedExtensions = computed(() => {
           </dd>
         </div>
         <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">SHA-256</dt>
-          <dd class="text-gray-900">
+          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            SHA-256
+          </dt>
+          <dd class="text-gray-900 dark:text-white">
             <HexValue
               :value="certificate.fingerprints.sha256"
               variant="grouped"
@@ -316,7 +372,9 @@ const sortedExtensions = computed(() => {
 
     <!-- Extensions -->
     <section v-if="sortedExtensions.length">
-      <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+      <h4
+        class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2"
+      >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"

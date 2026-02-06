@@ -2,6 +2,7 @@
 import { onMounted } from "vue";
 import { useCertificatesStore } from "./stores/certificates";
 import { useCrlsStore } from "./stores/crls";
+import { useTheme } from "./composables/useTheme";
 import CertificateCard from "./components/CertificateCard.vue";
 import CrlCard from "./components/CrlCard.vue";
 import CrlUpload from "./components/CrlUpload.vue";
@@ -9,6 +10,7 @@ import SectionState from "./components/SectionState.vue";
 
 const certificatesStore = useCertificatesStore();
 const crlsStore = useCrlsStore();
+useTheme();
 
 onMounted(async () => {
   await Promise.all([certificatesStore.fetchAll(), crlsStore.fetchAll()]);
@@ -16,11 +18,13 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-100">
+  <div class="min-h-screen bg-gray-50 dark:bg-dark-bg transition-colors">
     <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
+    <header
+      class="bg-white dark:bg-dark-surface shadow-sm border-b border-gray-200 dark:border-dark-border"
+    >
       <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <h1 class="text-2xl font-bold text-gray-900">PKI AIA/CDP</h1>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">PKI AIA/CDP</h1>
       </div>
     </header>
 
@@ -30,9 +34,12 @@ onMounted(async () => {
         <!-- Certificates Section -->
         <section>
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-semibold text-gray-900">Certificates (AIA)</h2>
-            <span v-if="!certificatesStore.loading" class="text-sm text-gray-500">
-              {{ certificatesStore.items.length }} certificate{{
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Certificates (AIA)</h2>
+            <span
+              v-if="!certificatesStore.loading"
+              class="text-sm text-gray-500 dark:text-gray-400"
+            >
+              {{ certificatesStore.items.length }} Item{{
                 certificatesStore.items.length !== 1 ? "s" : ""
               }}
             </span>
@@ -46,7 +53,7 @@ onMounted(async () => {
           >
             <template #empty-icon>
               <svg
-                class="w-12 h-12 mx-auto text-gray-400 mb-4"
+                class="w-12 h-12 mx-auto text-gray-400 dark:text-gray-500 mb-4"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -60,7 +67,7 @@ onMounted(async () => {
               </svg>
             </template>
 
-            <div class="border border-gray-200 rounded-lg overflow-hidden">
+            <div class="container-card-list">
               <CertificateCard
                 v-for="(cert, index) in certificatesStore.items"
                 :key="cert.id"
@@ -75,9 +82,9 @@ onMounted(async () => {
         <!-- CRLs Section -->
         <section>
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-semibold text-gray-900">CRLs (CDP)</h2>
-            <span v-if="!crlsStore.loading" class="text-sm text-gray-500">
-              {{ crlsStore.fullCrls.length }} CRL{{ crlsStore.fullCrls.length !== 1 ? "s" : "" }}
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">CRLs (CDP)</h2>
+            <span v-if="!crlsStore.loading" class="text-sm text-gray-500 dark:text-gray-400">
+              {{ crlsStore.fullCrls.length }} Item{{ crlsStore.fullCrls.length !== 1 ? "s" : "" }}
             </span>
           </div>
 
@@ -89,7 +96,7 @@ onMounted(async () => {
           >
             <template #empty-icon>
               <svg
-                class="w-12 h-12 mx-auto text-gray-400 mb-4"
+                class="w-12 h-12 mx-auto text-gray-400 dark:text-gray-500 mb-4"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -103,7 +110,7 @@ onMounted(async () => {
               </svg>
             </template>
 
-            <div class="border border-gray-200 rounded-lg overflow-hidden">
+            <div class="container-card-list">
               <CrlCard
                 v-for="(crl, index) in crlsStore.fullCrls"
                 :key="crl.id"
@@ -118,15 +125,15 @@ onMounted(async () => {
         <!-- Delta CRLs Section -->
         <section v-if="crlsStore.deltaCrls.length > 0">
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-semibold text-gray-900">Delta CRLs (Delta-CDP)</h2>
-            <span class="text-sm text-gray-500">
-              {{ crlsStore.deltaCrls.length }} delta{{
-                crlsStore.deltaCrls.length !== 1 ? "s" : ""
-              }}
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+              Delta CRLs (Delta-CDP)
+            </h2>
+            <span class="text-sm text-gray-500 dark:text-gray-400">
+              {{ crlsStore.deltaCrls.length }} Item{{ crlsStore.deltaCrls.length !== 1 ? "s" : "" }}
             </span>
           </div>
 
-          <div class="border border-gray-200 rounded-lg overflow-hidden">
+          <div class="container-card-list">
             <CrlCard
               v-for="(crl, index) in crlsStore.deltaCrls"
               :key="crl.id"
@@ -145,9 +152,11 @@ onMounted(async () => {
     </main>
 
     <!-- Footer -->
-    <footer class="border-t border-gray-200 bg-white mt-12">
+    <footer
+      class="border-t border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface mt-12"
+    >
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <p class="text-sm text-gray-500 text-center">
+        <p class="text-sm text-gray-500 dark:text-gray-400 text-center">
           PKI AIA/CDP Distribution Point · Powered by Cloudflare Workers
         </p>
       </div>

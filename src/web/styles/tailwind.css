@@ -9,7 +9,7 @@
   }
 
   body {
-    @apply text-gray-900 bg-gray-100;
+    @apply text-gray-900 bg-gray-50 dark:text-dark-text dark:bg-dark-bg;
   }
 }
 
@@ -20,11 +20,34 @@
   }
 
   .btn-secondary {
-    @apply px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
+    @apply px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:text-gray-200 dark:bg-dark-surface dark:border-dark-border dark:hover:bg-dark-surface;
   }
 
   .card {
-    @apply bg-white border border-gray-200 rounded-lg shadow-sm;
+    @apply bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-dark-surface dark:border-dark-border;
+  }
+
+  /* Card base styles for list items */
+  .card-item {
+    @apply overflow-hidden bg-white dark:bg-dark-surface shadow-sm hover:shadow-md transition-shadow border-b border-gray-200 dark:border-dark-border;
+  }
+
+  .card-item:first-child {
+    @apply rounded-t-lg;
+  }
+
+  .card-item:last-child {
+    @apply rounded-b-lg;
+  }
+
+  /* Card header with gradient */
+  .card-header {
+    @apply p-4 bg-gradient-to-r transition-colors;
+  }
+
+  /* Card content area */
+  .card-content {
+    @apply p-4 bg-white dark:bg-dark-surface border-t;
   }
 }
 
@@ -32,5 +55,24 @@
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  /* Border utilities */
+  .border-base {
+    @apply border border-gray-200 dark:border-dark-border;
+  }
+
+  .border-rounded-base {
+    @apply border-base rounded-lg;
+  }
+
+  /* Divider utilities */
+  .divider-base {
+    @apply border-t border-gray-200 dark:border-dark-border;
+  }
+
+  /* Container styles */
+  .container-card-list {
+    @apply border-rounded-base overflow-hidden;
   }
 }

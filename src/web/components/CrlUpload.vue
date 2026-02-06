@@ -121,9 +121,16 @@ function focusTextarea() {
 </script>
 
 <template>
-  <div class="card p-6">
-    <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-      <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <div
+    class="rounded-lg bg-white dark:bg-dark-surface shadow-sm p-6 border border-gray-200 dark:border-dark-border"
+  >
+    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+      <svg
+        class="w-5 h-5 text-blue-600 dark:text-blue-400"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
         <path
           stroke-linecap="round"
           stroke-linejoin="round"
@@ -137,11 +144,11 @@ function focusTextarea() {
     <!-- Success message -->
     <div
       v-if="store.lastUploadResult"
-      class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg"
+      class="mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg"
     >
       <div class="flex items-start gap-3">
         <svg
-          class="w-5 h-5 text-green-600 mt-0.5"
+          class="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -154,13 +161,13 @@ function focusTextarea() {
           />
         </svg>
         <div>
-          <p class="text-sm font-medium text-green-800">
+          <p class="text-sm font-medium text-green-800 dark:text-green-200">
             CRL
-            {{ store.lastUploadResult.status === "created" ? "uploaded" : "updated" }}
+            {{ store.lastUploadResult.replaced ? "updated" : "uploaded" }}
             successfully
           </p>
-          <p class="text-xs text-green-700 mt-1">
-            {{ store.lastUploadResult.type === "delta" ? "Delta" : "Full" }} CRL saved to
+          <p class="text-xs text-green-700 dark:text-green-300 mt-1">
+            {{ store.lastUploadResult.crlType === "delta" ? "Delta" : "Full" }} CRL saved to
             {{ store.lastUploadResult.id }}
           </p>
         </div>
@@ -168,10 +175,13 @@ function focusTextarea() {
     </div>
 
     <!-- Error message -->
-    <div v-if="store.uploadError" class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+    <div
+      v-if="store.uploadError"
+      class="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg"
+    >
       <div class="flex items-start gap-3">
         <svg
-          class="w-5 h-5 text-red-600 mt-0.5"
+          class="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -184,8 +194,8 @@ function focusTextarea() {
           />
         </svg>
         <div>
-          <p class="text-sm font-medium text-red-800">Upload failed</p>
-          <p class="text-xs text-red-700 mt-1">{{ store.uploadError }}</p>
+          <p class="text-sm font-medium text-red-800 dark:text-red-200">Upload failed</p>
+          <p class="text-xs text-red-700 dark:text-red-300 mt-1">{{ store.uploadError }}</p>
         </div>
       </div>
     </div>
@@ -193,7 +203,9 @@ function focusTextarea() {
     <form class="space-y-4" @submit.prevent="handleSubmit">
       <!-- Drop zone / textarea -->
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2"> PEM Content </label>
+        <label class="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2"
+          >> PEM Content
+        </label>
         <div
           class="relative rounded-lg"
           @dragover="handleDragOver"
@@ -206,14 +218,16 @@ function focusTextarea() {
             v-model="pemContent"
             rows="8"
             :class="[
-              'w-full px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg outline outline-2 outline-dashed outline-offset-[-1px] transition-colors',
-              dragActive ? 'outline-blue-400 bg-blue-50' : 'outline-gray-300 bg-white',
+              'w-full px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 rounded-lg outline-2 outline-dashed outline-offset-[-1px] transition-colors dark:text-white dark:caret-white',
+              dragActive
+                ? 'outline-blue-400 dark:outline-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                : 'outline-gray-300 dark:outline-dark-border bg-white dark:bg-dark-surface',
             ]"
             placeholder="Paste or drag and drop a .crl/.pem/.der file here, or type PEM content directly"
           ></textarea>
           <!-- Hidden file upload input - positioned in corner -->
           <label
-            class="absolute bottom-2 right-2 p-2 text-gray-500 hover:text-blue-600 cursor-pointer transition-colors"
+            class="absolute bottom-2 right-2 p-2 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors"
             title="Click to select a file"
           >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -231,19 +245,22 @@ function focusTextarea() {
 
       <!-- Submit -->
       <div class="flex items-center justify-between">
-        <p v-if="!isValid && pemContent.trim()" class="text-sm text-red-600">
+        <p v-if="!isValid && pemContent.trim()" class="text-sm text-red-600 dark:text-red-400">
           Invalid PEM format. Must contain X509 CRL markers.
         </p>
-        <p v-else-if="!isValid && !binaryData && pemContent.trim()" class="text-sm text-red-600">
+        <p
+          v-else-if="!isValid && !binaryData && pemContent.trim()"
+          class="text-sm text-red-600 dark:text-red-400"
+        >
           No valid CRL content detected.
         </p>
-        <p v-else class="text-sm text-gray-500">
+        <p v-else class="text-sm text-gray-500 dark:text-gray-400">
           {{ fileFormat === "der" ? "DER-formatted CRL" : "Paste or drop a PEM-encoded CRL" }}
         </p>
         <button
           type="submit"
           :disabled="!isValid || store.uploading"
-          class="btn-primary flex items-center gap-2"
+          class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <svg v-if="store.uploading" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
             <circle

@@ -41,17 +41,9 @@ const displayName = computed(() => {
 
 const downloadUrls = computed(() => {
   const baseUrl = props.crl.downloadUrl;
-  const format = props.crl.storage.format;
-
-  if (format === "pem") {
-    // Current is PEM, derive DER
-    const derUrl = baseUrl.replace(/\.pem$/, "");
-    return { der: derUrl, pem: baseUrl };
-  } else {
-    // Current is DER, derive PEM
-    const pemUrl = baseUrl + ".pem";
-    return { der: baseUrl, pem: pemUrl };
-  }
+  // API reports canonical DER storage; derive PEM by extension.
+  const pemUrl = baseUrl + ".pem";
+  return { der: baseUrl, pem: pemUrl };
 });
 
 const updateInfo = computed(() => {
@@ -71,8 +63,10 @@ const status = computed(() =>
 <template>
   <div
     :class="[
-      'overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow border-l-4 border-b border-gray-200',
-      crl.summary.crlType === 'delta' ? 'border-l-green-600' : 'border-l-purple-500',
+      'overflow-hidden bg-white dark:bg-dark-surface shadow-sm hover:shadow-md transition-shadow border-l-4 border-b border-gray-200 dark:border-dark-border',
+      crl.summary.crlType === 'delta'
+        ? 'border-l-green-500 dark:border-l-green-400'
+        : 'border-l-purple-500 dark:border-l-purple-400',
       props.isFirst ? 'rounded-t-lg' : '',
       props.isLast ? 'rounded-b-lg' : '',
     ]"
@@ -80,26 +74,28 @@ const status = computed(() =>
     <!-- Header -->
     <div
       :class="[
-        'p-4 bg-gradient-to-r to-white',
-        crl.summary.crlType === 'delta' ? 'from-green-50' : 'from-purple-50',
+        'p-4 bg-gradient-to-r to-white dark:to-dark-surface',
+        crl.summary.crlType === 'delta'
+          ? 'from-green-50 dark:from-green-950/20'
+          : 'from-purple-50 dark:from-purple-950/20',
       ]"
     >
       <div class="flex items-start justify-between gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-2">
-            <h3 class="text-base font-bold text-gray-900 truncate">
+            <h3 class="text-base font-bold text-gray-900 dark:text-white truncate">
               {{ displayName }}
             </h3>
             <StatusBadge :state="status.state" type="crl" />
           </div>
-          <p class="text-xs text-gray-600 mb-3">
+          <p class="text-xs text-gray-600 dark:text-gray-400 mb-3">
             <span v-if="crl.summary.crlNumber">CRL #{{ crl.summary.crlNumber }}</span>
             <span v-if="crl.summary.crlNumber" class="mx-1">·</span>
             <span>{{ crl.summary.revokedCount }} revoked</span>
           </p>
 
           <!-- Update info -->
-          <div class="text-xs text-gray-700 space-y-1">
+          <div class="text-xs text-gray-700 dark:text-dark-textMuted space-y-1">
             <div>
               <span class="font-medium">Issued</span> {{ updateInfo.issued }} ·
               <span class="font-medium">Next update</span>
@@ -108,7 +104,9 @@ const status = computed(() =>
                 v-if="status.state === 'current' && updateInfo.remaining"
                 :class="[
                   'ml-1',
-                  crl.summary.crlType === 'delta' ? 'text-green-700' : 'text-purple-700',
+                  crl.summary.crlType === 'delta'
+                    ? 'text-green-700 dark:text-green-400'
+                    : 'text-purple-700 dark:text-purple-400',
                 ]"
               >
                 ({{ updateInfo.remaining }})
@@ -125,8 +123,8 @@ const status = computed(() =>
           :class="[
             'inline-flex items-center transition-colors',
             crl.summary.crlType === 'delta'
-              ? 'text-green-600 hover:text-green-900'
-              : 'text-purple-600 hover:text-purple-900',
+              ? 'text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300'
+              : 'text-purple-600 dark:text-purple-400 hover:text-purple-900 dark:hover:text-purple-300',
           ]"
           :aria-expanded="expanded"
           title="Toggle details"
@@ -152,10 +150,10 @@ const status = computed(() =>
           <a
             :href="downloadUrls.der"
             :class="[
-              'inline-flex items-center px-2.5 py-1 text-xs font-medium border rounded hover:bg-opacity-5 transition-colors',
+              'inline-flex items-center px-2.5 py-1 text-xs font-medium border rounded transition-colors',
               crl.summary.crlType === 'delta'
-                ? 'text-green-600 border-green-600 hover:bg-green-50'
-                : 'text-purple-600 border-purple-600 hover:bg-purple-50',
+                ? 'text-green-600 dark:text-green-400 border-green-600 dark:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
+                : 'text-purple-600 dark:text-purple-400 border-purple-600 dark:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20',
             ]"
             download
           >
@@ -164,10 +162,10 @@ const status = computed(() =>
           <a
             :href="downloadUrls.pem"
             :class="[
-              'inline-flex items-center px-2.5 py-1 text-xs font-medium border rounded hover:bg-opacity-5 transition-colors',
+              'inline-flex items-center px-2.5 py-1 text-xs font-medium border rounded transition-colors',
               crl.summary.crlType === 'delta'
-                ? 'text-green-600 border-green-600 hover:bg-green-50'
-                : 'text-purple-600 border-purple-600 hover:bg-purple-50',
+                ? 'text-green-600 dark:text-green-400 border-green-600 dark:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
+                : 'text-purple-600 dark:text-purple-400 border-purple-600 dark:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20',
             ]"
             download
           >
@@ -189,15 +187,19 @@ const status = computed(() =>
       <div v-if="expanded" class="overflow-hidden">
         <div
           :class="[
-            'border-t p-4 bg-white',
-            crl.summary.crlType === 'delta' ? 'border-t-green-200' : 'border-t-purple-200',
+            'border-t p-4 bg-white dark:bg-dark-surface',
+            crl.summary.crlType === 'delta'
+              ? 'border-t-green-200 dark:border-t-green-900/50'
+              : 'border-t-purple-200 dark:border-t-purple-900/50',
           ]"
         >
           <div v-if="isLoading" class="flex items-center justify-center py-8">
             <svg
               :class="[
                 'animate-spin h-5 w-5',
-                crl.summary.crlType === 'delta' ? 'text-green-600' : 'text-purple-600',
+                crl.summary.crlType === 'delta'
+                  ? 'text-green-600 dark:text-green-400'
+                  : 'text-purple-600 dark:text-purple-400',
               ]"
               fill="none"
               viewBox="0 0 24 24"
@@ -216,10 +218,12 @@ const status = computed(() =>
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
               ></path>
             </svg>
-            <span class="ml-2 text-xs text-gray-600">Loading...</span>
+            <span class="ml-2 text-xs text-gray-600 dark:text-gray-400">Loading...</span>
           </div>
           <CrlDetails v-else-if="detail" :crl="detail" />
-          <div v-else class="text-center py-4 text-xs text-gray-500">Failed to load details</div>
+          <div v-else class="text-center py-4 text-xs text-gray-500 dark:text-gray-400">
+            Failed to load details
+          </div>
         </div>
       </div>
     </Transition>
