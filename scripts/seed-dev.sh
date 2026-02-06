@@ -4,11 +4,12 @@ set -e
 # Seed local R2 bucket with minimal test data for development
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEST_DIR="${SCRIPT_DIR}/../tests/fixtures"
+TEST_DIR="${SCRIPT_DIR}/../tests/fixtures/pki"
+CA_CERT_DIR="${TEST_DIR}/certs/ca"
 
 # Generate test data if not exists
-if [ ! -f "${TEST_DIR}/root-ca.crt" ]; then
-    echo "📦 Generating test data first..."
+if [ ! -f "${CA_CERT_DIR}/root-ca.cert.der" ]; then
+    echo "Generating test data first..."
     bash "${SCRIPT_DIR}/generate-test-data.sh"
 fi
 
@@ -19,14 +20,14 @@ echo "   (Workers can handle CRL uploads via API)"
 echo ""
 
 # Upload only core certificates (DER format)
-if [ -f "${TEST_DIR}/root-ca.der" ]; then
+if [ -f "${CA_CERT_DIR}/root-ca.cert.der" ]; then
     echo "  → ca/root-ca.crt"
-    npx wrangler r2 object put aia-cdp-local/ca/root-ca.crt --file="${TEST_DIR}/root-ca.der" --local --persist-to=.wrangler/state
+    npx wrangler r2 object put aia-cdp-local/ca/root-ca.crt --file="${CA_CERT_DIR}/root-ca.cert.der" --local --persist-to=.wrangler/state
 fi
 
-if [ -f "${TEST_DIR}/intermediate-ca.der" ]; then
+if [ -f "${CA_CERT_DIR}/intermediate-ca.cert.der" ]; then
     echo "  → ca/intermediate-ca.crt"
-    npx wrangler r2 object put aia-cdp-local/ca/intermediate-ca.crt --file="${TEST_DIR}/intermediate-ca.der" --local --persist-to=.wrangler/state
+    npx wrangler r2 object put aia-cdp-local/ca/intermediate-ca.crt --file="${CA_CERT_DIR}/intermediate-ca.cert.der" --local --persist-to=.wrangler/state
 fi
 
 echo ""

@@ -8,8 +8,8 @@ import { buildCertificateDetails } from "../../src/worker/pki/certs/details";
 import { parseCertificate } from "../../src/worker/pki/parsers";
 import { extractPEMBlock } from "../../src/worker/pki/crls/pem";
 
-const CERT_DER_URL = new URL("../fixtures/test-leaf.cert.der", import.meta.url);
-const CA_PEM_URL = new URL("../fixtures/test-ca.cert.pem", import.meta.url);
+const CERT_DER_URL = new URL("../fixtures/pki/certs/leaf/leaf-full.cert.der", import.meta.url);
+const CA_PEM_URL = new URL("../fixtures/pki/certs/ca/root-ca.cert.pem", import.meta.url);
 
 function toArrayBuffer(buffer: Buffer): ArrayBuffer {
   const view = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);

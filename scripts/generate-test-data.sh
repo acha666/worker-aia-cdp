@@ -1,195 +1,340 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-# Generate test PKI data for local development
-# Creates a CA, intermediate CA, leaf certificates, and various CRL test cases
+# Generate test PKI data for tests and local development
+# Includes certificates with minimal and maximal extensions plus CRL edge cases
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEST_DIR="${SCRIPT_DIR}/../tests/fixtures"
-mkdir -p "${TEST_DIR}"
+FIXTURE_ROOT="${SCRIPT_DIR}/../tests/fixtures"
+PKI_DIR="${FIXTURE_ROOT}/pki"
 
-cd "${TEST_DIR}"
+CERT_DIR="${PKI_DIR}/certs"
+CA_CERT_DIR="${CERT_DIR}/ca"
+LEAF_CERT_DIR="${CERT_DIR}/leaf"
 
-echo "🔐 Generating test PKI data with edge cases..."
+CRL_DIR="${PKI_DIR}/crls"
+CRL_FULL_DIR="${CRL_DIR}/full"
+CRL_DELTA_DIR="${CRL_DIR}/delta"
+CRL_BROKEN_DIR="${CRL_DIR}/broken"
+CRL_INVALID_DIR="${CRL_DIR}/invalid"
 
-# Root CA
-if [ ! -f "root-ca.key" ]; then
-    echo "Creating Root CA..."
-    openssl genrsa -out root-ca.key 2048
-    openssl req -new -x509 -days 3650 -key root-ca.key -out root-ca.crt \
-        -subj "/C=US/ST=Test/L=TestCity/O=TestOrg/OU=TestRoot/CN=Test Root CA"
-    openssl x509 -in root-ca.crt -outform DER -out root-ca.der
-fi
+SUPPORT_DIR="${PKI_DIR}/support"
+KEY_DIR="${SUPPORT_DIR}/keys"
+CSR_DIR="${SUPPORT_DIR}/csr"
+SRL_DIR="${SUPPORT_DIR}/srl"
+CA_DB_DIR="${SUPPORT_DIR}/ca-db"
 
-# Intermediate CA
-if [ ! -f "intermediate-ca.key" ]; then
-    echo "Creating Intermediate CA..."
-    openssl genrsa -out intermediate-ca.key 2048
-    openssl req -new -key intermediate-ca.key -out intermediate-ca.csr \
-        -subj "/C=US/ST=Test/L=TestCity/O=TestOrg/OU=TestIntermediate/CN=Test Intermediate CA"
-    
-    # Sign intermediate with root
-    openssl x509 -req -in intermediate-ca.csr -CA root-ca.crt -CAkey root-ca.key \
-        -CAcreateserial -out intermediate-ca.crt -days 1825 \
-        -extfile <(printf "basicConstraints=CA:TRUE\nkeyUsage=keyCertSign,cRLSign")
-    openssl x509 -in intermediate-ca.crt -outform DER -out intermediate-ca.der
-fi
+ROOT_DB_DIR="${CA_DB_DIR}/root"
+INTERMEDIATE_DB_DIR="${CA_DB_DIR}/intermediate"
+ROGUE_DB_DIR="${CA_DB_DIR}/rogue"
 
-# Leaf certificates
-if [ ! -f "leaf.key" ]; then
-    echo "Creating leaf certificates..."
-    # Valid leaf
-    openssl genrsa -out leaf.key 2048
-    openssl req -new -key leaf.key -out leaf.csr \
-        -subj "/C=US/ST=Test/L=TestCity/O=TestOrg/OU=TestUnit/CN=test.example.com"
-    openssl x509 -req -in leaf.csr -CA intermediate-ca.crt -CAkey intermediate-ca.key \
-        -CAcreateserial -out leaf.crt -days 365 \
-        -extfile <(printf "basicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth,clientAuth")
-    openssl x509 -in leaf.crt -outform DER -out leaf.der
-    
-    # Expired leaf
-    openssl genrsa -out leaf-expired.key 2048
-    openssl req -new -key leaf-expired.key -out leaf-expired.csr \
-        -subj "/C=US/ST=Test/L=TestCity/O=TestOrg/OU=TestUnit/CN=expired.example.com"
-    openssl x509 -req -in leaf-expired.csr -CA intermediate-ca.crt -CAkey intermediate-ca.key \
-        -CAcreateserial -out leaf-expired.crt -days -1 \
-        -extfile <(printf "basicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment") 2>/dev/null || true
-    [ -f "leaf-expired.crt" ] && openssl x509 -in leaf-expired.crt -outform DER -out leaf-expired.der
-    
-    # Revoked leaf (for CRL testing)
-    openssl genrsa -out leaf-revoked.key 2048
-    openssl req -new -key leaf-revoked.key -out leaf-revoked.csr \
-        -subj "/C=US/ST=Test/L=TestCity/O=TestOrg/OU=TestUnit/CN=revoked.example.com"
-    openssl x509 -req -in leaf-revoked.csr -CA intermediate-ca.crt -CAkey intermediate-ca.key \
-        -CAcreateserial -out leaf-revoked.crt -days 365 \
-        -extfile <(printf "basicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment")
-    openssl x509 -in leaf-revoked.crt -outform DER -out leaf-revoked.der
-fi
+ROOT_KEY="${KEY_DIR}/root-ca.key.pem"
+ROOT_CERT_PEM="${CA_CERT_DIR}/root-ca.cert.pem"
+ROOT_CERT_DER="${CA_CERT_DIR}/root-ca.cert.der"
 
-# Rogue CA (not in trust chain)
-if [ ! -f "rogue-ca.key" ]; then
-    echo "Creating rogue CA for testing..."
-    openssl genrsa -out rogue-ca.key 2048
-    openssl req -new -x509 -days 3650 -key rogue-ca.key -out rogue-ca.crt \
-        -subj "/C=XX/ST=Rogue/L=RogueCity/O=RogueOrg/OU=RogueUnit/CN=Rogue CA"
-    openssl x509 -in rogue-ca.crt -outform DER -out rogue-ca.der
-fi
+INTERMEDIATE_KEY="${KEY_DIR}/intermediate-ca.key.pem"
+INTERMEDIATE_CSR="${CSR_DIR}/intermediate-ca.csr.pem"
+INTERMEDIATE_CERT_PEM="${CA_CERT_DIR}/intermediate-ca.cert.pem"
+INTERMEDIATE_CERT_DER="${CA_CERT_DIR}/intermediate-ca.cert.der"
 
-# Setup CA database for proper CRL generation
-echo "Setting up CA database..."
-mkdir -p ca-db
-touch ca-db/index.txt
-echo "01" > ca-db/serial
-echo "01" > ca-db/crlnumber
+ROGUE_KEY="${KEY_DIR}/rogue-ca.key.pem"
+ROGUE_CERT_PEM="${CA_CERT_DIR}/rogue-ca.cert.pem"
+ROGUE_CERT_DER="${CA_CERT_DIR}/rogue-ca.cert.der"
 
-# Add revoked certificate to database
-if [ -f "leaf-revoked.crt" ]; then
-    SERIAL=$(openssl x509 -in leaf-revoked.crt -noout -serial | cut -d= -f2)
-    echo "R	$(date -u +%y%m%d%H%M%SZ -d '+365 days')	$(date -u +%y%m%d%H%M%SZ)	${SERIAL}	unknown	/C=US/ST=Test/L=TestCity/O=TestOrg/OU=TestUnit/CN=revoked.example.com" >> ca-db/index.txt
-fi
+LEAF_FULL_KEY="${KEY_DIR}/leaf-full.key.pem"
+LEAF_FULL_CSR="${CSR_DIR}/leaf-full.csr.pem"
+LEAF_FULL_CERT_PEM="${LEAF_CERT_DIR}/leaf-full.cert.pem"
+LEAF_FULL_CERT_DER="${LEAF_CERT_DIR}/leaf-full.cert.der"
 
-# Generate CRLs with different properties
-echo "Generating various CRLs..."
+LEAF_MIN_KEY="${KEY_DIR}/leaf-min.key.pem"
+LEAF_MIN_CSR="${CSR_DIR}/leaf-min.csr.pem"
+LEAF_MIN_CERT_PEM="${LEAF_CERT_DIR}/leaf-min.cert.pem"
+LEAF_MIN_CERT_DER="${LEAF_CERT_DIR}/leaf-min.cert.der"
 
-# 1. Valid root CA CRL (empty)
-openssl ca -gencrl -keyfile root-ca.key -cert root-ca.crt \
-    -out root-ca.crl -config <(cat <<EOF
-[ca]
+LEAF_REVOKED_KEY="${KEY_DIR}/leaf-revoked.key.pem"
+LEAF_REVOKED_CSR="${CSR_DIR}/leaf-revoked.csr.pem"
+LEAF_REVOKED_CERT_PEM="${LEAF_CERT_DIR}/leaf-revoked.cert.pem"
+LEAF_REVOKED_CERT_DER="${LEAF_CERT_DIR}/leaf-revoked.cert.der"
+
+LEAF_SHORT_KEY="${KEY_DIR}/leaf-short.key.pem"
+LEAF_SHORT_CSR="${CSR_DIR}/leaf-short.csr.pem"
+LEAF_SHORT_CERT_PEM="${LEAF_CERT_DIR}/leaf-short.cert.pem"
+LEAF_SHORT_CERT_DER="${LEAF_CERT_DIR}/leaf-short.cert.der"
+
+ROOT_CRL_PEM="${CRL_FULL_DIR}/root-ca.crl.pem"
+ROOT_CRL_DER="${CRL_FULL_DIR}/root-ca.crl.der"
+
+INTERMEDIATE_CRL_PEM="${CRL_FULL_DIR}/intermediate-ca.crl.pem"
+INTERMEDIATE_CRL_DER="${CRL_FULL_DIR}/intermediate-ca.crl.der"
+INTERMEDIATE_CRL_V2_PEM="${CRL_FULL_DIR}/intermediate-ca-v2.crl.pem"
+INTERMEDIATE_CRL_V2_DER="${CRL_FULL_DIR}/intermediate-ca-v2.crl.der"
+
+ROGUE_CRL_PEM="${CRL_FULL_DIR}/rogue-ca.crl.pem"
+ROGUE_CRL_DER="${CRL_FULL_DIR}/rogue-ca.crl.der"
+
+DELTA_CRL_1_PEM="${CRL_DELTA_DIR}/intermediate-ca-delta-1.crl.pem"
+DELTA_CRL_1_DER="${CRL_DELTA_DIR}/intermediate-ca-delta-1.dcrl"
+DELTA_CRL_2_PEM="${CRL_DELTA_DIR}/intermediate-ca-delta-2.crl.pem"
+DELTA_CRL_2_DER="${CRL_DELTA_DIR}/intermediate-ca-delta-2.dcrl"
+
+BROKEN_CRL_PEM="${CRL_BROKEN_DIR}/intermediate-ca-broken-sig.crl.pem"
+MALFORMED_CRL_PEM="${CRL_INVALID_DIR}/root-ca-malformed.crl.pem"
+INVALID_DER_CRL="${CRL_INVALID_DIR}/intermediate-ca-invalid.dcrl"
+
+ROOT_CRL_CONF="${SUPPORT_DIR}/root-crl.cnf"
+INTERMEDIATE_CRL_CONF="${SUPPORT_DIR}/intermediate-crl.cnf"
+ROGUE_CRL_CONF="${SUPPORT_DIR}/rogue-crl.cnf"
+
+mkdir -p "${FIXTURE_ROOT}"
+rm -rf "${PKI_DIR}"
+mkdir -p \
+    "${CA_CERT_DIR}" \
+    "${LEAF_CERT_DIR}" \
+    "${CRL_FULL_DIR}" \
+    "${CRL_DELTA_DIR}" \
+    "${CRL_BROKEN_DIR}" \
+    "${CRL_INVALID_DIR}" \
+    "${KEY_DIR}" \
+    "${CSR_DIR}" \
+    "${SRL_DIR}" \
+    "${ROOT_DB_DIR}" \
+    "${INTERMEDIATE_DB_DIR}" \
+    "${ROGUE_DB_DIR}"
+
+echo "1000" > "${SRL_DIR}/root-ca.srl"
+echo "2000" > "${SRL_DIR}/intermediate-ca.srl"
+
+init_ca_db() {
+    local db_dir="$1"
+    mkdir -p "${db_dir}/newcerts"
+    : > "${db_dir}/index.txt"
+    echo "1000" > "${db_dir}/serial"
+    echo "01" > "${db_dir}/crlnumber"
+}
+
+write_crl_config() {
+    local config="$1"
+    local db_dir="$2"
+    local key="$3"
+    local cert="$4"
+    cat > "${config}" <<EOF
+[ ca ]
 default_ca = CA_default
-[CA_default]
-database = ca-db/index.txt
-crlnumber = ca-db/crlnumber
+
+[ CA_default ]
+database = ${db_dir}/index.txt
+new_certs_dir = ${db_dir}/newcerts
+serial = ${db_dir}/serial
+crlnumber = ${db_dir}/crlnumber
+private_key = ${key}
+certificate = ${cert}
 default_md = sha256
 default_crl_days = 30
-EOF
-) 2>/dev/null || true
+unique_subject = no
+crl_extensions = crl_ext
 
-# 2. Valid intermediate CA CRL with revoked certificate
-openssl ca -gencrl -keyfile intermediate-ca.key -cert intermediate-ca.crt \
-    -out intermediate-ca.crl -config <(cat <<EOF
-[ca]
-default_ca = CA_default
-[CA_default]
-database = ca-db/index.txt
-crlnumber = ca-db/crlnumber
-default_md = sha256
-default_crl_days = 30
-EOF
-) 2>/dev/null || true
+[ crl_ext ]
+authorityKeyIdentifier = keyid:always
 
-# 3. CRL with different CRL number (v2)
-echo "02" > ca-db/crlnumber
-openssl ca -gencrl -keyfile intermediate-ca.key -cert intermediate-ca.crt \
-    -out intermediate-ca-v2.crl -config <(cat <<EOF
-[ca]
-default_ca = CA_default
-[CA_default]
-database = ca-db/index.txt
-crlnumber = ca-db/crlnumber
-default_md = sha256
-default_crl_days = 30
-EOF
-) 2>/dev/null || true
+[ crl_delta_base_1 ]
+authorityKeyIdentifier = keyid:always
+2.5.29.27 = critical,ASN1:INTEGER:1
 
-# 4. CRL from rogue CA (not in trust chain)
-openssl ca -gencrl -keyfile rogue-ca.key -cert rogue-ca.crt \
-    -out rogue-ca.crl -config <(cat <<EOF
-[ca]
-default_ca = CA_default
-[CA_default]
-database = ca-db/index.txt
-crlnumber = ca-db/crlnumber
-default_md = sha256
-default_crl_days = 30
+[ crl_delta_base_2 ]
+authorityKeyIdentifier = keyid:always
+2.5.29.27 = critical,ASN1:INTEGER:2
 EOF
-) 2>/dev/null || true
+}
 
-# 5. CRL with broken signature (valid CRL but signature corrupted)
-if [ -f "intermediate-ca.crl" ]; then
-    echo "Creating CRL with broken signature..."
-    cp intermediate-ca.crl intermediate-ca-broken-sig.crl
-    # Corrupt a byte in the signature portion (assuming PEM format)
-    if head -n 1 intermediate-ca-broken-sig.crl | grep -q "BEGIN"; then
-        # Get total lines and corrupt near the end (signature area)
-        TOTAL_LINES=$(wc -l < intermediate-ca-broken-sig.crl)
-        CORRUPT_LINE=$((TOTAL_LINES - 2))
-        sed -i "${CORRUPT_LINE}s/A/Z/" intermediate-ca-broken-sig.crl 2>/dev/null || \
-        sed -i '' "${CORRUPT_LINE}s/A/Z/" intermediate-ca-broken-sig.crl 2>/dev/null || true
+to_der_cert() {
+    local in_pem="$1"
+    local out_der="$2"
+    openssl x509 -in "${in_pem}" -outform DER -out "${out_der}"
+}
+
+to_der_crl() {
+    local in_pem="$1"
+    local out_der="$2"
+    openssl crl -in "${in_pem}" -outform DER -out "${out_der}"
+}
+
+corrupt_pem_signature() {
+    local source="$1"
+    local target="$2"
+    cp "${source}" "${target}"
+    if head -n 1 "${target}" | grep -q "BEGIN"; then
+        local total_lines
+        total_lines=$(wc -l < "${target}")
+        local corrupt_line=$((total_lines - 2))
+        sed -i "${corrupt_line}s/A/Z/" "${target}" 2>/dev/null || \
+            sed -i '' "${corrupt_line}s/A/Z/" "${target}" 2>/dev/null || true
     fi
+}
+
+echo "Generating test PKI data..."
+
+init_ca_db "${ROOT_DB_DIR}"
+init_ca_db "${INTERMEDIATE_DB_DIR}"
+init_ca_db "${ROGUE_DB_DIR}"
+
+write_crl_config "${ROOT_CRL_CONF}" "${ROOT_DB_DIR}" "${ROOT_KEY}" "${ROOT_CERT_PEM}"
+write_crl_config "${INTERMEDIATE_CRL_CONF}" "${INTERMEDIATE_DB_DIR}" "${INTERMEDIATE_KEY}" "${INTERMEDIATE_CERT_PEM}"
+write_crl_config "${ROGUE_CRL_CONF}" "${ROGUE_DB_DIR}" "${ROGUE_KEY}" "${ROGUE_CERT_PEM}"
+
+echo "Creating root CA..."
+openssl genrsa -out "${ROOT_KEY}" 2048
+openssl req -new -x509 -days 3650 -key "${ROOT_KEY}" -out "${ROOT_CERT_PEM}" \
+    -subj "/C=US/ST=Test/L=TestCity/O=TestOrg/OU=TestRoot/CN=Test Root CA" \
+    -addext "basicConstraints=critical,CA:TRUE" \
+    -addext "keyUsage=critical,keyCertSign,cRLSign" \
+    -addext "subjectKeyIdentifier=hash" \
+    -addext "authorityKeyIdentifier=keyid:always"
+to_der_cert "${ROOT_CERT_PEM}" "${ROOT_CERT_DER}"
+
+echo "Creating intermediate CA..."
+openssl genrsa -out "${INTERMEDIATE_KEY}" 2048
+openssl req -new -key "${INTERMEDIATE_KEY}" -out "${INTERMEDIATE_CSR}" \
+    -subj "/C=US/ST=Test/L=TestCity/O=TestOrg/OU=TestIntermediate/CN=Test Intermediate CA"
+openssl x509 -req -in "${INTERMEDIATE_CSR}" -CA "${ROOT_CERT_PEM}" -CAkey "${ROOT_KEY}" \
+    -CAserial "${SRL_DIR}/root-ca.srl" -out "${INTERMEDIATE_CERT_PEM}" -days 1825 \
+    -extfile <(cat <<EOF
+[v3_intermediate]
+basicConstraints=critical,CA:TRUE,pathlen:0
+keyUsage=critical,keyCertSign,cRLSign
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid,issuer
+crlDistributionPoints=URI:http://example.test/crl/root-ca.crl
+authorityInfoAccess=caIssuers;URI:http://example.test/ca/root-ca.crt
+EOF
+    ) -extensions v3_intermediate
+to_der_cert "${INTERMEDIATE_CERT_PEM}" "${INTERMEDIATE_CERT_DER}"
+
+echo "Creating rogue CA..."
+openssl genrsa -out "${ROGUE_KEY}" 2048
+openssl req -new -x509 -days 3650 -key "${ROGUE_KEY}" -out "${ROGUE_CERT_PEM}" \
+    -subj "/C=XX/ST=Rogue/L=RogueCity/O=RogueOrg/OU=RogueUnit/CN=Rogue CA" \
+    -addext "basicConstraints=critical,CA:TRUE" \
+    -addext "keyUsage=critical,keyCertSign,cRLSign" \
+    -addext "subjectKeyIdentifier=hash"
+to_der_cert "${ROGUE_CERT_PEM}" "${ROGUE_CERT_DER}"
+
+echo "Creating leaf certificates..."
+openssl genrsa -out "${LEAF_FULL_KEY}" 2048
+openssl req -new -key "${LEAF_FULL_KEY}" -out "${LEAF_FULL_CSR}" \
+    -subj "/C=US/ST=Test/L=TestCity/O=TestOrg/OU=TestUnit/CN=Leaf Certificate"
+openssl x509 -req -in "${LEAF_FULL_CSR}" -CA "${INTERMEDIATE_CERT_PEM}" -CAkey "${INTERMEDIATE_KEY}" \
+    -CAserial "${SRL_DIR}/intermediate-ca.srl" -out "${LEAF_FULL_CERT_PEM}" -days 365 \
+    -extfile <(cat <<EOF
+[v3_leaf_full]
+basicConstraints=critical,CA:FALSE
+keyUsage=critical,digitalSignature,keyEncipherment,keyAgreement
+extendedKeyUsage=serverAuth,clientAuth,codeSigning,emailProtection
+subjectAltName=DNS:leaf.example.test,DNS:leaf.example.com,IP:192.0.2.10,URI:http://example.test,email:leaf@example.test
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid,issuer
+crlDistributionPoints=URI:http://example.test/crl/intermediate-ca.crl
+authorityInfoAccess=OCSP;URI:http://ocsp.example.test,caIssuers;URI:http://example.test/ca/intermediate-ca.crt
+EOF
+    ) -extensions v3_leaf_full
+to_der_cert "${LEAF_FULL_CERT_PEM}" "${LEAF_FULL_CERT_DER}"
+
+openssl genrsa -out "${LEAF_MIN_KEY}" 2048
+openssl req -new -key "${LEAF_MIN_KEY}" -out "${LEAF_MIN_CSR}" \
+    -subj "/C=US/ST=Test/L=TestCity/O=TestOrg/OU=TestUnit/CN=Minimal Leaf"
+openssl x509 -req -in "${LEAF_MIN_CSR}" -CA "${INTERMEDIATE_CERT_PEM}" -CAkey "${INTERMEDIATE_KEY}" \
+    -CAserial "${SRL_DIR}/intermediate-ca.srl" -out "${LEAF_MIN_CERT_PEM}" -days 365 \
+    -extfile <(cat <<EOF
+[v3_leaf_min]
+basicConstraints=critical,CA:FALSE
+EOF
+    ) -extensions v3_leaf_min
+to_der_cert "${LEAF_MIN_CERT_PEM}" "${LEAF_MIN_CERT_DER}"
+
+openssl genrsa -out "${LEAF_REVOKED_KEY}" 2048
+openssl req -new -key "${LEAF_REVOKED_KEY}" -out "${LEAF_REVOKED_CSR}" \
+    -subj "/C=US/ST=Test/L=TestCity/O=TestOrg/OU=TestUnit/CN=Revoked Leaf"
+openssl x509 -req -in "${LEAF_REVOKED_CSR}" -CA "${INTERMEDIATE_CERT_PEM}" -CAkey "${INTERMEDIATE_KEY}" \
+    -CAserial "${SRL_DIR}/intermediate-ca.srl" -out "${LEAF_REVOKED_CERT_PEM}" -days 365 \
+    -extfile <(cat <<EOF
+[v3_leaf_revoked]
+basicConstraints=critical,CA:FALSE
+keyUsage=critical,digitalSignature,keyEncipherment
+EOF
+    ) -extensions v3_leaf_revoked
+to_der_cert "${LEAF_REVOKED_CERT_PEM}" "${LEAF_REVOKED_CERT_DER}"
+
+openssl genrsa -out "${LEAF_SHORT_KEY}" 2048
+openssl req -new -key "${LEAF_SHORT_KEY}" -out "${LEAF_SHORT_CSR}" \
+    -subj "/C=US/ST=Test/L=TestCity/O=TestOrg/OU=TestUnit/CN=Short Lived Leaf"
+openssl x509 -req -in "${LEAF_SHORT_CSR}" -CA "${INTERMEDIATE_CERT_PEM}" -CAkey "${INTERMEDIATE_KEY}" \
+    -CAserial "${SRL_DIR}/intermediate-ca.srl" -out "${LEAF_SHORT_CERT_PEM}" -days 2 \
+    -extfile <(cat <<EOF
+[v3_leaf_short]
+basicConstraints=critical,CA:FALSE
+keyUsage=critical,digitalSignature
+EOF
+    ) -extensions v3_leaf_short
+to_der_cert "${LEAF_SHORT_CERT_PEM}" "${LEAF_SHORT_CERT_DER}"
+
+revoked_serial=$(openssl x509 -in "${LEAF_REVOKED_CERT_PEM}" -noout -serial | cut -d= -f2)
+revoked_subject="/C=US/ST=Test/L=TestCity/O=TestOrg/OU=TestUnit/CN=Revoked Leaf"
+revocation_date=$(date -u +%y%m%d%H%M%SZ)
+expiration_date=$(date -u +%y%m%d%H%M%SZ -d '+365 days')
+printf "R\t%s\t%s\t%s\tunknown\t%s\n" \
+    "${expiration_date}" \
+    "${revocation_date}" \
+    "${revoked_serial}" \
+    "${revoked_subject}" \
+    >> "${INTERMEDIATE_DB_DIR}/index.txt"
+
+echo "Generating CRLs..."
+openssl ca -gencrl -config "${ROOT_CRL_CONF}" -out "${ROOT_CRL_PEM}" -batch 2>/dev/null || true
+openssl ca -gencrl -config "${INTERMEDIATE_CRL_CONF}" -out "${INTERMEDIATE_CRL_PEM}" -batch 2>/dev/null || true
+
+echo "02" > "${INTERMEDIATE_DB_DIR}/crlnumber"
+openssl ca -gencrl -config "${INTERMEDIATE_CRL_CONF}" -out "${INTERMEDIATE_CRL_V2_PEM}" -batch 2>/dev/null || true
+
+echo "10" > "${INTERMEDIATE_DB_DIR}/crlnumber"
+openssl ca -gencrl -config "${INTERMEDIATE_CRL_CONF}" -crlexts crl_delta_base_1 \
+    -out "${DELTA_CRL_1_PEM}" -batch 2>/dev/null || true
+
+echo "11" > "${INTERMEDIATE_DB_DIR}/crlnumber"
+openssl ca -gencrl -config "${INTERMEDIATE_CRL_CONF}" -crlexts crl_delta_base_2 \
+    -out "${DELTA_CRL_2_PEM}" -batch 2>/dev/null || true
+
+openssl ca -gencrl -config "${ROGUE_CRL_CONF}" -out "${ROGUE_CRL_PEM}" -batch 2>/dev/null || true
+
+if [ -f "${INTERMEDIATE_CRL_PEM}" ]; then
+    corrupt_pem_signature "${INTERMEDIATE_CRL_PEM}" "${BROKEN_CRL_PEM}"
 fi
 
-# 6. Malformed CRL (truncated)
-if [ -f "root-ca.crl" ]; then
-    echo "Creating malformed CRL..."
-    head -n 5 root-ca.crl > root-ca-malformed.crl
+if [ -f "${ROOT_CRL_PEM}" ]; then
+    head -n 5 "${ROOT_CRL_PEM}" > "${MALFORMED_CRL_PEM}"
 fi
 
-# 7. Malformed CRL (invalid DER)
-echo "Creating invalid DER CRL..."
-echo "This is not a valid CRL" > intermediate-ca-invalid.dcrl
+echo "This is not a valid CRL" > "${INVALID_DER_CRL}"
 
-# Convert valid CRLs to DER format
-[ -f "root-ca.crl" ] && openssl crl -in root-ca.crl -outform DER -out root-ca.dcrl 2>/dev/null || true
-[ -f "intermediate-ca.crl" ] && openssl crl -in intermediate-ca.crl -outform DER -out intermediate-ca.dcrl 2>/dev/null || true
-[ -f "intermediate-ca-v2.crl" ] && openssl crl -in intermediate-ca-v2.crl -outform DER -out intermediate-ca-v2.dcrl 2>/dev/null || true
-[ -f "rogue-ca.crl" ] && openssl crl -in rogue-ca.crl -outform DER -out rogue-ca.dcrl 2>/dev/null || true
+if [ -f "${ROOT_CRL_PEM}" ]; then
+    to_der_crl "${ROOT_CRL_PEM}" "${ROOT_CRL_DER}"
+fi
+if [ -f "${INTERMEDIATE_CRL_PEM}" ]; then
+    to_der_crl "${INTERMEDIATE_CRL_PEM}" "${INTERMEDIATE_CRL_DER}"
+fi
+if [ -f "${INTERMEDIATE_CRL_V2_PEM}" ]; then
+    to_der_crl "${INTERMEDIATE_CRL_V2_PEM}" "${INTERMEDIATE_CRL_V2_DER}"
+fi
+if [ -f "${ROGUE_CRL_PEM}" ]; then
+    to_der_crl "${ROGUE_CRL_PEM}" "${ROGUE_CRL_DER}"
+fi
+if [ -f "${DELTA_CRL_1_PEM}" ]; then
+    to_der_crl "${DELTA_CRL_1_PEM}" "${DELTA_CRL_1_DER}"
+fi
+if [ -f "${DELTA_CRL_2_PEM}" ]; then
+    to_der_crl "${DELTA_CRL_2_PEM}" "${DELTA_CRL_2_DER}"
+fi
 
 echo ""
-echo "✅ Test PKI data generated in ${TEST_DIR}"
-echo ""
-echo "📦 Generated certificates:"
-ls -lh *.crt 2>/dev/null | grep -v index || true
-echo ""
-echo "📋 Generated CRLs (PEM):"
-ls -lh *.crl 2>/dev/null || true
-echo ""
-echo "📋 Generated CRLs (DER):"
-ls -lh *.dcrl 2>/dev/null || true
-echo ""
-echo "🧪 Test cases included:"
-echo "  - Valid CRLs with different CRL numbers"
-echo "  - CRL from rogue CA (not in trust chain)"
-echo "  - CRL with broken signature"
-echo "  - Malformed/truncated CRLs"
-echo "  - Invalid DER CRL"
-echo "  - Revoked certificate entries"
+echo "Test PKI data generated in ${PKI_DIR}"
+echo "Certificates: ${CA_CERT_DIR}, ${LEAF_CERT_DIR}"
+echo "CRLs: ${CRL_DIR}"
+echo "Support files: ${SUPPORT_DIR}"

@@ -10,6 +10,15 @@ npm run seed:dev
 npm run dev
 ```
 
+## Testing
+
+`npm run test` will generate the PKI fixtures on demand under `tests/fixtures/pki`.
+If you need to regenerate them manually, run:
+
+```bash
+bash scripts/generate-test-data.sh
+```
+
 ## Deployment
 
 ### Deploy via Cloudflare Dashboard (Easiest)

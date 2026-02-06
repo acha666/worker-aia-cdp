@@ -45,7 +45,7 @@ if (typeof globalThis.atob !== "function") {
   globalThis.atob = (input: string) => Buffer.from(input, "base64").toString("binary");
 }
 
-const CERT_PEM_URL = new URL("../fixtures/test-leaf.cert.pem", import.meta.url);
+const CERT_PEM_URL = new URL("../fixtures/pki/certs/leaf/leaf-full.cert.pem", import.meta.url);
 
 class MockR2Object implements R2ObjectBody {
   readonly customMetadata?: Record<string, string> | undefined;
@@ -225,7 +225,7 @@ test("ensureSummaryMetadata parses certificate and writes metadata", async () =>
 
   const summary = await ensureSummaryMetadata({
     env,
-    key: "ca/test-leaf.cert.pem",
+    key: "ca/leaf-full.cert.pem",
     kind: "certificate",
     existingMeta: { foo: "bar" },
     expectedEtag: '"etag-value"',
@@ -235,12 +235,12 @@ test("ensureSummaryMetadata parses certificate and writes metadata", async () =>
   assert.equal(summary.kind, "certificate");
   assert.equal(summary.displayName, "Leaf Certificate");
   assert.equal(summary.subjectCommonName, "Leaf Certificate");
-  assert.equal(summary.issuerCommonName, "Test Root CA");
+  assert.equal(summary.issuerCommonName, "Test Intermediate CA");
   assert(summary.notBefore);
   assert(summary.notAfter);
 
   assert(bucket.lastPut);
-  assert.equal(bucket.lastPut?.key, "ca/test-leaf.cert.pem");
+  assert.equal(bucket.lastPut?.key, "ca/leaf-full.cert.pem");
   assert(bucket.lastPut?.options.customMetadata);
   const metadata = bucket.lastPut?.options.customMetadata ?? {};
   assert.equal(metadata.summaryVersion, SUMMARY_VERSION);
