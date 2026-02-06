@@ -3,6 +3,7 @@ import { computed } from "vue";
 import type { CertificateDetail, Name } from "@contracts/schemas";
 import ExtensionView from "./ExtensionView.vue";
 import HexValue from "./HexValue.vue";
+import StatusBadge from "./StatusBadge.vue";
 import { formatDateTimeWithZone, getRelativeTimeDetailed } from "../utils/dates";
 import { computeCertificateStatus } from "../utils/status";
 
@@ -223,18 +224,12 @@ const sortedExtensions = computed(() => {
             Status
           </dt>
           <dd class="text-gray-900 dark:text-white font-medium">
-            <span
-              :class="
-                validityStatus.state === 'valid'
-                  ? 'text-green-700 dark:text-green-400'
-                  : 'text-gray-900 dark:text-white'
-              "
-            >
-              {{ validityStatus.label }}
-            </span>
-            <span v-if="validityStatus.detail" class="text-gray-600 dark:text-gray-400">
-              ({{ validityStatus.detail }})
-            </span>
+            <div class="flex items-center gap-2">
+              <StatusBadge :state="validityStatus.state" type="certificate" />
+              <span v-if="validityStatus.detail" class="text-gray-600 dark:text-gray-400">
+                ({{ validityStatus.detail }})
+              </span>
+            </div>
           </dd>
         </div>
       </dl>

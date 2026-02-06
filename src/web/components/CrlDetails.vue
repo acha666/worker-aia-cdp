@@ -3,6 +3,7 @@ import { computed } from "vue";
 import type { CrlDetail, Extension, Name } from "@contracts/schemas";
 import ExtensionView from "./ExtensionView.vue";
 import HexValue from "./HexValue.vue";
+import StatusBadge from "./StatusBadge.vue";
 import { formatDateTimeWithZone, getRelativeTimeDetailed } from "../utils/dates";
 import { computeCrlStatus } from "../utils/status";
 
@@ -45,12 +46,24 @@ const validityStatus = computed(() => {
   const nextUpdate = props.crl.tbsCertList.nextUpdate?.iso ?? null;
   const status = computeCrlStatus(thisUpdate, nextUpdate);
   if (status.state === "expired") {
-    return { label: "Expired", detail: getRelativeTimeDetailed(nextUpdate) };
+    return {
+      label: "Expired",
+      detail: getRelativeTimeDetailed(nextUpdate),
+      state: status.state,
+    };
   }
   if (status.state === "stale") {
-    return { label: "Stale", detail: getRelativeTimeDetailed(nextUpdate) };
+    return {
+      label: "Stale",
+      detail: getRelativeTimeDetailed(nextUpdate),
+      state: status.state,
+    };
   }
-  return { label: "Current", detail: getRelativeTimeDetailed(nextUpdate) };
+  return {
+    label: "Current",
+    detail: getRelativeTimeDetailed(nextUpdate),
+    state: status.state,
+  };
 });
 
 const formattedRevokedCerts = computed(() => {
@@ -185,10 +198,12 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
             Status
           </dt>
           <dd class="text-gray-900 dark:text-white font-medium">
-            {{ validityStatus.label }}
-            <span v-if="validityStatus.detail" class="text-gray-600 dark:text-gray-400">
-              ({{ validityStatus.detail }})
-            </span>
+            <div class="flex items-center gap-2">
+              <StatusBadge :state="validityStatus.state" type="crl" />
+              <span v-if="validityStatus.detail" class="text-gray-600 dark:text-gray-400">
+                ({{ validityStatus.detail }})
+              </span>
+            </div>
           </dd>
         </div>
       </dl>
