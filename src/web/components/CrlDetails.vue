@@ -53,6 +53,14 @@ const validityStatus = computed(() => {
   return { label: "Current", detail: getRelativeTimeDetailed(nextUpdate) };
 });
 
+const formattedRevokedCerts = computed(() => {
+  const items = props.crl.tbsCertList.revokedCertificates?.items ?? [];
+  return items.map((cert) => ({
+    ...cert,
+    revocationDateFormatted: formatDateTimeWithZone(cert.revocationDate?.iso ?? null),
+  }));
+});
+
 const sortedExtensions = computed(() => {
   const items = props.crl.tbsCertList.crlExtensions?.items ?? [];
   return [...items].sort((a, b) => {
@@ -291,10 +299,7 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-gray-600">
-            <tr
-              v-for="cert in crl.tbsCertList.revokedCertificates?.items?.slice(0, 100) || []"
-              :key="cert.userCertificate.hex"
-            >
+            <tr v-for="cert in formattedRevokedCerts.slice(0, 100)" :key="cert.userCertificate.hex">
               <td class="px-3 py-2 text-gray-700 dark:text-dark-text">
                 <HexValue
                   :value="cert.userCertificate.hex"
@@ -303,7 +308,7 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
                 />
               </td>
               <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
-                {{ cert.revocationDate.iso }}
+                {{ cert.revocationDateFormatted }}
               </td>
               <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
                 <template v-if="cert.crlEntryExtensions?.items">
