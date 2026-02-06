@@ -101,9 +101,19 @@ function isAppRoute(value: unknown): value is AppRoute {
  * e.g., "/api/v2/certificates/:id" -> /^\/api\/v2\/certificates\/[^\/]+$/
  */
 function pathToRegex(path: string): RegExp {
-  const regexStr = path
-    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&") // Escape special chars
-    .replace(/:(\w+)/g, "[^/]+"); // Replace :param with [^/]+ (unescaped colon)
+  const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const segments = path.split("/");
+  const regexSegments = segments.map((segment, index) => {
+    if (index === 0) {
+      return "";
+    } // Preserve leading slash
+    if (segment.startsWith(":")) {
+      const isLast = index === segments.length - 1;
+      return isLast ? ".+" : "[^/]+";
+    }
+    return escapeRegex(segment);
+  });
+  const regexStr = regexSegments.join("/");
   return new RegExp(`^${regexStr}$`);
 }
 
