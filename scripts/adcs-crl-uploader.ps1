@@ -1,7 +1,7 @@
 #Requires -Version 7.0
 [CmdletBinding()]
 param(
-    [string]$UploadUri = 'https://aia.example.com/api/v1/crls',
+    [string]$UploadUri = 'https://aia.example.com/api/v2/crls',
     [string]$SourceDir = 'C:\ProgramData\PKI\crl-uploader\CertEnroll',
     [string]$LogPath   = 'C:\ProgramData\PKI\crl-uploader\upload.log'
 )
@@ -35,30 +35,32 @@ function Test-CrlValid {
     return ($LASTEXITCODE -eq 0)
 }
 
-function Convert-CrlToPem {
-    param([Parameter(Mandatory)][string]$Path)
-    $head = Get-Content -LiteralPath $Path -TotalCount 2 -ErrorAction Stop
-    if ($head -match '-----BEGIN\s+X509\s+CRL-----') {
-        return (Get-Content -Raw -LiteralPath $Path -Encoding ASCII)
-    }
-    $tmp = [System.IO.Path]::GetTempFileName()
-    try {
-        & certutil.exe -f -encode $Path $tmp | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "certutil -encode failed: $Path" }
-        Get-Content -Raw -LiteralPath $tmp -Encoding ASCII
-    } finally { Remove-Item -LiteralPath $tmp -ErrorAction SilentlyContinue }
-}
-
-function Invoke-PostJsonPermissive {
+function Invoke-PostCrlFile {
     param([Parameter(Mandatory)][string]$Uri,
-          [Parameter(Mandatory)][string]$Body,
+          [Parameter(Mandatory)][string]$FilePath,
           [int]$TimeoutSec = 60)
+    
+    $fileName = Split-Path -Leaf $FilePath
+    $fileBytes = [System.IO.File]::ReadAllBytes($FilePath)
+    $boundary = [System.Guid]::NewGuid().ToString()
+    
+    $bodyLines = @(
+        "--$boundary",
+        "Content-Disposition: form-data; name=`"crl`"; filename=`"$fileName`"",
+        "Content-Type: application/octet-stream",
+        "",
+        [System.Text.Encoding]::Latin1.GetString($fileBytes),
+        "--$boundary--"
+    )
+    
+    $body = $bodyLines -join "`r`n"
+    
     $irm = Get-Command Invoke-RestMethod -ErrorAction SilentlyContinue
     if ($irm -and $irm.Parameters.ContainsKey('SkipHttpErrorCheck')) {
-        return Invoke-RestMethod -Method Post -Uri $Uri -ContentType 'text/plain' -Body $Body -TimeoutSec $TimeoutSec -SkipHttpErrorCheck
+        return Invoke-RestMethod -Method Post -Uri $Uri -ContentType "multipart/form-data; boundary=$boundary" -Body $body -TimeoutSec $TimeoutSec -SkipHttpErrorCheck
     }
     try {
-        return Invoke-RestMethod -Method Post -Uri $Uri -ContentType 'text/plain' -Body $Body -TimeoutSec $TimeoutSec
+        return Invoke-RestMethod -Method Post -Uri $Uri -ContentType "multipart/form-data; boundary=$boundary" -Body $body -TimeoutSec $TimeoutSec
     } catch {
         $resp = $_.Exception.Response
         if ($resp -and $resp.GetResponseStream) {
@@ -76,7 +78,7 @@ try {
     Write-Log INFO ("Startup: UploadUri={0}; SourceDir={1}" -f $UploadUri, $SourceDir)
 
     $files = @()
-    foreach ($pat in @('*.crl','*.pem')) {
+    foreach ($pat in @('*.crl','*.dcrl')) {
         $files += Get-ChildItem -LiteralPath $SourceDir -Filter $pat -File -ErrorAction SilentlyContinue
     }
     if (-not $files) {
@@ -90,12 +92,13 @@ try {
                 Write-Log WARN ("Invalid CRL skipped: {0}" -f $f.Name)
                 continue
             }
-            $pem = Convert-CrlToPem -Path $f.FullName
             Write-Log INFO ("Uploading: {0}" -f $f.Name)
-            $resp = Invoke-PostJsonPermissive -Uri $UploadUri -Body $pem -TimeoutSec 60
+            $resp = Invoke-PostCrlFile -Uri $UploadUri -FilePath $f.FullName -TimeoutSec 60
             $json = ($resp | ConvertTo-Json -Depth 8)
-            if ($resp.status -eq 'ok' -or $resp.stored -or $resp.byAki) {
-                Write-Log SUCCESS "Upstream response: $json"
+            if ($resp.data -and $resp.data.id) {
+                Write-Log SUCCESS ("Upload successful - ID: {0}" -f $resp.data.id)
+            } elseif ($resp.error) {
+                Write-Log WARN ("Upload rejected - {0}: {1}" -f $resp.error.code, $resp.error.message)
             } else {
                 Write-Log WARN "Upstream response: $json"
             }
