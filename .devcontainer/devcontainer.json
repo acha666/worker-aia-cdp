@@ -1,13 +1,11 @@
 {
   "name": "Worker AIA CDP Development",
   "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
-
   "features": {
     "ghcr.io/devcontainers/features/git:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
-
   "customizations": {
     "vscode": {
       "extensions": [
@@ -16,17 +14,10 @@
         "ms-vscode.vscode-typescript-next",
         "bradlc.vscode-tailwindcss",
         "usernamehw.errorlens",
-        "yoavbls.pretty-ts-errors"
-      ],
-      "settings": {
-        "editor.formatOnSave": true,
-        "editor.defaultFormatter": "esbenp.prettier-vscode",
-        "editor.codeActionsOnSave": {
-          "source.fixAll.eslint": "explicit"
-        },
-        "typescript.tsdk": "node_modules/typescript/lib",
-        "files.eol": "\n"
-      }
+        "yoavbls.pretty-ts-errors",
+        "Vue.volar",
+        "Vue.vscode-typescript-vue-plugin"
+      ]
     }
   },
 
@@ -41,15 +32,11 @@
       "onAutoForward": "notify"
     }
   },
-
   "postCreateCommand": "npm install",
-
   "remoteUser": "node",
-
   "mounts": [
     "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/node/.ssh,readonly,type=bind,consistency=cached"
   ],
-
   "remoteEnv": {
     "BROWSER": "wslview"
   }
