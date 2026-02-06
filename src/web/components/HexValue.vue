@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { copyToClipboard, formatHex, normalizeHexForCopy } from "../utils/format";
+import { copyToClipboard, formatHex, formatHexGroups, normalizeHexForCopy } from "../utils/format";
 
 const props = withDefaults(
   defineProps<{
@@ -25,9 +25,9 @@ const props = withDefaults(
 );
 
 const formattedValue = computed(() => {
-  if (!props.value) return props.fallback;
+  if (!props.value) return null;
   if (props.variant === "grouped") {
-    return formatHex(props.value, { groupSize: props.groupSize, separator: props.separator });
+    return formatHexGroups(props.value, { groupSize: props.groupSize });
   }
   return formatHex(props.value, { groupSize: 0, separator: "" });
 });
@@ -48,7 +48,16 @@ const rootClasses = computed(() => [
 
 <template>
   <component :is="rootTag" :class="rootClasses">
-    <span :class="[valueClass, 'min-w-0']">{{ formattedValue }}</span>
+    <span v-if="!Array.isArray(formattedValue)" :class="[valueClass, 'min-w-0']">
+      {{ formattedValue ?? fallback }}
+    </span>
+    <span v-else :class="[valueClass, 'min-w-0']">
+      <template v-for="(group, index) in formattedValue" :key="index">
+        <span v-if="index > 0">{{ separator }}</span
+        ><wbr />
+        <span>{{ group }}</span>
+      </template>
+    </span>
     <button
       v-if="showCopy && copyValue"
       type="button"

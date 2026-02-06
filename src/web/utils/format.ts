@@ -16,6 +16,16 @@ export function formatHex(hex: string, options: HexFormatOptions = {}): string {
   return separator ? groups.join(separator) : groups.join("");
 }
 
+export function formatHexGroups(hex: string, options: HexFormatOptions = {}): string[] {
+  const groupSize = options.groupSize ?? 2;
+  const uppercase = options.uppercase ?? true;
+  const value = uppercase ? hex.toUpperCase() : hex;
+
+  if (groupSize <= 0) return [value];
+
+  return value.match(new RegExp(`.{1,${groupSize}}`, "g")) || [];
+}
+
 export function normalizeHexForCopy(hex: string): string {
   const trimmed = hex.trim();
   const noPrefix =
