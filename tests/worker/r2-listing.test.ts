@@ -107,7 +107,7 @@ test("cachedListAllWithPrefix fetches from R2 and populates cache when missing",
     assert.equal(stored.items[0].uploaded, "2025-09-27T03:04:05.000Z");
     assert.equal(typeof stored.cachedAt, "string");
     const cacheControl = putCall.response.headers.get("cache-control");
-    assert.equal(cacheControl, "public, max-age=60, s-maxage=300, stale-while-revalidate=86400");
+    assert.equal(cacheControl, "public, max-age=30, s-maxage=60, stale-while-revalidate=0");
   } finally {
     globalThis.caches = originalCaches;
   }

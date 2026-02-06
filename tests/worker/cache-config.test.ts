@@ -27,10 +27,10 @@ class MemoryCache {
 }
 
 test("cacheDurations expose expected TTL constants", () => {
-  assert.equal(cacheDurations.LIST_CACHE_TTL, 60);
-  assert.equal(cacheDurations.LIST_CACHE_SMAXAGE, 300);
-  assert.equal(cacheDurations.LIST_CACHE_SWR, 86400);
-  assert.equal(cacheDurations.META_CACHE_TTL, 60);
+  assert.equal(cacheDurations.LIST_CACHE_TTL, 30);
+  assert.equal(cacheDurations.LIST_CACHE_SMAXAGE, 60);
+  assert.equal(cacheDurations.LIST_CACHE_SWR, 0);
+  assert.equal(cacheDurations.META_CACHE_TTL, 30);
 });
 
 test("createMetaCacheKey encodes key safely", () => {
@@ -38,7 +38,7 @@ test("createMetaCacheKey encodes key safely", () => {
   const request = createMetaCacheKey(key);
   assert.equal(
     request.url,
-    "https://r2cache.internal/meta?key=crl%2F%C3%9C%C3%B1%C3%AE%C3%A7%C3%B8d%C3%A9%20value.pem"
+    "https://r2cache.internal/meta/v1?key=crl%2F%C3%9C%C3%B1%C3%AE%C3%A7%C3%B8d%C3%A9%20value.pem"
   );
 });
 
@@ -63,7 +63,7 @@ test("predefined list cache keys point at expected URLs", () => {
 test("createBinaryCacheKey normalizes leading slashes and encodes method", () => {
   const request = createBinaryCacheKey("/ca/root.pem", "head");
   const url = new URL(request.url);
-  assert.equal(`${url.origin}${url.pathname}`, "https://r2cache.internal/binary");
+  assert.equal(`${url.origin}${url.pathname}`, "https://r2cache.internal/binary/v1");
   assert.equal(url.searchParams.get("key"), "ca/root.pem");
   assert.equal(url.searchParams.get("method"), "HEAD");
   assert.equal(request.method, "GET");
