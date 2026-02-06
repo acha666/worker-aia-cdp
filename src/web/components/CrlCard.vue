@@ -4,7 +4,7 @@ import type { CrlListItem, CrlDetail } from "@contracts/schemas";
 import { useCrlsStore } from "../stores/crls";
 import StatusBadge from "./StatusBadge.vue";
 import CrlDetails from "./CrlDetails.vue";
-import { formatDateDay, getRelativeTime } from "../utils/dates";
+import { formatDateDay, formatDateDayWithoutTimezone, getRelativeTime } from "../utils/dates";
 import { computeCrlStatus } from "../utils/status";
 
 const props = defineProps<{
@@ -49,7 +49,7 @@ const downloadUrls = computed(() => {
 const updateInfo = computed(() => {
   const { thisUpdate, nextUpdate } = props.crl.summary;
   return {
-    issued: formatDateDay(thisUpdate),
+    issued: formatDateDayWithoutTimezone(thisUpdate),
     expires: nextUpdate ? formatDateDay(nextUpdate) : "N/A",
     remaining: nextUpdate ? getRelativeTime(nextUpdate) : null,
   };

@@ -4,7 +4,7 @@ import type { CertificateListItem, CertificateDetail } from "@contracts/schemas"
 import { useCertificatesStore } from "../stores/certificates";
 import StatusBadge from "./StatusBadge.vue";
 import CertificateDetails from "./CertificateDetails.vue";
-import { formatDateDay, getRelativeTime } from "../utils/dates";
+import { formatDateDay, formatDateDayWithoutTimezone, getRelativeTime } from "../utils/dates";
 import { computeCertificateStatus } from "../utils/status";
 
 const props = defineProps<{
@@ -53,7 +53,7 @@ const downloadUrls = computed(() => {
 const validityInfo = computed(() => {
   const { notBefore, notAfter } = props.certificate.summary;
   return {
-    from: formatDateDay(notBefore),
+    from: formatDateDayWithoutTimezone(notBefore),
     to: formatDateDay(notAfter),
     remaining: getRelativeTime(notAfter),
   };

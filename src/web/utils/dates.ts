@@ -54,6 +54,19 @@ export function formatDateDay(iso: string | null): string {
   }
 }
 
+export function formatDateDayWithoutTimezone(iso: string | null): string {
+  if (!iso) return "N/A";
+  try {
+    const date = new Date(iso);
+    const month = MONTH_NAMES[date.getMonth()];
+    const day = String(date.getDate()).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${month} ${day} ${year}`;
+  } catch {
+    return iso;
+  }
+}
+
 export function formatRelativeSeconds(seconds: number): string {
   if (!Number.isFinite(seconds)) return "";
   const abs = Math.abs(seconds);
