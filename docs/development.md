@@ -70,6 +70,22 @@ pnpm run format:check
 pnpm run format
 ```
 
+## Local GitHub Actions (act)
+
+Inside the devcontainer, `nektos/act` is installed automatically during setup and can run
+the repository workflow locally.
+
+```bash
+act
+```
+
+To run only a specific job from `.github/workflows/ci.yml`:
+
+```bash
+act -j lint
+act -j test
+```
+
 ## Fixtures
 
 Generate or clean PKI test fixtures:
