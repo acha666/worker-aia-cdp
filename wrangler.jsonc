@@ -3,7 +3,7 @@
   "main": "src/worker/worker.ts",
   "compatibility_date": "2025-09-16",
   "build": {
-    "command": "npm run build"
+    "command": "pnpm run build"
   },
   "r2_buckets": [
     {
@@ -27,7 +27,7 @@
         }
       ],
       "build": {
-        "command": "npm run build:dev",
+        "command": "pnpm run build:dev",
         "watch": "src/web"
       }
     }

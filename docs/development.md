@@ -2,27 +2,27 @@
 
 ## Requirements
 
-Node 22+ and npm 10+ are expected, along with Wrangler for local Worker development.
+Node 22+ and pnpm 10+ are expected, along with Wrangler for local Worker development.
 
 ## Local Development
 
 Start the Worker in local mode. This runs the Worker with the local R2 bucket configuration.
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 If you want a separate frontend dev server with proxying, run the frontend and the Worker in separate terminals.
 
 ```bash
-npm run dev:worker
-npm run dev:frontend
+pnpm run dev:worker
+pnpm run dev:frontend
 ```
 
 To watch only assets build output, use:
 
 ```bash
-npm run dev:assets
+pnpm run dev:assets
 ```
 
 ## Build and Deploy
@@ -30,8 +30,8 @@ npm run dev:assets
 Build the frontend assets and deploy the Worker.
 
 ```bash
-npm run build
-npm run deploy
+pnpm run build
+pnpm run deploy
 ```
 
 ## Tests and Checks
@@ -39,8 +39,8 @@ npm run deploy
 Run tests with automatic fixture generation.
 
 ```bash
-npm run test
-npm run test:watch
+pnpm run test
+pnpm run test:watch
 ```
 
 Tests automatically generate PKI fixtures on demand under `tests/fixtures/pki`, which
@@ -49,25 +49,41 @@ separates certificates, CRLs, and support artifacts (keys, CSRs, serials).
 Run linting and formatting checks:
 
 ```bash
-npm run check
-npm run check:fix
+pnpm run check
+pnpm run check:fix
 ```
 
 Run type checks individually:
 
 ```bash
-npm run type-check
-npm run type-check:worker
-npm run type-check:web
+pnpm run type-check
+pnpm run type-check:worker
+pnpm run type-check:web
 ```
 
 Run linting and formatting individually:
 
 ```bash
-npm run lint
-npm run lint:fix
-npm run format:check
-npm run format
+pnpm run lint
+pnpm run lint:fix
+pnpm run format:check
+pnpm run format
+```
+
+## Local GitHub Actions (act)
+
+Inside the devcontainer, `nektos/act` is installed automatically during setup and can run
+the repository workflow locally.
+
+```bash
+act
+```
+
+To run only a specific job from `.github/workflows/ci.yml`:
+
+```bash
+act -j lint
+act -j test
 ```
 
 ## Fixtures
@@ -75,8 +91,8 @@ npm run format
 Generate or clean PKI test fixtures:
 
 ```bash
-npm run fixtures:generate
-npm run fixtures:clean
+pnpm run fixtures:generate
+pnpm run fixtures:clean
 ```
 
 Fixture layout (all generated, gitignored):
@@ -91,8 +107,8 @@ Fixture layout (all generated, gitignored):
 Reset and seed the local R2 bucket:
 
 ```bash
-npm run reset:dev
-npm run seed:dev
+pnpm run reset:dev
+pnpm run seed:dev
 ```
 
 `seed:dev` automatically generates fixtures if needed, then uploads core CA certificates

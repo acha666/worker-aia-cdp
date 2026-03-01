@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # Enable version updates for npm dependencies
+  # Enable version updates for pnpm dependencies
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
@@ -11,7 +11,7 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
-      - "npm"
+      - "pnpm"
     commit-message:
       prefix: "chore(deps):"
       include: "scope"

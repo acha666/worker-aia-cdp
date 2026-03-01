@@ -5,14 +5,14 @@ Cloudflare Worker and Vue UI for serving X.509 certificates and CRLs using AIA a
 ## Quick start
 
 ```bash
-npm install
-npm run seed:dev
-npm run dev
+pnpm install
+pnpm run seed:dev
+pnpm run dev
 ```
 
 ## Testing
 
-`npm run test` will generate the PKI fixtures on demand under `tests/fixtures/pki`.
+`pnpm run test` will generate the PKI fixtures on demand under `tests/fixtures/pki`.
 If you need to regenerate them manually, run:
 
 ```bash
@@ -29,7 +29,7 @@ bash scripts/generate-test-data.sh
    - Go to Cloudflare Dashboard → **Workers & Pages** → **Create**
    - Click **Connect to Git** and select your fork
 3. **Configure build:**
-   - Build command: `npm run build`
+   - Build command: `pnpm run build`
    - Deploy command: `npx wrangler deploy`
 4. **Set your site name:**
    - Add environment variable `SITE_NAME` with your custom name
@@ -42,7 +42,7 @@ bash scripts/generate-test-data.sh
 
 ```bash
 npx wrangler login
-npm run deploy
+pnpm run deploy
 ```
 
 ## Initial Setup

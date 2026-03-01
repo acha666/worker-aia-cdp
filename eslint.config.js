@@ -10,6 +10,7 @@ export default [
       "dist/**",
       "build/**",
       ".wrangler/**",
+      ".pnpm-store/**",
       "coverage/**",
       "public/**",
       "tests/web/**",
