@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import type { CertificateDetail, Name } from "@contracts/schemas";
 import ExtensionView from "./ExtensionView.vue";
 import HexValue from "./HexValue.vue";
@@ -10,6 +11,8 @@ import { computeCertificateStatus } from "../utils/status";
 const props = defineProps<{
   certificate: CertificateDetail;
 }>();
+
+const { t } = useI18n();
 
 const publicKeyInfo = computed(() => {
   const parsed = props.certificate.tbsCertificate.subjectPublicKeyInfo.parsed;
@@ -30,22 +33,20 @@ const publicKeyInfo = computed(() => {
   return { type: parsed.type ?? "unknown" };
 });
 
-const EMPTY_VALUE = "(empty)";
-
 function displayValue(value?: string | null): string {
-  if (!value) return EMPTY_VALUE;
+  if (!value) return t("common.emptyValue");
   const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : EMPTY_VALUE;
+  return trimmed.length > 0 ? trimmed : t("common.emptyValue");
 }
 
 function mapNameFields(name: Name) {
   return [
-    { label: "Common Name", value: displayValue(name.commonName) },
-    { label: "Organization", value: displayValue(name.organization) },
-    { label: "Organizational Unit", value: displayValue(name.organizationalUnit) },
-    { label: "Country Name", value: displayValue(name.country) },
-    { label: "State/Province", value: displayValue(name.stateOrProvince) },
-    { label: "Locality", value: displayValue(name.locality) },
+    { labelKey: "nameFields.commonName", value: displayValue(name.commonName) },
+    { labelKey: "nameFields.organization", value: displayValue(name.organization) },
+    { labelKey: "nameFields.organizationalUnit", value: displayValue(name.organizationalUnit) },
+    { labelKey: "nameFields.countryName", value: displayValue(name.country) },
+    { labelKey: "nameFields.stateProvince", value: displayValue(name.stateOrProvince) },
+    { labelKey: "nameFields.locality", value: displayValue(name.locality) },
   ];
 }
 
@@ -65,20 +66,20 @@ const validityStatus = computed(() => {
   const status = computeCertificateStatus(notBefore?.iso, notAfter?.iso);
   if (status.state === "expired") {
     return {
-      label: "Expired",
+      label: t("status.expired"),
       detail: getRelativeTimeDetailed(notAfter?.iso ?? null),
       state: status.state,
     };
   }
   if (status.state === "not-yet-valid") {
     return {
-      label: "Not yet valid",
+      label: t("status.notYetValid"),
       detail: getRelativeTimeDetailed(notBefore?.iso ?? null),
       state: status.state,
     };
   }
   return {
-    label: "Active",
+    label: t("status.active"),
     detail: getRelativeTimeDetailed(notAfter?.iso ?? null),
     state: status.state,
   };
@@ -110,7 +111,7 @@ const sortedExtensions = computed(() => {
             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
           />
         </svg>
-        Certificate Information
+        {{ t("details.certificate.information") }}
       </h4>
       <div class="space-y-4">
         <dl class="space-y-2 text-sm">
@@ -118,7 +119,7 @@ const sortedExtensions = computed(() => {
             <dt
               class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
             >
-              X.509 Version
+              {{ t("details.certificate.x509Version") }}
             </dt>
             <dd class="text-gray-900 dark:text-white font-medium">
               {{ certificate.tbsCertificate.version.display }}
@@ -128,7 +129,7 @@ const sortedExtensions = computed(() => {
             <dt
               class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
             >
-              Serial Number
+              {{ t("details.certificate.serialNumber") }}
             </dt>
             <dd class="text-gray-900 dark:text-white">
               <HexValue
@@ -147,18 +148,18 @@ const sortedExtensions = computed(() => {
             <h5
               class="text-xs font-semibold text-gray-700 dark:text-dark-text uppercase tracking-wide mb-2"
             >
-              Subject
+              {{ t("details.certificate.subject") }}
             </h5>
             <dl class="space-y-2 text-sm">
               <div
                 v-for="field in subjectFields"
-                :key="field.label"
+                :key="field.labelKey"
                 class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline"
               >
                 <dt
                   class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
                 >
-                  {{ field.label }}
+                  {{ t(field.labelKey) }}
                 </dt>
                 <dd class="text-gray-900 dark:text-white font-medium">{{ field.value }}</dd>
               </div>
@@ -170,18 +171,18 @@ const sortedExtensions = computed(() => {
             <h5
               class="text-xs font-semibold text-gray-700 dark:text-dark-text uppercase tracking-wide mb-2"
             >
-              Issuer
+              {{ t("details.certificate.issuer") }}
             </h5>
             <dl class="space-y-2 text-sm">
               <div
                 v-for="field in issuerFields"
-                :key="field.label"
+                :key="field.labelKey"
                 class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline"
               >
                 <dt
                   class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
                 >
-                  {{ field.label }}
+                  {{ t(field.labelKey) }}
                 </dt>
                 <dd class="text-gray-900 dark:text-white font-medium">{{ field.value }}</dd>
               </div>
@@ -204,24 +205,24 @@ const sortedExtensions = computed(() => {
             d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
           />
         </svg>
-        Validity
+        {{ t("details.certificate.validity") }}
       </h4>
       <dl class="space-y-2 text-sm">
         <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
           <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            Not Before
+            {{ t("details.certificate.notBefore") }}
           </dt>
           <dd class="text-gray-900 dark:text-white font-medium">{{ validityDates.notBefore }}</dd>
         </div>
         <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
           <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            Not After
+            {{ t("details.certificate.notAfter") }}
           </dt>
           <dd class="text-gray-900 dark:text-white font-medium">{{ validityDates.notAfter }}</dd>
         </div>
         <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
           <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            Status
+            {{ t("details.certificate.status") }}
           </dt>
           <dd class="text-gray-900 dark:text-white font-medium">
             <div class="flex items-center gap-2">
@@ -248,30 +249,30 @@ const sortedExtensions = computed(() => {
             d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
           />
         </svg>
-        Cryptography
+        {{ t("details.certificate.cryptography") }}
       </h4>
       <dl class="space-y-2 text-sm">
         <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
           <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            Signature Algorithm
+            {{ t("details.certificate.signatureAlgorithm") }}
           </dt>
           <dd class="text-gray-900 dark:text-white font-medium">
             {{
               certificate.signatureAlgorithm?.algorithm?.name ||
               certificate.signatureAlgorithm?.algorithm?.oid ||
-              "Unknown"
+              t("common.unknown")
             }}
           </dd>
         </div>
         <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
           <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            Public Key Algorithm
+            {{ t("details.certificate.publicKeyAlgorithm") }}
           </dt>
           <dd class="text-gray-900 dark:text-white font-medium">
             {{
               certificate.tbsCertificate.subjectPublicKeyInfo.algorithm?.algorithm?.name ||
               certificate.tbsCertificate.subjectPublicKeyInfo.algorithm?.algorithm?.oid ||
-              "Unknown"
+              t("common.unknown")
             }}
           </dd>
         </div>
@@ -280,24 +281,24 @@ const sortedExtensions = computed(() => {
             <dt
               class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
             >
-              Key Size
+              {{ t("details.certificate.keySize") }}
             </dt>
             <dd class="text-gray-900 dark:text-white font-medium">
-              {{ publicKeyInfo.keySize }} bits
+              {{ publicKeyInfo.keySize }} {{ t("common.bits") }}
             </dd>
           </template>
           <template v-else-if="publicKeyInfo.type === 'EC'">
             <dt
               class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
             >
-              Curve
+              {{ t("details.certificate.curve") }}
             </dt>
             <dd class="text-gray-900 dark:text-white font-medium">{{ publicKeyInfo.curve }}</dd>
           </template>
         </div>
         <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
           <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            Public Key SHA-1
+            {{ t("details.certificate.publicKeySha1") }}
           </dt>
           <dd class="text-gray-900 dark:text-white">
             <HexValue
@@ -309,7 +310,7 @@ const sortedExtensions = computed(() => {
         </div>
         <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
           <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            Public Key SHA-256
+            {{ t("details.certificate.publicKeySha256") }}
           </dt>
           <dd class="text-gray-900 dark:text-white">
             <HexValue
@@ -335,7 +336,7 @@ const sortedExtensions = computed(() => {
             d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"
           />
         </svg>
-        Fingerprints
+        {{ t("details.certificate.fingerprints") }}
       </h4>
       <dl class="space-y-2 text-sm">
         <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
@@ -378,7 +379,7 @@ const sortedExtensions = computed(() => {
             d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
           />
         </svg>
-        Extensions ({{ sortedExtensions.length }})
+        {{ t("details.certificate.extensions") }} ({{ sortedExtensions.length }})
       </h4>
       <div class="space-y-2">
         <ExtensionView v-for="ext in sortedExtensions" :key="ext.extnID.oid" :extension="ext" />

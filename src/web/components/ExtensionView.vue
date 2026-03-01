@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import type { Extension } from "@contracts/schemas";
 import HexValue from "./HexValue.vue";
 
 const props = defineProps<{
   extension: Extension;
 }>();
+
+const { t } = useI18n();
 
 const expanded = ref(false);
 
@@ -27,7 +30,7 @@ const parsed = computed<ParsedExtension | null>(() => {
 });
 
 function formatGeneralName(gn: { type?: string; value?: string }): string {
-  const type = gn.type ?? "unknown";
+  const type = gn.type ?? t("extension.unknownType");
   const value = gn.value ?? "";
   return `${type}: ${value}`;
 }
@@ -45,7 +48,7 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
           v-if="extension.critical"
           class="px-1.5 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded dark:bg-red-900/40 dark:text-red-200"
         >
-          Critical
+          {{ t("extension.critical") }}
         </span>
         <span
           v-if="!isParsed"
@@ -79,7 +82,7 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
         <div class="px-3 py-2 border-t border-gray-100 dark:border-dark-border text-sm">
           <!-- OID -->
           <div class="mb-2">
-            <span class="text-gray-500 dark:text-gray-400">OID:</span>
+            <span class="text-gray-500 dark:text-gray-400">{{ t("extension.oid") }}:</span>
             <code class="ml-1 text-sm text-gray-700 dark:text-dark-text">{{
               extension.extnID.oid
             }}</code>
@@ -91,7 +94,7 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
             <template v-if="parsed.extensionType === 'basicConstraints'">
               <div class="space-y-1">
                 <div>
-                  <span class="text-gray-500 dark:text-gray-400">CA:</span>
+                  <span class="text-gray-500 dark:text-gray-400">{{ t("extension.ca") }}:</span>
                   <span
                     class="ml-1"
                     :class="
@@ -100,11 +103,13 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
                         : 'text-gray-600 dark:text-gray-400'
                     "
                   >
-                    {{ parsed.cA ? "Yes" : "No" }}
+                    {{ parsed.cA ? t("common.yes") : t("common.no") }}
                   </span>
                 </div>
                 <div v-if="parsed.pathLenConstraint !== undefined">
-                  <span class="text-gray-500 dark:text-gray-400">Path Length:</span>
+                  <span class="text-gray-500 dark:text-gray-400"
+                    >{{ t("extension.pathLength") }}:</span
+                  >
                   <span class="ml-1 text-gray-900 dark:text-white">
                     {{ parsed.pathLenConstraint }}
                   </span>
@@ -156,7 +161,7 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
             <template v-else-if="parsed.extensionType === 'authorityKeyIdentifier'">
               <div class="space-y-1">
                 <div v-if="parsed.keyIdentifier">
-                  <span class="text-gray-500 dark:text-gray-400">Key ID:</span>
+                  <span class="text-gray-500 dark:text-gray-400">{{ t("extension.keyId") }}:</span>
                   <HexValue
                     class="ml-1"
                     :value="parsed.keyIdentifier"
@@ -170,7 +175,7 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
             <!-- Subject Key Identifier (has 'keyIdentifier' but it's the only field or no authorityCertIssuer) -->
             <template v-else-if="parsed.extensionType === 'subjectKeyIdentifier'">
               <div>
-                <span class="text-gray-500 dark:text-gray-400">Key ID:</span>
+                <span class="text-gray-500 dark:text-gray-400">{{ t("extension.keyId") }}:</span>
                 <HexValue
                   class="ml-1"
                   :value="parsed.keyIdentifier"
@@ -233,7 +238,9 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
             <!-- CRL Number -->
             <template v-else-if="parsed.extensionType === 'cRLNumber'">
               <div>
-                <span class="text-gray-500 dark:text-gray-400">CRL Number:</span>
+                <span class="text-gray-500 dark:text-gray-400"
+                  >{{ t("extension.crlNumber") }}:</span
+                >
                 <span class="ml-1 text-gray-900 dark:text-white">{{ parsed.number }}</span>
               </div>
             </template>
@@ -241,7 +248,9 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
             <!-- Delta CRL Indicator -->
             <template v-else-if="parsed.extensionType === 'deltaCRLIndicator'">
               <div>
-                <span class="text-gray-500 dark:text-gray-400">Base CRL Number:</span>
+                <span class="text-gray-500 dark:text-gray-400"
+                  >{{ t("extension.baseCrlNumber") }}:</span
+                >
                 <span class="ml-1 text-gray-900 dark:text-white">{{ parsed.baseCRLNumber }}</span>
               </div>
             </template>
@@ -258,13 +267,13 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
           <!-- Raw hex for unsupported/error -->
           <template v-else>
             <div v-if="extension.parseError" class="text-xs text-red-600 dark:text-red-400 mb-2">
-              Error: {{ extension.parseError }}
+              {{ t("extension.error") }}: {{ extension.parseError }}
             </div>
             <details class="text-xs">
               <summary
                 class="cursor-pointer text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
               >
-                Raw value (hex)
+                {{ t("extension.rawHex") }}
               </summary>
               <HexValue
                 block

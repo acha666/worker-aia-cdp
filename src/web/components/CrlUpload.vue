@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { useCrlsStore } from "../stores/crls";
 
 const store = useCrlsStore();
+const { t } = useI18n();
 
 const pemContent = ref("");
 const binaryData = ref<ArrayBuffer | null>(null);
@@ -111,7 +113,7 @@ async function processFile(file: File) {
     }
   } catch (error) {
     console.error("Error processing file:", error);
-    store.uploadError = "Failed to read file";
+    store.uploadError = t("upload.errors.readFile");
   }
 }
 
@@ -138,7 +140,7 @@ function focusTextarea() {
           d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
         />
       </svg>
-      Upload CRL
+      {{ t("upload.title") }}
     </h3>
 
     <!-- Success message -->
@@ -163,11 +165,16 @@ function focusTextarea() {
         <div>
           <p class="text-sm font-medium text-green-800 dark:text-green-200">
             CRL
-            {{ store.lastUploadResult.replaced ? "updated" : "uploaded" }}
-            successfully
+            {{
+              t(
+                store.lastUploadResult.replaced ? "upload.status.updated" : "upload.status.uploaded"
+              )
+            }}
+            {{ t("upload.status.success") }}
           </p>
           <p class="text-xs text-green-700 dark:text-green-300 mt-1">
-            {{ store.lastUploadResult.crlType === "delta" ? "Delta" : "Full" }} CRL saved to
+            {{ t(store.lastUploadResult.crlType === "delta" ? "common.delta" : "common.full") }}
+            {{ t("upload.status.savedTo") }}
             {{ store.lastUploadResult.id }}
           </p>
         </div>
@@ -194,7 +201,9 @@ function focusTextarea() {
           />
         </svg>
         <div>
-          <p class="text-sm font-medium text-red-800 dark:text-red-200">Upload failed</p>
+          <p class="text-sm font-medium text-red-800 dark:text-red-200">
+            {{ t("upload.errors.uploadFailed") }}
+          </p>
           <p class="text-xs text-red-700 dark:text-red-300 mt-1">{{ store.uploadError }}</p>
         </div>
       </div>
@@ -204,7 +213,7 @@ function focusTextarea() {
       <!-- Drop zone / textarea -->
       <div>
         <label class="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2"
-          >> PEM Content
+          >{{ t("upload.labels.pemContent") }}
         </label>
         <div
           class="relative rounded-lg"
@@ -223,12 +232,12 @@ function focusTextarea() {
                 ? 'outline-blue-400 dark:outline-blue-500 bg-blue-50 dark:bg-blue-900/20'
                 : 'outline-gray-300 dark:outline-dark-border bg-white dark:bg-dark-surface',
             ]"
-            placeholder="Paste or drag and drop a .crl/.pem/.der file here, or type PEM content directly"
+            :placeholder="t('upload.placeholder')"
           ></textarea>
           <!-- Hidden file upload input - positioned in corner -->
           <label
             class="absolute bottom-2 right-2 p-2 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors"
-            title="Click to select a file"
+            :title="t('upload.selectFile')"
           >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -246,16 +255,16 @@ function focusTextarea() {
       <!-- Submit -->
       <div class="flex items-center justify-between">
         <p v-if="!isValid && pemContent.trim()" class="text-sm text-red-600 dark:text-red-400">
-          Invalid PEM format. Must contain X509 CRL markers.
+          {{ t("upload.errors.invalidPem") }}
         </p>
         <p
           v-else-if="!isValid && !binaryData && pemContent.trim()"
           class="text-sm text-red-600 dark:text-red-400"
         >
-          No valid CRL content detected.
+          {{ t("upload.errors.noValidContent") }}
         </p>
         <p v-else class="text-sm text-gray-500 dark:text-gray-400">
-          {{ fileFormat === "der" ? "DER-formatted CRL" : "Paste or drop a PEM-encoded CRL" }}
+          {{ fileFormat === "der" ? t("upload.helpers.der") : t("upload.helpers.pem") }}
         </p>
         <button
           type="submit"
@@ -277,7 +286,7 @@ function focusTextarea() {
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
             ></path>
           </svg>
-          {{ store.uploading ? "Uploading..." : "Upload CRL" }}
+          {{ store.uploading ? t("upload.actions.uploading") : t("upload.actions.upload") }}
         </button>
       </div>
     </form>

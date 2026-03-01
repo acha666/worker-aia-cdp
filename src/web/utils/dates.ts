@@ -1,3 +1,41 @@
+import { i18n } from "../i18n";
+
+function getLocale(): string {
+  return i18n.global.locale.value || "en";
+}
+
+function t(key: string, named?: Record<string, string | number>): string {
+  if (named) {
+    return i18n.global.t(key, named) as string;
+  }
+  return i18n.global.t(key) as string;
+}
+
+function getNotAvailable(): string {
+  return t("common.notAvailable");
+}
+
+function formatDatePart(date: Date): string {
+  return new Intl.DateTimeFormat(getLocale(), {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatTimePart(date: Date): string {
+  return new Intl.DateTimeFormat(getLocale(), {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function withDirection(value: string, sign: number): string {
+  return sign >= 0 ? t("dates.in", { value }) : t("dates.ago", { value });
+}
+
 export function formatTimezoneOffset(date: Date): string {
   const offsetMinutes = -date.getTimezoneOffset();
   if (offsetMinutes === 0) return "UTC";
@@ -11,57 +49,45 @@ export function formatTimezoneOffset(date: Date): string {
 }
 
 export function formatDateReadable(iso: string | null): string {
-  if (!iso) return "N/A";
+  if (!iso) return getNotAvailable();
   try {
     const date = new Date(iso);
-    const month = MONTH_NAMES[date.getMonth()];
-    const day = String(date.getDate()).padStart(2, "0");
-    const year = date.getFullYear();
-    return `${month} ${day} ${year}`;
+    return formatDatePart(date);
   } catch {
     return iso;
   }
 }
 
 export function formatDateTimeWithZone(iso: string | null): string {
-  if (!iso) return "N/A";
+  if (!iso) return getNotAvailable();
   try {
     const date = new Date(iso);
-    const month = MONTH_NAMES[date.getMonth()];
-    const day = String(date.getDate()).padStart(2, "0");
-    const year = date.getFullYear();
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    const seconds = String(date.getSeconds()).padStart(2, "0");
+    const datePart = formatDatePart(date);
+    const timePart = formatTimePart(date);
     const tz = formatTimezoneOffset(date);
-    return `${month} ${day} ${year} ${hours}:${minutes}:${seconds} (${tz})`;
+    return `${datePart} ${timePart} (${tz})`;
   } catch {
     return iso;
   }
 }
 
 export function formatDateDay(iso: string | null): string {
-  if (!iso) return "N/A";
+  if (!iso) return getNotAvailable();
   try {
     const date = new Date(iso);
-    const month = MONTH_NAMES[date.getMonth()];
-    const day = String(date.getDate()).padStart(2, "0");
-    const year = date.getFullYear();
+    const datePart = formatDatePart(date);
     const tz = formatTimezoneOffset(date);
-    return `${month} ${day} ${year} (${tz})`;
+    return `${datePart} (${tz})`;
   } catch {
     return iso;
   }
 }
 
 export function formatDateDayWithoutTimezone(iso: string | null): string {
-  if (!iso) return "N/A";
+  if (!iso) return getNotAvailable();
   try {
     const date = new Date(iso);
-    const month = MONTH_NAMES[date.getMonth()];
-    const day = String(date.getDate()).padStart(2, "0");
-    const year = date.getFullYear();
-    return `${month} ${day} ${year}`;
+    return formatDatePart(date);
   } catch {
     return iso;
   }
@@ -73,7 +99,7 @@ export function formatRelativeSeconds(seconds: number): string {
   const sign = seconds >= 0 ? 1 : -1;
 
   if (abs < 86400) {
-    if (abs === 0) return "now";
+    if (abs === 0) return t("dates.now");
     const totalMinutes = Math.max(1, Math.round(abs / 60));
     let hours = Math.floor(totalMinutes / 60);
     let minutes = totalMinutes % 60;
@@ -82,26 +108,27 @@ export function formatRelativeSeconds(seconds: number): string {
       hours += 1;
       minutes = 0;
     }
-    const segments = [];
-    if (hours > 0) segments.push(`${hours}h`);
-    if (minutes > 0 || segments.length === 0) segments.push(`${minutes}m`);
-    return sign >= 0 ? `in ${segments.join(" ")}` : `${segments.join(" ")} ago`;
+    const segments: string[] = [];
+    if (hours > 0) segments.push(`${hours}${t("dates.short.hour")}`);
+    if (minutes > 0 || segments.length === 0) {
+      segments.push(`${minutes}${t("dates.short.minute")}`);
+    }
+    return withDirection(segments.join(" "), sign);
   }
 
-  const units = [
-    { label: "day", value: 86400 },
-    { label: "hour", value: 3600 },
-    { label: "minute", value: 60 },
-    { label: "second", value: 1 },
+  const units: { unit: Intl.RelativeTimeFormatUnit; value: number }[] = [
+    { unit: "day", value: 86400 },
+    { unit: "hour", value: 3600 },
+    { unit: "minute", value: 60 },
+    { unit: "second", value: 1 },
   ];
 
+  const relativeFormatter = new Intl.RelativeTimeFormat(getLocale(), { numeric: "always" });
+
   for (const unit of units) {
-    if (abs >= unit.value || unit.label === "second") {
+    if (abs >= unit.value || unit.unit === "second") {
       const count = Math.round(abs / unit.value);
-      const plural = count === 1 ? "" : "s";
-      return sign >= 0
-        ? `in ${count} ${unit.label}${plural}`
-        : `${count} ${unit.label}${plural} ago`;
+      return relativeFormatter.format(sign * count, unit.unit);
     }
   }
   return "";
@@ -128,12 +155,12 @@ export function formatRelativeDetailedSeconds(seconds: number): string {
   const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
   const minutes = totalMinutes % 60;
 
-  const segments = [] as string[];
-  if (days > 0) segments.push(`${days}d`);
-  if (hours > 0) segments.push(`${hours}h`);
-  if (minutes > 0 || segments.length === 0) segments.push(`${minutes}m`);
+  const segments: string[] = [];
+  if (days > 0) segments.push(`${days}${t("dates.short.day")}`);
+  if (hours > 0) segments.push(`${hours}${t("dates.short.hour")}`);
+  if (minutes > 0 || segments.length === 0) segments.push(`${minutes}${t("dates.short.minute")}`);
 
-  return sign >= 0 ? `in ${segments.join(" ")}` : `${segments.join(" ")} ago`;
+  return withDirection(segments.join(" "), sign);
 }
 
 export function getRelativeTimeDetailed(iso: string | null): string {
@@ -147,18 +174,3 @@ export function getRelativeTimeDetailed(iso: string | null): string {
     return "";
   }
 }
-
-const MONTH_NAMES = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];

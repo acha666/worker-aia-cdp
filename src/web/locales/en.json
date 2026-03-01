@@ -1,0 +1,151 @@
+{
+  "app": {
+    "title": "PKI AIA/CDP",
+    "sections": {
+      "certificates": "Certificates (AIA)",
+      "crls": "CRLs (CDP)",
+      "deltaCrls": "Delta CRLs (Delta-CDP)"
+    },
+    "empty": {
+      "certificates": "No certificates found",
+      "crls": "No CRLs found"
+    },
+    "footer": "PKI AIA/CDP Distribution Point · Powered by Cloudflare Workers"
+  },
+  "common": {
+    "itemCount": "1 item | {count} items",
+    "language": "Language",
+    "notAvailable": "N/A",
+    "emptyValue": "(empty)",
+    "unknown": "Unknown",
+    "yes": "Yes",
+    "no": "No",
+    "from": "From",
+    "until": "Until",
+    "showingFirst": "Showing first {limit} of {total} revoked certificates",
+    "delta": "Delta",
+    "full": "Full",
+    "bits": "bits"
+  },
+  "status": {
+    "valid": "Valid",
+    "expired": "Expired",
+    "notYetValid": "Not Yet Valid",
+    "current": "Current",
+    "stale": "Stale",
+    "active": "Active"
+  },
+  "dates": {
+    "now": "now",
+    "in": "in {value}",
+    "ago": "{value} ago",
+    "short": {
+      "day": "d",
+      "hour": "h",
+      "minute": "m"
+    }
+  },
+  "nameFields": {
+    "commonName": "Common Name",
+    "organization": "Organization",
+    "organizationalUnit": "Organizational Unit",
+    "countryName": "Country Name",
+    "stateProvince": "State/Province",
+    "locality": "Locality"
+  },
+  "crlCard": {
+    "unknownCrl": "Unknown CRL",
+    "revokedCount": "{count} revoked",
+    "issued": "Issued",
+    "nextUpdate": "Next update",
+    "toggleDetails": "Toggle details",
+    "loading": "Loading...",
+    "failedToLoadDetails": "Failed to load details"
+  },
+  "certificateCard": {
+    "unknownCertificate": "Unknown Certificate",
+    "issuer": "Issuer",
+    "toggleDetails": "Toggle details",
+    "loading": "Loading...",
+    "failedToLoadDetails": "Failed to load details"
+  },
+  "details": {
+    "certificate": {
+      "information": "Certificate Information",
+      "x509Version": "X.509 Version",
+      "serialNumber": "Serial Number",
+      "subject": "Subject",
+      "issuer": "Issuer",
+      "validity": "Validity",
+      "notBefore": "Not Before",
+      "notAfter": "Not After",
+      "status": "Status",
+      "cryptography": "Cryptography",
+      "signatureAlgorithm": "Signature Algorithm",
+      "publicKeyAlgorithm": "Public Key Algorithm",
+      "keySize": "Key Size",
+      "curve": "Curve",
+      "publicKeySha1": "Public Key SHA-1",
+      "publicKeySha256": "Public Key SHA-256",
+      "fingerprints": "Fingerprints",
+      "extensions": "Extensions"
+    },
+    "crl": {
+      "information": "CRL Information",
+      "version": "Version",
+      "revokedCertificates": "Revoked Certificates",
+      "issuer": "Issuer",
+      "validity": "Validity",
+      "thisUpdate": "This Update",
+      "nextUpdate": "Next Update",
+      "status": "Status",
+      "cryptography": "Cryptography",
+      "signatureAlgorithm": "Signature Algorithm",
+      "fingerprints": "Fingerprints",
+      "serialNumber": "Serial Number",
+      "revocationDate": "Revocation Date",
+      "reason": "Reason",
+      "extensions": "Extensions"
+    }
+  },
+  "extension": {
+    "critical": "Critical",
+    "oid": "OID",
+    "ca": "CA",
+    "pathLength": "Path Length",
+    "keyId": "Key ID",
+    "crlNumber": "CRL Number",
+    "baseCrlNumber": "Base CRL Number",
+    "error": "Error",
+    "rawHex": "Raw value (hex)",
+    "unknownType": "unknown"
+  },
+  "upload": {
+    "title": "Upload CRL",
+    "status": {
+      "uploaded": "uploaded",
+      "updated": "updated",
+      "success": "successfully",
+      "savedTo": "CRL saved to"
+    },
+    "errors": {
+      "uploadFailed": "Upload failed",
+      "invalidPem": "Invalid PEM format. Must contain X509 CRL markers.",
+      "noValidContent": "No valid CRL content detected.",
+      "readFile": "Failed to read file"
+    },
+    "labels": {
+      "pemContent": "PEM Content"
+    },
+    "placeholder": "Paste or drag and drop a .crl/.pem/.der file here, or type PEM content directly",
+    "selectFile": "Click to select a file",
+    "helpers": {
+      "der": "DER-formatted CRL",
+      "pem": "Paste or drop a PEM-encoded CRL"
+    },
+    "actions": {
+      "uploading": "Uploading...",
+      "upload": "Upload CRL"
+    }
+  }
+}

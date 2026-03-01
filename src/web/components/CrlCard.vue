@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import type { CrlListItem, CrlDetail } from "@contracts/schemas";
 import { useCrlsStore } from "../stores/crls";
 import StatusBadge from "./StatusBadge.vue";
@@ -14,6 +15,7 @@ const props = defineProps<{
 }>();
 
 const store = useCrlsStore();
+const { t } = useI18n();
 const expanded = ref(false);
 const detail = ref<CrlDetail | null>(null);
 
@@ -35,7 +37,7 @@ watch(
 
 const displayName = computed(() => {
   const issuerCommonName = props.crl.summary.issuerCommonName;
-  if (!issuerCommonName) return "Unknown CRL";
+  if (!issuerCommonName) return t("crlCard.unknownCrl");
   return issuerCommonName;
 });
 
@@ -50,7 +52,7 @@ const updateInfo = computed(() => {
   const { thisUpdate, nextUpdate } = props.crl.summary;
   return {
     issued: formatDateDayWithoutTimezone(thisUpdate),
-    expires: nextUpdate ? formatDateDay(nextUpdate) : "N/A",
+    expires: nextUpdate ? formatDateDay(nextUpdate) : t("common.notAvailable"),
     remaining: nextUpdate ? getRelativeTime(nextUpdate) : null,
   };
 });
@@ -91,14 +93,14 @@ const status = computed(() =>
           <p class="text-xs text-gray-600 dark:text-gray-400 mb-3">
             <span v-if="crl.summary.crlNumber">CRL #{{ crl.summary.crlNumber }}</span>
             <span v-if="crl.summary.crlNumber" class="mx-1">·</span>
-            <span>{{ crl.summary.revokedCount }} revoked</span>
+            <span>{{ t("crlCard.revokedCount", { count: crl.summary.revokedCount }) }}</span>
           </p>
 
           <!-- Update info -->
           <div class="text-xs text-gray-700 dark:text-dark-textMuted space-y-1">
             <div>
-              <span class="font-medium">Issued</span> {{ updateInfo.issued }} ·
-              <span class="font-medium">Next update</span>
+              <span class="font-medium">{{ t("crlCard.issued") }}</span> {{ updateInfo.issued }} ·
+              <span class="font-medium">{{ t("crlCard.nextUpdate") }}</span>
               {{ updateInfo.expires }}
               <span
                 v-if="status.state === 'current' && updateInfo.remaining"
@@ -127,7 +129,7 @@ const status = computed(() =>
               : 'text-purple-600 dark:text-purple-400 hover:text-purple-900 dark:hover:text-purple-300',
           ]"
           :aria-expanded="expanded"
-          title="Toggle details"
+          :title="t('crlCard.toggleDetails')"
           @click="toggle"
         >
           <svg
@@ -218,11 +220,13 @@ const status = computed(() =>
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
               ></path>
             </svg>
-            <span class="ml-2 text-xs text-gray-600 dark:text-gray-400">Loading...</span>
+            <span class="ml-2 text-xs text-gray-600 dark:text-gray-400">{{
+              t("crlCard.loading")
+            }}</span>
           </div>
           <CrlDetails v-else-if="detail" :crl="detail" />
           <div v-else class="text-center py-4 text-xs text-gray-500 dark:text-gray-400">
-            Failed to load details
+            {{ t("crlCard.failedToLoadDetails") }}
           </div>
         </div>
       </div>

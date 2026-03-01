@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { useCertificatesStore } from "./stores/certificates";
 import { useCrlsStore } from "./stores/crls";
 import { useTheme } from "./composables/useTheme";
+import { useLocale } from "./composables/useLocale";
 import CertificateCard from "./components/CertificateCard.vue";
 import CrlCard from "./components/CrlCard.vue";
 import CrlUpload from "./components/CrlUpload.vue";
@@ -10,6 +12,8 @@ import SectionState from "./components/SectionState.vue";
 
 const certificatesStore = useCertificatesStore();
 const crlsStore = useCrlsStore();
+const { t } = useI18n();
+const { locale, localeOptions } = useLocale();
 useTheme();
 
 onMounted(async () => {
@@ -23,8 +27,19 @@ onMounted(async () => {
     <header
       class="bg-white dark:bg-dark-surface shadow-sm border-b border-gray-200 dark:border-dark-border"
     >
-      <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">PKI AIA/CDP</h1>
+      <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t("app.title") }}</h1>
+        <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+          <span>{{ t("common.language") }}</span>
+          <select
+            v-model="locale"
+            class="rounded border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-gray-800 dark:text-white px-2 py-1"
+          >
+            <option v-for="option in localeOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+        </label>
       </div>
     </header>
 
@@ -34,13 +49,21 @@ onMounted(async () => {
         <!-- Certificates Section -->
         <section>
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Certificates (AIA)</h2>
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+              {{ t("app.sections.certificates") }}
+            </h2>
             <span
               v-if="!certificatesStore.loading"
               class="text-sm text-gray-500 dark:text-gray-400"
             >
-              {{ certificatesStore.items.length }} Item{{
-                certificatesStore.items.length !== 1 ? "s" : ""
+              {{
+                t(
+                  "common.itemCount",
+                  { count: certificatesStore.items.length },
+                  {
+                    plural: certificatesStore.items.length,
+                  }
+                )
               }}
             </span>
           </div>
@@ -49,7 +72,7 @@ onMounted(async () => {
             :show-loading="certificatesStore.loading && certificatesStore.items.length === 0"
             :error="certificatesStore.error"
             :is-empty="certificatesStore.isEmpty"
-            empty-text="No certificates found"
+            :empty-text="t('app.empty.certificates')"
           >
             <template #empty-icon>
               <svg
@@ -82,9 +105,19 @@ onMounted(async () => {
         <!-- CRLs Section -->
         <section>
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">CRLs (CDP)</h2>
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+              {{ t("app.sections.crls") }}
+            </h2>
             <span v-if="!crlsStore.loading" class="text-sm text-gray-500 dark:text-gray-400">
-              {{ crlsStore.fullCrls.length }} Item{{ crlsStore.fullCrls.length !== 1 ? "s" : "" }}
+              {{
+                t(
+                  "common.itemCount",
+                  { count: crlsStore.fullCrls.length },
+                  {
+                    plural: crlsStore.fullCrls.length,
+                  }
+                )
+              }}
             </span>
           </div>
 
@@ -92,7 +125,7 @@ onMounted(async () => {
             :show-loading="crlsStore.loading && crlsStore.allCrls.length === 0"
             :error="crlsStore.error"
             :is-empty="crlsStore.fullCrls.length === 0"
-            empty-text="No CRLs found"
+            :empty-text="t('app.empty.crls')"
           >
             <template #empty-icon>
               <svg
@@ -126,10 +159,18 @@ onMounted(async () => {
         <section v-if="crlsStore.deltaCrls.length > 0">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-              Delta CRLs (Delta-CDP)
+              {{ t("app.sections.deltaCrls") }}
             </h2>
             <span class="text-sm text-gray-500 dark:text-gray-400">
-              {{ crlsStore.deltaCrls.length }} Item{{ crlsStore.deltaCrls.length !== 1 ? "s" : "" }}
+              {{
+                t(
+                  "common.itemCount",
+                  { count: crlsStore.deltaCrls.length },
+                  {
+                    plural: crlsStore.deltaCrls.length,
+                  }
+                )
+              }}
             </span>
           </div>
 
@@ -157,7 +198,7 @@ onMounted(async () => {
     >
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <p class="text-sm text-gray-500 dark:text-gray-400 text-center">
-          PKI AIA/CDP Distribution Point · Powered by Cloudflare Workers
+          {{ t("app.footer") }}
         </p>
       </div>
     </footer>

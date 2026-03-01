@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import type { CertificateStatusState, CrlStatusState } from "../utils/status";
 
 const props = defineProps<{
@@ -7,35 +9,37 @@ const props = defineProps<{
   showLabel?: boolean;
 }>();
 
+const { t } = useI18n();
+
 const config = {
   // Certificate states
   valid: {
-    label: "Valid",
+    labelKey: "status.valid",
     bgColor: "bg-green-100 dark:bg-green-950/40",
     textColor: "text-green-700 dark:text-green-400",
     borderColor: "border-green-300 dark:border-green-800",
   },
   expired: {
-    label: "Expired",
+    labelKey: "status.expired",
     bgColor: "bg-red-100 dark:bg-red-950/40",
     textColor: "text-red-700 dark:text-red-400",
     borderColor: "border-red-300 dark:border-red-800",
   },
   "not-yet-valid": {
-    label: "Not Yet Valid",
+    labelKey: "status.notYetValid",
     bgColor: "bg-yellow-100 dark:bg-yellow-950/40",
     textColor: "text-yellow-700 dark:text-yellow-400",
     borderColor: "border-yellow-300 dark:border-yellow-800",
   },
   // CRL states
   current: {
-    label: "Current",
+    labelKey: "status.current",
     bgColor: "bg-green-100 dark:bg-green-950/40",
     textColor: "text-green-700 dark:text-green-400",
     borderColor: "border-green-300 dark:border-green-800",
   },
   stale: {
-    label: "Stale",
+    labelKey: "status.stale",
     bgColor: "bg-yellow-100 dark:bg-yellow-950/40",
     textColor: "text-yellow-700 dark:text-yellow-400",
     borderColor: "border-yellow-300 dark:border-yellow-800",
@@ -43,6 +47,7 @@ const config = {
 };
 
 const statusConfig = config[props.state] || config.valid;
+const statusLabel = computed(() => t(statusConfig.labelKey));
 </script>
 
 <template>
@@ -54,6 +59,6 @@ const statusConfig = config[props.state] || config.valid;
       statusConfig.borderColor,
     ]"
   >
-    {{ statusConfig.label }}
+    {{ statusLabel }}
   </span>
 </template>

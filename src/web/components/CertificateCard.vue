@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import type { CertificateListItem, CertificateDetail } from "@contracts/schemas";
 import { useCertificatesStore } from "../stores/certificates";
 import StatusBadge from "./StatusBadge.vue";
@@ -14,6 +15,7 @@ const props = defineProps<{
 }>();
 
 const store = useCertificatesStore();
+const { t } = useI18n();
 const expanded = ref(false);
 const detail = ref<CertificateDetail | null>(null);
 
@@ -36,7 +38,7 @@ watch(
 
 const displayName = computed(() => {
   const subjectCN = props.certificate.summary.subjectCN;
-  if (!subjectCN) return "Unknown Certificate";
+  if (!subjectCN) return t("certificateCard.unknownCertificate");
   return subjectCN;
 });
 
@@ -82,14 +84,15 @@ const status = computed(() =>
             <StatusBadge :state="status.state" type="certificate" />
           </div>
           <p class="text-xs text-gray-600 dark:text-gray-400 truncate mb-3">
-            Issuer: {{ certificate.summary.issuerCN || "Unknown" }}
+            {{ t("certificateCard.issuer") }}:
+            {{ certificate.summary.issuerCN || t("common.unknown") }}
           </p>
 
           <!-- Validity info - collapsed view only shows dates -->
           <div class="text-xs text-gray-700 dark:text-dark-textMuted space-y-1">
             <div>
-              <span class="font-medium">From</span> {{ validityInfo.from }} ·
-              <span class="font-medium">Until</span> {{ validityInfo.to }}
+              <span class="font-medium">{{ t("common.from") }}</span> {{ validityInfo.from }} ·
+              <span class="font-medium">{{ t("common.until") }}</span> {{ validityInfo.to }}
               <span
                 v-if="validityInfo.remaining && status.state === 'valid'"
                 class="text-green-700 dark:text-green-400"
@@ -107,7 +110,7 @@ const status = computed(() =>
         <button
           class="inline-flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
           :aria-expanded="expanded"
-          title="Toggle details"
+          :title="t('certificateCard.toggleDetails')"
           @click="toggle"
         >
           <svg
@@ -178,11 +181,13 @@ const status = computed(() =>
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
               ></path>
             </svg>
-            <span class="ml-2 text-xs text-gray-600 dark:text-gray-400">Loading...</span>
+            <span class="ml-2 text-xs text-gray-600 dark:text-gray-400">
+              {{ t("certificateCard.loading") }}
+            </span>
           </div>
           <CertificateDetails v-else-if="detail" :certificate="detail" />
           <div v-else class="text-center py-4 text-xs text-gray-500 dark:text-gray-400">
-            Failed to load details
+            {{ t("certificateCard.failedToLoadDetails") }}
           </div>
         </div>
       </div>
