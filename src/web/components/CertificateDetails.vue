@@ -97,293 +97,182 @@ const sortedExtensions = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Certificate Information -->
-    <section>
-      <h4
-        class="text-sm font-semibold text-gray-700 dark:text-dark-text mb-3 flex items-center gap-2"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-          />
-        </svg>
-        {{ t("details.certificate.information") }}
-      </h4>
-      <div class="space-y-4">
-        <dl class="space-y-2 text-sm">
-          <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-            <dt
-              class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
-            >
-              {{ t("details.certificate.x509Version") }}
-            </dt>
-            <dd class="text-gray-900 dark:text-white font-medium">
-              {{ certificate.tbsCertificate.version.display }}
-            </dd>
-          </div>
-          <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-            <dt
-              class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
-            >
-              {{ t("details.certificate.serialNumber") }}
-            </dt>
-            <dd class="text-gray-900 dark:text-white">
-              <HexValue
-                :value="certificate.tbsCertificate.serialNumber.hex"
-                variant="plain"
-                value-class="font-mono text-sm break-all"
-              />
-            </dd>
-          </div>
-        </dl>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div
-            class="border border-gray-200 dark:border-dark-border rounded dark:bg-dark-surface/30 bg-gray-50/60 p-3"
-          >
-            <h5
-              class="text-xs font-semibold text-gray-700 dark:text-dark-text uppercase tracking-wide mb-2"
-            >
-              {{ t("details.certificate.subject") }}
-            </h5>
-            <dl class="space-y-2 text-sm">
-              <div
-                v-for="field in subjectFields"
-                :key="field.labelKey"
-                class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline"
-              >
-                <dt
-                  class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
+  <div class="d-flex flex-column ga-4">
+    <v-card variant="tonal">
+      <v-card-title class="text-subtitle-1">{{
+        t("details.certificate.information")
+      }}</v-card-title>
+      <v-card-text>
+        <v-row>
+          <v-col cols="12" md="6">
+            <div class="d-flex flex-column ga-2 text-body-2">
+              <div>
+                <span class="text-medium-emphasis"
+                  >{{ t("details.certificate.x509Version") }}:</span
                 >
-                  {{ t(field.labelKey) }}
-                </dt>
-                <dd class="text-gray-900 dark:text-white font-medium">{{ field.value }}</dd>
+                <span class="ml-2 font-weight-medium">{{
+                  certificate.tbsCertificate.version.display
+                }}</span>
               </div>
-            </dl>
-          </div>
-          <div
-            class="border border-gray-200 dark:border-dark-border rounded dark:bg-dark-surface/30 bg-gray-50/60 p-3"
-          >
-            <h5
-              class="text-xs font-semibold text-gray-700 dark:text-dark-text uppercase tracking-wide mb-2"
-            >
-              {{ t("details.certificate.issuer") }}
-            </h5>
-            <dl class="space-y-2 text-sm">
-              <div
-                v-for="field in issuerFields"
-                :key="field.labelKey"
-                class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline"
-              >
-                <dt
-                  class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
+              <div>
+                <span class="text-medium-emphasis"
+                  >{{ t("details.certificate.serialNumber") }}:</span
                 >
-                  {{ t(field.labelKey) }}
-                </dt>
-                <dd class="text-gray-900 dark:text-white font-medium">{{ field.value }}</dd>
+                <HexValue
+                  class="ml-2"
+                  :value="certificate.tbsCertificate.serialNumber.hex"
+                  variant="plain"
+                  value-class="font-mono text-body-2"
+                />
               </div>
-            </dl>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Validity -->
-    <section>
-      <h4
-        class="text-sm font-semibold text-gray-700 dark:text-dark-text mb-3 flex items-center gap-2"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-        {{ t("details.certificate.validity") }}
-      </h4>
-      <dl class="space-y-2 text-sm">
-        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            {{ t("details.certificate.notBefore") }}
-          </dt>
-          <dd class="text-gray-900 dark:text-white font-medium">{{ validityDates.notBefore }}</dd>
-        </div>
-        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            {{ t("details.certificate.notAfter") }}
-          </dt>
-          <dd class="text-gray-900 dark:text-white font-medium">{{ validityDates.notAfter }}</dd>
-        </div>
-        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            {{ t("details.certificate.status") }}
-          </dt>
-          <dd class="text-gray-900 dark:text-white font-medium">
-            <div class="flex items-center gap-2">
-              <StatusBadge :state="validityStatus.state" type="certificate" />
-              <span v-if="validityStatus.detail" class="text-gray-600 dark:text-gray-400">
-                ({{ validityStatus.detail }})
-              </span>
             </div>
-          </dd>
-        </div>
-      </dl>
-    </section>
+          </v-col>
+          <v-col cols="12" md="6">
+            <v-card variant="outlined">
+              <v-card-title class="text-caption">{{
+                t("details.certificate.subject")
+              }}</v-card-title>
+              <v-card-text class="d-flex flex-column ga-1 text-body-2">
+                <div v-for="field in subjectFields" :key="field.labelKey">
+                  <span class="text-medium-emphasis">{{ t(field.labelKey) }}:</span>
+                  <span class="ml-2">{{ field.value }}</span>
+                </div>
+              </v-card-text>
+            </v-card>
+            <v-card variant="outlined" class="mt-3">
+              <v-card-title class="text-caption">{{
+                t("details.certificate.issuer")
+              }}</v-card-title>
+              <v-card-text class="d-flex flex-column ga-1 text-body-2">
+                <div v-for="field in issuerFields" :key="field.labelKey">
+                  <span class="text-medium-emphasis">{{ t(field.labelKey) }}:</span>
+                  <span class="ml-2">{{ field.value }}</span>
+                </div>
+              </v-card-text>
+            </v-card>
+          </v-col>
+        </v-row>
+      </v-card-text>
+    </v-card>
 
-    <!-- Cryptography -->
-    <section>
-      <h4
-        class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-          />
-        </svg>
-        {{ t("details.certificate.cryptography") }}
-      </h4>
-      <dl class="space-y-2 text-sm">
-        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            {{ t("details.certificate.signatureAlgorithm") }}
-          </dt>
-          <dd class="text-gray-900 dark:text-white font-medium">
+    <v-card variant="tonal">
+      <v-card-title class="text-subtitle-1">{{ t("details.certificate.validity") }}</v-card-title>
+      <v-card-text class="d-flex flex-column ga-2 text-body-2">
+        <div>
+          <span class="text-medium-emphasis">{{ t("details.certificate.notBefore") }}:</span>
+          <span class="ml-2">{{ validityDates.notBefore }}</span>
+        </div>
+        <div>
+          <span class="text-medium-emphasis">{{ t("details.certificate.notAfter") }}:</span>
+          <span class="ml-2">{{ validityDates.notAfter }}</span>
+        </div>
+        <div class="d-flex align-center ga-2">
+          <span class="text-medium-emphasis">{{ t("details.certificate.status") }}:</span>
+          <StatusBadge :state="validityStatus.state" type="certificate" />
+          <span v-if="validityStatus.detail" class="text-medium-emphasis"
+            >({{ validityStatus.detail }})</span
+          >
+        </div>
+      </v-card-text>
+    </v-card>
+
+    <v-card variant="tonal">
+      <v-card-title class="text-subtitle-1">{{
+        t("details.certificate.cryptography")
+      }}</v-card-title>
+      <v-card-text class="d-flex flex-column ga-2 text-body-2">
+        <div>
+          <span class="text-medium-emphasis"
+            >{{ t("details.certificate.signatureAlgorithm") }}:</span
+          >
+          <span class="ml-2">{{
+            certificate.signatureAlgorithm?.algorithm?.name ||
+            certificate.signatureAlgorithm?.algorithm?.oid ||
+            t("common.unknown")
+          }}</span>
+        </div>
+        <div>
+          <span class="text-medium-emphasis"
+            >{{ t("details.certificate.publicKeyAlgorithm") }}:</span
+          >
+          <span class="ml-2">{{
+            certificate.tbsCertificate.subjectPublicKeyInfo.algorithm?.algorithm?.name ||
+            certificate.tbsCertificate.subjectPublicKeyInfo.algorithm?.algorithm?.oid ||
+            t("common.unknown")
+          }}</span>
+        </div>
+        <div v-if="publicKeyInfo">
+          <span class="text-medium-emphasis"
+            >{{
+              publicKeyInfo.type === "RSA"
+                ? t("details.certificate.keySize")
+                : t("details.certificate.curve")
+            }}:</span
+          >
+          <span class="ml-2">
             {{
-              certificate.signatureAlgorithm?.algorithm?.name ||
-              certificate.signatureAlgorithm?.algorithm?.oid ||
-              t("common.unknown")
+              publicKeyInfo.type === "RSA"
+                ? `${publicKeyInfo.keySize} ${t("common.bits")}`
+                : publicKeyInfo.type === "EC"
+                  ? publicKeyInfo.curve
+                  : ""
             }}
-          </dd>
+          </span>
         </div>
-        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            {{ t("details.certificate.publicKeyAlgorithm") }}
-          </dt>
-          <dd class="text-gray-900 dark:text-white font-medium">
-            {{
-              certificate.tbsCertificate.subjectPublicKeyInfo.algorithm?.algorithm?.name ||
-              certificate.tbsCertificate.subjectPublicKeyInfo.algorithm?.algorithm?.oid ||
-              t("common.unknown")
-            }}
-          </dd>
-        </div>
-        <div v-if="publicKeyInfo" class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <template v-if="publicKeyInfo.type === 'RSA'">
-            <dt
-              class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
-            >
-              {{ t("details.certificate.keySize") }}
-            </dt>
-            <dd class="text-gray-900 dark:text-white font-medium">
-              {{ publicKeyInfo.keySize }} {{ t("common.bits") }}
-            </dd>
-          </template>
-          <template v-else-if="publicKeyInfo.type === 'EC'">
-            <dt
-              class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
-            >
-              {{ t("details.certificate.curve") }}
-            </dt>
-            <dd class="text-gray-900 dark:text-white font-medium">{{ publicKeyInfo.curve }}</dd>
-          </template>
-        </div>
-        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            {{ t("details.certificate.publicKeySha1") }}
-          </dt>
-          <dd class="text-gray-900 dark:text-white">
-            <HexValue
-              :value="certificate.tbsCertificate.subjectPublicKeyInfo.fingerprints.sha1"
-              variant="grouped"
-              value-class="font-mono text-sm break-all"
-            />
-          </dd>
-        </div>
-        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            {{ t("details.certificate.publicKeySha256") }}
-          </dt>
-          <dd class="text-gray-900 dark:text-white">
-            <HexValue
-              :value="certificate.tbsCertificate.subjectPublicKeyInfo.fingerprints.sha256"
-              variant="grouped"
-              value-class="font-mono text-sm break-all"
-            />
-          </dd>
-        </div>
-      </dl>
-    </section>
-
-    <!-- Fingerprints -->
-    <section>
-      <h4
-        class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"
+        <div>
+          <span class="text-medium-emphasis">{{ t("details.certificate.publicKeySha1") }}:</span>
+          <HexValue
+            class="ml-2"
+            :value="certificate.tbsCertificate.subjectPublicKeyInfo.fingerprints.sha1"
+            variant="grouped"
+            value-class="font-mono text-body-2"
           />
-        </svg>
-        {{ t("details.certificate.fingerprints") }}
-      </h4>
-      <dl class="space-y-2 text-sm">
-        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            SHA-1
-          </dt>
-          <dd class="text-gray-900 dark:text-white">
-            <HexValue
-              :value="certificate.fingerprints.sha1"
-              variant="grouped"
-              value-class="font-mono text-sm break-all"
-            />
-          </dd>
         </div>
-        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            SHA-256
-          </dt>
-          <dd class="text-gray-900 dark:text-white">
-            <HexValue
-              :value="certificate.fingerprints.sha256"
-              variant="grouped"
-              value-class="font-mono text-sm break-all"
-            />
-          </dd>
-        </div>
-      </dl>
-    </section>
-
-    <!-- Extensions -->
-    <section v-if="sortedExtensions.length">
-      <h4
-        class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+        <div>
+          <span class="text-medium-emphasis">{{ t("details.certificate.publicKeySha256") }}:</span>
+          <HexValue
+            class="ml-2"
+            :value="certificate.tbsCertificate.subjectPublicKeyInfo.fingerprints.sha256"
+            variant="grouped"
+            value-class="font-mono text-body-2"
           />
-        </svg>
+        </div>
+      </v-card-text>
+    </v-card>
+
+    <v-card variant="tonal">
+      <v-card-title class="text-subtitle-1">{{
+        t("details.certificate.fingerprints")
+      }}</v-card-title>
+      <v-card-text class="d-flex flex-column ga-2 text-body-2">
+        <div>
+          <span class="text-medium-emphasis">SHA-1:</span>
+          <HexValue
+            class="ml-2"
+            :value="certificate.fingerprints.sha1"
+            variant="grouped"
+            value-class="font-mono text-body-2"
+          />
+        </div>
+        <div>
+          <span class="text-medium-emphasis">SHA-256:</span>
+          <HexValue
+            class="ml-2"
+            :value="certificate.fingerprints.sha256"
+            variant="grouped"
+            value-class="font-mono text-body-2"
+          />
+        </div>
+      </v-card-text>
+    </v-card>
+
+    <v-card v-if="sortedExtensions.length" variant="tonal">
+      <v-card-title class="text-subtitle-1">
         {{ t("details.certificate.extensions") }} ({{ sortedExtensions.length }})
-      </h4>
-      <div class="space-y-2">
+      </v-card-title>
+      <v-card-text class="d-flex flex-column ga-2">
         <ExtensionView v-for="ext in sortedExtensions" :key="ext.extnID.oid" :extension="ext" />
-      </div>
-    </section>
+      </v-card-text>
+    </v-card>
   </div>
 </template>

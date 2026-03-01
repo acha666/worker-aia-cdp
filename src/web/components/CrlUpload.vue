@@ -10,7 +10,6 @@ const pemContent = ref("");
 const binaryData = ref<ArrayBuffer | null>(null);
 const dragActive = ref(false);
 const fileFormat = ref<"pem" | "der" | "unknown">("unknown");
-const textareaRef = ref<HTMLTextAreaElement | null>(null);
 
 const isValid = computed(() => {
   // DER format is valid if we have binary data
@@ -70,6 +69,13 @@ async function handleFileSelect(e: Event) {
   }
 }
 
+async function handleFileSelection(files: File[] | File | null) {
+  const selected = Array.isArray(files) ? files[0] : files;
+  if (selected) {
+    await processFile(selected);
+  }
+}
+
 async function processFile(file: File) {
   // Clear previous data
   pemContent.value = "";
@@ -116,179 +122,87 @@ async function processFile(file: File) {
     store.uploadError = t("upload.errors.readFile");
   }
 }
-
-function focusTextarea() {
-  textareaRef.value?.focus();
-}
 </script>
 
 <template>
-  <div
-    class="rounded-lg bg-white dark:bg-dark-surface shadow-sm p-6 border border-gray-200 dark:border-dark-border"
-  >
-    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-      <svg
-        class="w-5 h-5 text-blue-600 dark:text-blue-400"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-        />
-      </svg>
+  <v-card variant="outlined" rounded="lg">
+    <v-card-title class="d-flex align-center ga-2">
+      <v-icon icon="mdi-upload" color="primary" />
       {{ t("upload.title") }}
-    </h3>
-
-    <!-- Success message -->
-    <div
-      v-if="store.lastUploadResult"
-      class="mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg"
-    >
-      <div class="flex items-start gap-3">
-        <svg
-          class="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-        <div>
-          <p class="text-sm font-medium text-green-800 dark:text-green-200">
-            CRL
-            {{
-              t(
-                store.lastUploadResult.replaced ? "upload.status.updated" : "upload.status.uploaded"
-              )
-            }}
-            {{ t("upload.status.success") }}
-          </p>
-          <p class="text-xs text-green-700 dark:text-green-300 mt-1">
-            {{ t(store.lastUploadResult.crlType === "delta" ? "common.delta" : "common.full") }}
-            {{ t("upload.status.savedTo") }}
-            {{ store.lastUploadResult.id }}
-          </p>
+    </v-card-title>
+    <v-card-text>
+      <!-- Success message -->
+      <v-alert v-if="store.lastUploadResult" type="success" variant="tonal" class="mb-4">
+        <div class="text-body-2 font-weight-medium">
+          CRL
+          {{
+            t(store.lastUploadResult.replaced ? "upload.status.updated" : "upload.status.uploaded")
+          }}
+          {{ t("upload.status.success") }}
         </div>
-      </div>
-    </div>
-
-    <!-- Error message -->
-    <div
-      v-if="store.uploadError"
-      class="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg"
-    >
-      <div class="flex items-start gap-3">
-        <svg
-          class="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-        <div>
-          <p class="text-sm font-medium text-red-800 dark:text-red-200">
-            {{ t("upload.errors.uploadFailed") }}
-          </p>
-          <p class="text-xs text-red-700 dark:text-red-300 mt-1">{{ store.uploadError }}</p>
+        <div class="text-caption mt-1">
+          {{ t(store.lastUploadResult.crlType === "delta" ? "common.delta" : "common.full") }}
+          {{ t("upload.status.savedTo") }}
+          {{ store.lastUploadResult.id }}
         </div>
-      </div>
-    </div>
+      </v-alert>
 
-    <form class="space-y-4" @submit.prevent="handleSubmit">
-      <!-- Drop zone / textarea -->
-      <div>
-        <label class="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2"
-          >{{ t("upload.labels.pemContent") }}
-        </label>
-        <div
-          class="relative rounded-lg"
+      <!-- Error message -->
+      <v-alert v-if="store.uploadError" type="error" variant="tonal" class="mb-4">
+        <div class="text-body-2 font-weight-medium">{{ t("upload.errors.uploadFailed") }}</div>
+        <div class="text-caption mt-1">{{ store.uploadError }}</div>
+      </v-alert>
+
+      <form @submit.prevent="handleSubmit">
+        <v-file-input
+          :label="t('upload.selectFile')"
+          accept=".crl,.pem,.der"
+          prepend-icon="mdi-paperclip"
+          variant="outlined"
+          density="comfortable"
+          class="mb-4"
+          @update:model-value="handleFileSelection"
+          @change="handleFileSelect"
+        />
+
+        <v-sheet
+          border
+          rounded
+          :color="dragActive ? 'primary' : undefined"
+          :variant="dragActive ? 'tonal' : 'flat'"
+          class="pa-3"
           @dragover="handleDragOver"
           @dragleave="handleDragLeave"
           @drop="handleDrop"
-          @click="focusTextarea"
         >
-          <textarea
-            ref="textareaRef"
+          <v-textarea
             v-model="pemContent"
-            rows="8"
-            :class="[
-              'w-full px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 rounded-lg outline-2 outline-dashed outline-offset-[-1px] transition-colors dark:text-white dark:caret-white',
-              dragActive
-                ? 'outline-blue-400 dark:outline-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                : 'outline-gray-300 dark:outline-dark-border bg-white dark:bg-dark-surface',
-            ]"
+            :label="t('upload.labels.pemContent')"
             :placeholder="t('upload.placeholder')"
-          ></textarea>
-          <!-- Hidden file upload input - positioned in corner -->
-          <label
-            class="absolute bottom-2 right-2 p-2 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors"
-            :title="t('upload.selectFile')"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            <input type="file" accept=".crl,.pem,.der" class="hidden" @change="handleFileSelect" />
-          </label>
-        </div>
-      </div>
+            rows="8"
+            auto-grow
+            variant="outlined"
+            class="font-mono"
+          />
+        </v-sheet>
 
-      <!-- Submit -->
-      <div class="flex items-center justify-between">
-        <p v-if="!isValid && pemContent.trim()" class="text-sm text-red-600 dark:text-red-400">
-          {{ t("upload.errors.invalidPem") }}
-        </p>
-        <p
-          v-else-if="!isValid && !binaryData && pemContent.trim()"
-          class="text-sm text-red-600 dark:text-red-400"
-        >
-          {{ t("upload.errors.noValidContent") }}
-        </p>
-        <p v-else class="text-sm text-gray-500 dark:text-gray-400">
-          {{ fileFormat === "der" ? t("upload.helpers.der") : t("upload.helpers.pem") }}
-        </p>
-        <button
-          type="submit"
-          :disabled="!isValid || store.uploading"
-          class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          <svg v-if="store.uploading" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-            <circle
-              class="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              stroke-width="4"
-            ></circle>
-            <path
-              class="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-            ></path>
-          </svg>
-          {{ store.uploading ? t("upload.actions.uploading") : t("upload.actions.upload") }}
-        </button>
-      </div>
-    </form>
-  </div>
+        <div class="d-flex align-center justify-space-between mt-4 ga-2">
+          <p v-if="!isValid && pemContent.trim()" class="text-caption text-error">
+            {{ t("upload.errors.invalidPem") }}
+          </p>
+          <p v-else class="text-caption text-medium-emphasis">
+            {{ fileFormat === "der" ? t("upload.helpers.der") : t("upload.helpers.pem") }}
+          </p>
+          <v-btn
+            type="submit"
+            :disabled="!isValid || store.uploading"
+            :loading="store.uploading"
+            color="primary"
+          >
+            {{ store.uploading ? t("upload.actions.uploading") : t("upload.actions.upload") }}
+          </v-btn>
+        </div>
+      </form>
+    </v-card-text>
+  </v-card>
 </template>

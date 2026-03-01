@@ -1,10 +1,12 @@
 import { ref, onMounted } from "vue";
+import { useTheme as useVuetifyTheme } from "vuetify";
 
 type Theme = "light" | "dark" | "auto";
 
 const STORAGE_KEY = "theme-preference";
 
 export function useTheme() {
+  const vuetifyTheme = useVuetifyTheme();
   const theme = ref<Theme>("auto");
   const isDark = ref(false);
 
@@ -25,6 +27,8 @@ export function useTheme() {
     } else {
       html.classList.remove("dark");
     }
+
+    vuetifyTheme.global.name.value = prefersDark ? "dark" : "light";
   };
 
   const initializeTheme = () => {

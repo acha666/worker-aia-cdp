@@ -15,34 +15,24 @@ const config = {
   // Certificate states
   valid: {
     labelKey: "status.valid",
-    bgColor: "bg-green-100 dark:bg-green-950/40",
-    textColor: "text-green-700 dark:text-green-400",
-    borderColor: "border-green-300 dark:border-green-800",
+    color: "success",
   },
   expired: {
     labelKey: "status.expired",
-    bgColor: "bg-red-100 dark:bg-red-950/40",
-    textColor: "text-red-700 dark:text-red-400",
-    borderColor: "border-red-300 dark:border-red-800",
+    color: "error",
   },
   "not-yet-valid": {
     labelKey: "status.notYetValid",
-    bgColor: "bg-yellow-100 dark:bg-yellow-950/40",
-    textColor: "text-yellow-700 dark:text-yellow-400",
-    borderColor: "border-yellow-300 dark:border-yellow-800",
+    color: "warning",
   },
   // CRL states
   current: {
     labelKey: "status.current",
-    bgColor: "bg-green-100 dark:bg-green-950/40",
-    textColor: "text-green-700 dark:text-green-400",
-    borderColor: "border-green-300 dark:border-green-800",
+    color: "success",
   },
   stale: {
     labelKey: "status.stale",
-    bgColor: "bg-yellow-100 dark:bg-yellow-950/40",
-    textColor: "text-yellow-700 dark:text-yellow-400",
-    borderColor: "border-yellow-300 dark:border-yellow-800",
+    color: "warning",
   },
 };
 
@@ -51,14 +41,7 @@ const statusLabel = computed(() => t(statusConfig.labelKey));
 </script>
 
 <template>
-  <span
-    :class="[
-      'inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium border',
-      statusConfig.bgColor,
-      statusConfig.textColor,
-      statusConfig.borderColor,
-    ]"
-  >
+  <v-chip :color="statusConfig.color" variant="tonal" size="small" label>
     {{ statusLabel }}
-  </span>
+  </v-chip>
 </template>

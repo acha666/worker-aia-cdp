@@ -10,7 +10,7 @@ const props = defineProps<{
 
 const { t } = useI18n();
 
-const expanded = ref(false);
+const expanded = ref<number[]>([]);
 
 const extensionName = computed(() => {
   return props.extension.extnID.name || props.extension.extnID.oid;
@@ -37,255 +37,205 @@ function formatGeneralName(gn: { type?: string; value?: string }): string {
 </script>
 
 <template>
-  <div class="border border-gray-200 dark:border-dark-border rounded bg-white dark:bg-dark-surface">
-    <button
-      class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-      @click="expanded = !expanded"
-    >
-      <div class="flex items-center gap-2">
-        <span class="text-sm font-medium text-gray-900 dark:text-white">{{ extensionName }}</span>
-        <span
-          v-if="extension.critical"
-          class="px-1.5 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded dark:bg-red-900/40 dark:text-red-200"
-        >
-          {{ t("extension.critical") }}
-        </span>
-        <span
-          v-if="!isParsed"
-          class="px-1.5 py-0.5 text-xs font-medium bg-gray-100 dark:bg-dark-surface text-gray-600 dark:text-dark-textMuted rounded"
-        >
-          {{ extension.parseStatus }}
-        </span>
-      </div>
-      <svg
-        :class="[
-          'w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform',
-          expanded ? 'rotate-0' : '-rotate-90',
-        ]"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-      </svg>
-    </button>
+  <v-expansion-panels v-model="expanded" variant="accordion" elevation="0">
+    <v-expansion-panel>
+      <v-expansion-panel-title>
+        <div class="d-flex align-center ga-2 flex-wrap">
+          <span class="text-body-2 font-weight-medium">{{ extensionName }}</span>
+          <v-chip v-if="extension.critical" color="error" size="x-small" variant="tonal" label>
+            {{ t("extension.critical") }}
+          </v-chip>
+          <v-chip v-if="!isParsed" size="x-small" variant="tonal" label>
+            {{ extension.parseStatus }}
+          </v-chip>
+        </div>
+      </v-expansion-panel-title>
 
-    <Transition
-      enter-active-class="transition-all duration-150 ease-out"
-      enter-from-class="opacity-0 max-h-0"
-      enter-to-class="opacity-100 max-h-96"
-      leave-active-class="transition-all duration-150 ease-in"
-      leave-from-class="opacity-100 max-h-96"
-      leave-to-class="opacity-0 max-h-0"
-    >
-      <div v-if="expanded" class="overflow-hidden">
-        <div class="px-3 py-2 border-t border-gray-100 dark:border-dark-border text-sm">
-          <!-- OID -->
-          <div class="mb-2">
-            <span class="text-gray-500 dark:text-gray-400">{{ t("extension.oid") }}:</span>
-            <code class="ml-1 text-sm text-gray-700 dark:text-dark-text">{{
-              extension.extnID.oid
-            }}</code>
-          </div>
+      <v-expansion-panel-text>
+        <div class="mb-2 text-body-2">
+          <span class="text-medium-emphasis">{{ t("extension.oid") }}:</span>
+          <span class="ml-2 font-weight-medium">{{ extension.extnID.oid }}</span>
+        </div>
 
-          <!-- Parsed content -->
-          <template v-if="parsed">
-            <!-- Basic Constraints -->
-            <template v-if="parsed.extensionType === 'basicConstraints'">
-              <div class="space-y-1">
-                <div>
-                  <span class="text-gray-500 dark:text-gray-400">{{ t("extension.ca") }}:</span>
-                  <span
-                    class="ml-1"
-                    :class="
-                      parsed.cA
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-gray-600 dark:text-gray-400'
-                    "
-                  >
-                    {{ parsed.cA ? t("common.yes") : t("common.no") }}
-                  </span>
-                </div>
-                <div v-if="parsed.pathLenConstraint !== undefined">
-                  <span class="text-gray-500 dark:text-gray-400"
-                    >{{ t("extension.pathLength") }}:</span
-                  >
-                  <span class="ml-1 text-gray-900 dark:text-white">
-                    {{ parsed.pathLenConstraint }}
-                  </span>
-                </div>
-              </div>
-            </template>
-
-            <!-- Key Usage -->
-            <template v-else-if="parsed.extensionType === 'keyUsage'">
-              <div class="flex flex-wrap gap-1">
-                <span
-                  v-for="flag in parsed.usages || []"
-                  :key="flag"
-                  class="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded dark:bg-blue-900/40 dark:text-blue-200"
-                >
-                  {{ flag }}
-                </span>
-              </div>
-            </template>
-
-            <!-- Extended Key Usage -->
-            <template v-else-if="parsed.extensionType === 'extendedKeyUsage'">
-              <div class="flex flex-wrap gap-1">
-                <span
-                  v-for="usage in parsed.purposes || []"
-                  :key="usage.oid"
-                  class="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded dark:bg-purple-900/40 dark:text-purple-200"
-                  :title="usage.oid"
-                >
-                  {{ usage.name || usage.oid }}
-                </span>
-              </div>
-            </template>
-
-            <!-- Subject Alternative Name -->
-            <template v-else-if="parsed.extensionType === 'subjectAltName'">
-              <ul class="space-y-1">
-                <li
-                  v-for="(name, idx) in parsed.names || []"
-                  :key="idx"
-                  class="text-xs text-gray-700 dark:text-dark-text font-mono"
-                >
-                  {{ formatGeneralName(name) }}
-                </li>
-              </ul>
-            </template>
-
-            <!-- Authority Key Identifier -->
-            <template v-else-if="parsed.extensionType === 'authorityKeyIdentifier'">
-              <div class="space-y-1">
-                <div v-if="parsed.keyIdentifier">
-                  <span class="text-gray-500 dark:text-gray-400">{{ t("extension.keyId") }}:</span>
-                  <HexValue
-                    class="ml-1"
-                    :value="parsed.keyIdentifier"
-                    variant="grouped"
-                    value-class="text-sm text-gray-700 dark:text-dark-text break-all font-mono"
-                  />
-                </div>
-              </div>
-            </template>
-
-            <!-- Subject Key Identifier (has 'keyIdentifier' but it's the only field or no authorityCertIssuer) -->
-            <template v-else-if="parsed.extensionType === 'subjectKeyIdentifier'">
+        <template v-if="parsed">
+          <template v-if="parsed.extensionType === 'basicConstraints'">
+            <div class="d-flex flex-column ga-1 text-body-2">
               <div>
-                <span class="text-gray-500 dark:text-gray-400">{{ t("extension.keyId") }}:</span>
-                <HexValue
-                  class="ml-1"
-                  :value="parsed.keyIdentifier"
-                  variant="grouped"
-                  value-class="text-sm text-gray-700 dark:text-gray-300 break-all font-mono"
-                />
+                <span class="text-medium-emphasis">{{ t("extension.ca") }}:</span>
+                <v-chip
+                  class="ml-2"
+                  :color="parsed.cA ? 'success' : undefined"
+                  size="x-small"
+                  variant="tonal"
+                  label
+                >
+                  {{ parsed.cA ? t("common.yes") : t("common.no") }}
+                </v-chip>
               </div>
-            </template>
+              <div v-if="parsed.pathLenConstraint !== undefined">
+                <span class="text-medium-emphasis">{{ t("extension.pathLength") }}:</span>
+                <span class="ml-2">{{ parsed.pathLenConstraint }}</span>
+              </div>
+            </div>
+          </template>
 
-            <!-- CRL Distribution Points -->
-            <template v-else-if="parsed.extensionType === 'cRLDistributionPoints'">
-              <ul class="space-y-2">
-                <li v-for="(dp, idx) in parsed.distributionPoints || []" :key="idx" class="text-xs">
+          <template v-else-if="parsed.extensionType === 'keyUsage'">
+            <div class="d-flex flex-wrap ga-1">
+              <v-chip
+                v-for="flag in parsed.usages || []"
+                :key="flag"
+                size="x-small"
+                color="primary"
+                variant="tonal"
+                label
+              >
+                {{ flag }}
+              </v-chip>
+            </div>
+          </template>
+
+          <template v-else-if="parsed.extensionType === 'extendedKeyUsage'">
+            <div class="d-flex flex-wrap ga-1">
+              <v-chip
+                v-for="usage in parsed.purposes || []"
+                :key="usage.oid"
+                size="x-small"
+                color="secondary"
+                variant="tonal"
+                :title="usage.oid"
+                label
+              >
+                {{ usage.name || usage.oid }}
+              </v-chip>
+            </div>
+          </template>
+
+          <template v-else-if="parsed.extensionType === 'subjectAltName'">
+            <v-list density="compact" class="py-0">
+              <v-list-item v-for="(name, idx) in parsed.names || []" :key="idx" class="px-0">
+                <v-list-item-title class="font-mono text-caption">
+                  {{ formatGeneralName(name) }}
+                </v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </template>
+
+          <template
+            v-else-if="
+              parsed.extensionType === 'authorityKeyIdentifier' ||
+              parsed.extensionType === 'subjectKeyIdentifier'
+            "
+          >
+            <div v-if="parsed.keyIdentifier" class="text-body-2">
+              <span class="text-medium-emphasis">{{ t("extension.keyId") }}:</span>
+              <HexValue
+                class="ml-2"
+                :value="parsed.keyIdentifier"
+                variant="grouped"
+                value-class="text-body-2 font-mono"
+              />
+            </div>
+          </template>
+
+          <template v-else-if="parsed.extensionType === 'cRLDistributionPoints'">
+            <v-list density="compact" class="py-0">
+              <v-list-item
+                v-for="(dp, idx) in parsed.distributionPoints || []"
+                :key="idx"
+                class="px-0"
+              >
+                <v-list-item-title class="font-mono text-caption">
                   <template v-if="dp.distributionPoint?.fullName">
-                    <div
-                      v-for="(name, nidx) in dp.distributionPoint.fullName"
-                      :key="nidx"
-                      class="text-gray-700 dark:text-dark-text font-mono"
-                    >
+                    <div v-for="(name, nidx) in dp.distributionPoint.fullName" :key="nidx">
                       {{ formatGeneralName(name) }}
                     </div>
                   </template>
-                </li>
-              </ul>
-            </template>
+                </v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </template>
 
-            <!-- Authority Info Access -->
-            <template v-else-if="parsed.extensionType === 'authorityInfoAccess'">
-              <ul class="space-y-1">
-                <li
-                  v-for="(desc, idx) in parsed.accessDescriptions || []"
-                  :key="idx"
-                  class="text-xs"
-                >
-                  <span class="text-gray-500 dark:text-gray-400"
+          <template v-else-if="parsed.extensionType === 'authorityInfoAccess'">
+            <v-list density="compact" class="py-0">
+              <v-list-item
+                v-for="(desc, idx) in parsed.accessDescriptions || []"
+                :key="idx"
+                class="px-0"
+              >
+                <v-list-item-title class="text-caption">
+                  <span class="text-medium-emphasis"
                     >{{ desc.accessMethod.name || desc.accessMethod.oid }}:</span
                   >
-                  <span class="ml-1 text-gray-700 dark:text-dark-text font-mono">{{
-                    formatGeneralName(desc.accessLocation)
-                  }}</span>
-                </li>
-              </ul>
-            </template>
-
-            <!-- Certificate Policies -->
-            <template v-else-if="parsed.extensionType === 'certificatePolicies'">
-              <ul class="space-y-1">
-                <li
-                  v-for="policy in parsed.policies || []"
-                  :key="policy.policyIdentifier.oid"
-                  class="text-xs"
-                >
-                  <span class="text-gray-700 dark:text-dark-text">{{
-                    policy.policyIdentifier.name || policy.policyIdentifier.oid
-                  }}</span>
-                </li>
-              </ul>
-            </template>
-
-            <!-- CRL Number -->
-            <template v-else-if="parsed.extensionType === 'cRLNumber'">
-              <div>
-                <span class="text-gray-500 dark:text-gray-400"
-                  >{{ t("extension.crlNumber") }}:</span
-                >
-                <span class="ml-1 text-gray-900 dark:text-white">{{ parsed.number }}</span>
-              </div>
-            </template>
-
-            <!-- Delta CRL Indicator -->
-            <template v-else-if="parsed.extensionType === 'deltaCRLIndicator'">
-              <div>
-                <span class="text-gray-500 dark:text-gray-400"
-                  >{{ t("extension.baseCrlNumber") }}:</span
-                >
-                <span class="ml-1 text-gray-900 dark:text-white">{{ parsed.baseCRLNumber }}</span>
-              </div>
-            </template>
-
-            <!-- Generic fallback -->
-            <template v-else>
-              <pre
-                class="text-xs text-gray-600 dark:text-dark-textMuted bg-gray-50 dark:bg-dark-surface/50 p-2 rounded overflow-auto max-h-40"
-                >{{ JSON.stringify(parsed, null, 2) }}</pre
-              >
-            </template>
+                  <span class="ml-2 font-mono">{{ formatGeneralName(desc.accessLocation) }}</span>
+                </v-list-item-title>
+              </v-list-item>
+            </v-list>
           </template>
 
-          <!-- Raw hex for unsupported/error -->
-          <template v-else>
-            <div v-if="extension.parseError" class="text-xs text-red-600 dark:text-red-400 mb-2">
-              {{ t("extension.error") }}: {{ extension.parseError }}
+          <template v-else-if="parsed.extensionType === 'certificatePolicies'">
+            <v-list density="compact" class="py-0">
+              <v-list-item
+                v-for="policy in parsed.policies || []"
+                :key="policy.policyIdentifier.oid"
+                class="px-0"
+              >
+                <v-list-item-title class="text-caption">
+                  {{ policy.policyIdentifier.name || policy.policyIdentifier.oid }}
+                </v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </template>
+
+          <template v-else-if="parsed.extensionType === 'cRLNumber'">
+            <div class="text-body-2">
+              <span class="text-medium-emphasis">{{ t("extension.crlNumber") }}:</span>
+              <span class="ml-2">{{ parsed.number }}</span>
             </div>
-            <details class="text-xs">
-              <summary
-                class="cursor-pointer text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-              >
-                {{ t("extension.rawHex") }}
-              </summary>
-              <HexValue
-                block
-                class="mt-1 p-2 bg-gray-50 dark:bg-dark-surface/50 rounded text-gray-600 dark:text-dark-textMuted break-all max-h-32 overflow-auto"
-                :value="extension.extnValue.hex"
-                variant="grouped"
-                value-class="text-sm font-mono"
-              />
-            </details>
           </template>
-        </div>
-      </div>
-    </Transition>
-  </div>
+
+          <template v-else-if="parsed.extensionType === 'deltaCRLIndicator'">
+            <div class="text-body-2">
+              <span class="text-medium-emphasis">{{ t("extension.baseCrlNumber") }}:</span>
+              <span class="ml-2">{{ parsed.baseCRLNumber }}</span>
+            </div>
+          </template>
+
+          <template v-else>
+            <v-sheet border rounded class="pa-2">
+              <pre class="text-caption" style="white-space: pre-wrap">{{
+                JSON.stringify(parsed, null, 2)
+              }}</pre>
+            </v-sheet>
+          </template>
+        </template>
+
+        <template v-else>
+          <v-alert
+            v-if="extension.parseError"
+            type="error"
+            variant="tonal"
+            density="compact"
+            class="mb-2"
+          >
+            {{ t("extension.error") }}: {{ extension.parseError }}
+          </v-alert>
+          <v-expansion-panels variant="accordion" elevation="0">
+            <v-expansion-panel>
+              <v-expansion-panel-title class="text-caption">{{
+                t("extension.rawHex")
+              }}</v-expansion-panel-title>
+              <v-expansion-panel-text>
+                <HexValue
+                  block
+                  :value="extension.extnValue.hex"
+                  variant="grouped"
+                  value-class="text-body-2 font-mono"
+                />
+              </v-expansion-panel-text>
+            </v-expansion-panel>
+          </v-expansion-panels>
+        </template>
+      </v-expansion-panel-text>
+    </v-expansion-panel>
+  </v-expansion-panels>
 </template>

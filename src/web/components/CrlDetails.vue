@@ -99,276 +99,130 @@ const revokedCount = props.crl.tbsCertList.revokedCertificates?.count || 0;
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- CRL Information -->
-    <section>
-      <h4
-        class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-          />
-        </svg>
-        {{ t("details.crl.information") }}
-      </h4>
-      <div class="space-y-4">
-        <dl class="space-y-2 text-sm">
-          <div
-            v-if="crl.tbsCertList.version"
-            class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline"
-          >
-            <dt
-              class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
-            >
-              {{ t("details.crl.version") }}
-            </dt>
-            <dd class="text-gray-900 dark:text-white font-medium">
-              {{ crl.tbsCertList.version.display }}
-            </dd>
+  <div class="d-flex flex-column ga-4">
+    <v-card variant="tonal">
+      <v-card-title class="text-subtitle-1">{{ t("details.crl.information") }}</v-card-title>
+      <v-card-text>
+        <div class="d-flex flex-column ga-2 text-body-2">
+          <div v-if="crl.tbsCertList.version">
+            <span class="text-medium-emphasis">{{ t("details.crl.version") }}:</span>
+            <span class="ml-2">{{ crl.tbsCertList.version.display }}</span>
           </div>
-          <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-            <dt
-              class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
-            >
-              {{ t("details.crl.revokedCertificates") }}
-            </dt>
-            <dd class="text-gray-900 dark:text-white font-medium">{{ revokedCount }}</dd>
+          <div>
+            <span class="text-medium-emphasis">{{ t("details.crl.revokedCertificates") }}:</span>
+            <span class="ml-2">{{ revokedCount }}</span>
           </div>
-        </dl>
+        </div>
 
-        <div
-          class="border border-gray-200 dark:border-dark-border rounded dark:bg-dark-surface/30 bg-gray-50/60 p-3"
-        >
-          <h5
-            class="text-xs font-semibold text-gray-700 dark:text-dark-text uppercase tracking-wide mb-2"
+        <v-card variant="outlined" class="mt-4">
+          <v-card-title class="text-caption">{{ t("details.crl.issuer") }}</v-card-title>
+          <v-card-text class="d-flex flex-column ga-1 text-body-2">
+            <div v-for="field in issuerFields" :key="field.labelKey">
+              <span class="text-medium-emphasis">{{ t(field.labelKey) }}:</span>
+              <span class="ml-2">{{ field.value }}</span>
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-card-text>
+    </v-card>
+
+    <v-card variant="tonal">
+      <v-card-title class="text-subtitle-1">{{ t("details.crl.validity") }}</v-card-title>
+      <v-card-text class="d-flex flex-column ga-2 text-body-2">
+        <div>
+          <span class="text-medium-emphasis">{{ t("details.crl.thisUpdate") }}:</span>
+          <span class="ml-2">{{ validityDates.thisUpdate }}</span>
+        </div>
+        <div>
+          <span class="text-medium-emphasis">{{ t("details.crl.nextUpdate") }}:</span>
+          <span class="ml-2">{{ validityDates.nextUpdate }}</span>
+        </div>
+        <div class="d-flex align-center ga-2">
+          <span class="text-medium-emphasis">{{ t("details.crl.status") }}:</span>
+          <StatusBadge :state="validityStatus.state" type="crl" />
+          <span v-if="validityStatus.detail" class="text-medium-emphasis"
+            >({{ validityStatus.detail }})</span
           >
-            {{ t("details.crl.issuer") }}
-          </h5>
-          <dl class="space-y-2 text-sm">
-            <div
-              v-for="field in issuerFields"
-              :key="field.labelKey"
-              class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline"
-            >
-              <dt
-                class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
-              >
-                {{ t(field.labelKey) }}
-              </dt>
-              <dd class="text-gray-900 dark:text-white font-medium">{{ field.value }}</dd>
-            </div>
-          </dl>
         </div>
-      </div>
-    </section>
+      </v-card-text>
+    </v-card>
 
-    <!-- Validity -->
-    <section>
-      <h4
-        class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-        {{ t("details.crl.validity") }}
-      </h4>
-      <dl class="space-y-2 text-sm">
-        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            {{ t("details.crl.thisUpdate") }}
-          </dt>
-          <dd class="text-gray-900 dark:text-white font-medium">{{ validityDates.thisUpdate }}</dd>
-        </div>
-        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            {{ t("details.crl.nextUpdate") }}
-          </dt>
-          <dd class="text-gray-900 dark:text-white font-medium">{{ validityDates.nextUpdate }}</dd>
-        </div>
-        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            {{ t("details.crl.status") }}
-          </dt>
-          <dd class="text-gray-900 dark:text-white font-medium">
-            <div class="flex items-center gap-2">
-              <StatusBadge :state="validityStatus.state" type="crl" />
-              <span v-if="validityStatus.detail" class="text-gray-600 dark:text-gray-400">
-                ({{ validityStatus.detail }})
-              </span>
-            </div>
-          </dd>
-        </div>
-      </dl>
-    </section>
+    <v-card variant="tonal">
+      <v-card-title class="text-subtitle-1">{{ t("details.crl.cryptography") }}</v-card-title>
+      <v-card-text class="text-body-2">
+        <span class="text-medium-emphasis">{{ t("details.crl.signatureAlgorithm") }}:</span>
+        <span class="ml-2">{{
+          crl.signatureAlgorithm?.algorithm?.name ||
+          crl.signatureAlgorithm?.algorithm?.oid ||
+          t("common.unknown")
+        }}</span>
+      </v-card-text>
+    </v-card>
 
-    <!-- Cryptography -->
-    <section>
-      <h4
-        class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-          />
-        </svg>
-        {{ t("details.crl.cryptography") }}
-      </h4>
-      <dl class="space-y-2 text-sm">
-        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            {{ t("details.crl.signatureAlgorithm") }}
-          </dt>
-          <dd class="text-gray-900 dark:text-white font-medium">
-            {{
-              crl.signatureAlgorithm?.algorithm?.name ||
-              crl.signatureAlgorithm?.algorithm?.oid ||
-              t("common.unknown")
-            }}
-          </dd>
+    <v-card variant="tonal">
+      <v-card-title class="text-subtitle-1">{{ t("details.crl.fingerprints") }}</v-card-title>
+      <v-card-text class="d-flex flex-column ga-2 text-body-2">
+        <div>
+          <span class="text-medium-emphasis">SHA-1:</span>
+          <HexValue class="ml-2" :value="crl.fingerprints.sha1" variant="grouped" />
         </div>
-      </dl>
-    </section>
+        <div>
+          <span class="text-medium-emphasis">SHA-256:</span>
+          <HexValue class="ml-2" :value="crl.fingerprints.sha256" variant="grouped" />
+        </div>
+      </v-card-text>
+    </v-card>
 
-    <!-- Fingerprints -->
-    <section>
-      <h4
-        class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"
-          />
-        </svg>
-        {{ t("details.crl.fingerprints") }}
-      </h4>
-      <dl class="space-y-2 text-sm">
-        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-baseline">
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            SHA-1
-          </dt>
-          <dd class="text-gray-900 dark:text-white">
-            <HexValue :value="crl.fingerprints.sha1" variant="grouped" />
-          </dd>
-        </div>
-        <div class="grid grid-cols-[160px_1fr] gap-x-3 items-start">
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            SHA-256
-          </dt>
-          <dd class="text-gray-900 dark:text-white">
-            <HexValue :value="crl.fingerprints.sha256" variant="grouped" />
-          </dd>
-        </div>
-      </dl>
-    </section>
-
-    <!-- Revoked Certificates -->
-    <section v-if="revokedCount > 0">
-      <h4
-        class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
-          />
-        </svg>
+    <v-card v-if="revokedCount > 0" variant="tonal">
+      <v-card-title class="text-subtitle-1">
         {{ t("details.crl.revokedCertificates") }} ({{ revokedCount }})
-      </h4>
-      <div
-        class="max-h-64 overflow-auto border border-gray-200 dark:border-dark-border rounded bg-white dark:bg-dark-surface"
-      >
-        <table class="min-w-full text-sm">
-          <thead class="bg-gray-50 dark:bg-dark-surface/50 sticky top-0">
+      </v-card-title>
+      <v-card-text>
+        <v-table density="compact" fixed-header height="320">
+          <thead>
             <tr>
-              <th
-                class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-              >
-                {{ t("details.crl.serialNumber") }}
-              </th>
-              <th
-                class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-              >
-                {{ t("details.crl.revocationDate") }}
-              </th>
-              <th
-                class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-              >
-                {{ t("details.crl.reason") }}
-              </th>
+              <th>{{ t("details.crl.serialNumber") }}</th>
+              <th>{{ t("details.crl.revocationDate") }}</th>
+              <th>{{ t("details.crl.reason") }}</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-100 dark:divide-gray-600">
+          <tbody>
             <tr v-for="cert in formattedRevokedCerts.slice(0, 100)" :key="cert.userCertificate.hex">
-              <td class="px-3 py-2 text-gray-700 dark:text-dark-text">
+              <td>
                 <HexValue
                   :value="cert.userCertificate.hex"
                   variant="plain"
-                  value-class="font-mono text-sm break-all"
+                  value-class="font-mono text-body-2"
                 />
               </td>
-              <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
-                {{ cert.revocationDateFormatted }}
-              </td>
-              <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
+              <td>{{ cert.revocationDateFormatted }}</td>
+              <td>
                 <template v-if="cert.crlEntryExtensions?.items">
                   <template
                     v-for="ext in cert.crlEntryExtensions?.items || []"
                     :key="ext.extnID.oid"
                   >
-                    <span v-if="getCrlReasonName(ext)">
-                      {{ getCrlReasonName(ext) }}
-                    </span>
+                    <span v-if="getCrlReasonName(ext)">{{ getCrlReasonName(ext) }}</span>
                   </template>
                 </template>
-                <span v-else class="text-gray-400 dark:text-gray-500">-</span>
+                <span v-else>-</span>
               </td>
             </tr>
           </tbody>
-        </table>
-        <div
-          v-if="revokedCount > 100"
-          class="px-3 py-2 text-xs text-gray-500 dark:text-dark-textMuted bg-gray-50 dark:bg-dark-surface/50 border-t border-gray-200 dark:border-dark-border"
-        >
+        </v-table>
+        <div v-if="revokedCount > 100" class="text-caption text-medium-emphasis mt-2">
           {{ t("common.showingFirst", { limit: 100, total: revokedCount }) }}
         </div>
-      </div>
-    </section>
+      </v-card-text>
+    </v-card>
 
-    <!-- Extensions -->
-    <section v-if="sortedExtensions.length">
-      <h4
-        class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2"
+    <v-card v-if="sortedExtensions.length" variant="tonal">
+      <v-card-title class="text-subtitle-1"
+        >{{ t("details.crl.extensions") }} ({{ sortedExtensions.length }})</v-card-title
       >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
-          />
-        </svg>
-        {{ t("details.crl.extensions") }} ({{ sortedExtensions.length }})
-      </h4>
-      <div class="space-y-2">
+      <v-card-text class="d-flex flex-column ga-2">
         <ExtensionView v-for="ext in sortedExtensions" :key="ext.extnID.oid" :extension="ext" />
-      </div>
-    </section>
+      </v-card-text>
+    </v-card>
   </div>
 </template>

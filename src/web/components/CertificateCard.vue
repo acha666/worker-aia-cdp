@@ -67,130 +67,57 @@ const status = computed(() =>
 </script>
 
 <template>
-  <div
-    class="overflow-hidden bg-white dark:bg-dark-surface border-l-4 border-l-blue-500 dark:border-l-blue-400 shadow-sm hover:shadow-md transition-shadow border-b border-gray-200 dark:border-dark-border"
-    :class="[props.isFirst ? 'rounded-t-lg' : '', props.isLast ? 'rounded-b-lg' : '']"
-  >
-    <!-- Header -->
-    <div
-      class="p-4 bg-gradient-to-r from-blue-50 dark:from-blue-950/30 to-white dark:to-dark-surface"
-    >
-      <div class="flex items-start justify-between gap-3">
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 mb-2">
-            <h3 class="text-base font-bold text-gray-900 dark:text-white truncate">
-              {{ displayName }}
-            </h3>
-            <StatusBadge :state="status.state" type="certificate" />
-          </div>
-          <p class="text-xs text-gray-600 dark:text-gray-400 truncate mb-3">
-            {{ t("certificateCard.issuer") }}:
-            {{ certificate.summary.issuerCN || t("common.unknown") }}
-          </p>
-
-          <!-- Validity info - collapsed view only shows dates -->
-          <div class="text-xs text-gray-700 dark:text-dark-textMuted space-y-1">
-            <div>
-              <span class="font-medium">{{ t("common.from") }}</span> {{ validityInfo.from }} ·
-              <span class="font-medium">{{ t("common.until") }}</span> {{ validityInfo.to }}
-              <span
-                v-if="validityInfo.remaining && status.state === 'valid'"
-                class="text-green-700 dark:text-green-400"
-              >
-                ({{ validityInfo.remaining }})
-              </span>
-            </div>
-          </div>
+  <v-card variant="outlined" rounded="lg">
+    <v-card-item>
+      <template #title>
+        <div class="d-flex align-center ga-2 flex-wrap">
+          <span class="text-body-1 font-weight-bold">{{ displayName }}</span>
+          <StatusBadge :state="status.state" type="certificate" />
         </div>
+      </template>
+      <template #subtitle>
+        {{ t("certificateCard.issuer") }}:
+        {{ certificate.summary.issuerCN || t("common.unknown") }}
+      </template>
+    </v-card-item>
+
+    <v-card-text class="pt-0">
+      <div class="text-body-2">
+        <span class="font-weight-medium">{{ t("common.from") }}</span> {{ validityInfo.from }} ·
+        <span class="font-weight-medium">{{ t("common.until") }}</span> {{ validityInfo.to }}
+        <span v-if="validityInfo.remaining && status.state === 'valid'" class="text-success">
+          ({{ validityInfo.remaining }})
+        </span>
       </div>
+    </v-card-text>
 
-      <!-- Download buttons and expand button -->
-      <div class="mt-3 flex items-center justify-between gap-2">
-        <!-- Expand button -->
-        <button
-          class="inline-flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-          :aria-expanded="expanded"
-          :title="t('certificateCard.toggleDetails')"
-          @click="toggle"
-        >
-          <svg
-            :class="['w-5 h-5 transition-transform', expanded ? 'rotate-0' : '-rotate-90']"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
-        </button>
+    <v-card-actions>
+      <v-btn
+        :icon="expanded ? 'mdi-chevron-up' : 'mdi-chevron-down'"
+        variant="text"
+        :aria-expanded="expanded"
+        :title="t('certificateCard.toggleDetails')"
+        @click="toggle"
+      />
+      <v-spacer />
+      <v-btn :href="downloadUrls.der" download variant="outlined" size="small">DER</v-btn>
+      <v-btn :href="downloadUrls.pem" download variant="outlined" size="small">PEM</v-btn>
+    </v-card-actions>
 
-        <!-- Format buttons -->
-        <div class="flex items-center gap-2">
-          <a
-            :href="downloadUrls.der"
-            class="inline-flex items-center px-2.5 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 border border-blue-600 dark:border-blue-400 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-            download
-          >
-            DER
-          </a>
-          <a
-            :href="downloadUrls.pem"
-            class="inline-flex items-center px-2.5 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 border border-blue-600 dark:border-blue-400 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-            download
-          >
-            PEM
-          </a>
-        </div>
-      </div>
-    </div>
-
-    <!-- Details panel -->
-    <Transition
-      enter-active-class="transition-all duration-200 ease-out"
-      enter-from-class="opacity-0 max-h-0"
-      enter-to-class="opacity-100 max-h-[2000px]"
-      leave-active-class="transition-all duration-200 ease-in"
-      leave-from-class="opacity-100 max-h-[2000px]"
-      leave-to-class="opacity-0 max-h-0"
-    >
-      <div v-if="expanded" class="overflow-hidden">
-        <div
-          class="border-t border-blue-200 dark:border-blue-900/50 p-4 bg-white dark:bg-dark-surface"
-        >
-          <div v-if="isLoading" class="flex items-center justify-center py-8">
-            <svg
-              class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              ></circle>
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              ></path>
-            </svg>
-            <span class="ml-2 text-xs text-gray-600 dark:text-gray-400">
-              {{ t("certificateCard.loading") }}
-            </span>
+    <v-expand-transition>
+      <div v-if="expanded">
+        <v-divider />
+        <v-card-text>
+          <div v-if="isLoading" class="d-flex align-center justify-center py-6 ga-2">
+            <v-progress-circular indeterminate color="primary" size="20" width="2" />
+            <span class="text-caption">{{ t("certificateCard.loading") }}</span>
           </div>
           <CertificateDetails v-else-if="detail" :certificate="detail" />
-          <div v-else class="text-center py-4 text-xs text-gray-500 dark:text-gray-400">
+          <div v-else class="text-center py-2 text-caption text-medium-emphasis">
             {{ t("certificateCard.failedToLoadDetails") }}
           </div>
-        </div>
+        </v-card-text>
       </div>
-    </Transition>
-  </div>
+    </v-expand-transition>
+  </v-card>
 </template>

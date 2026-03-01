@@ -22,52 +22,40 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-dark-bg transition-colors">
-    <!-- Header -->
-    <header
-      class="bg-white dark:bg-dark-surface shadow-sm border-b border-gray-200 dark:border-dark-border"
-    >
-      <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t("app.title") }}</h1>
-        <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-          <span>{{ t("common.language") }}</span>
-          <select
+  <v-app>
+    <v-app-bar flat border>
+      <v-container class="d-flex align-center justify-space-between">
+        <v-toolbar-title>{{ t("app.title") }}</v-toolbar-title>
+        <div class="d-flex align-center ga-2" style="max-width: 260px">
+          <span class="text-body-2 text-medium-emphasis">{{ t("common.language") }}</span>
+          <v-select
             v-model="locale"
-            class="rounded border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-gray-800 dark:text-white px-2 py-1"
-          >
-            <option v-for="option in localeOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-        </label>
-      </div>
-    </header>
+            :items="localeOptions"
+            item-title="label"
+            item-value="value"
+            density="compact"
+            variant="outlined"
+            hide-details
+          />
+        </div>
+      </v-container>
+    </v-app-bar>
 
-    <!-- Main content -->
-    <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div class="space-y-8">
-        <!-- Certificates Section -->
+    <v-main>
+      <v-container class="py-8 d-flex flex-column ga-8" max-width="960">
         <section>
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-              {{ t("app.sections.certificates") }}
-            </h2>
-            <span
-              v-if="!certificatesStore.loading"
-              class="text-sm text-gray-500 dark:text-gray-400"
-            >
+          <div class="d-flex align-center justify-space-between mb-3">
+            <h2 class="text-h6">{{ t("app.sections.certificates") }}</h2>
+            <span v-if="!certificatesStore.loading" class="text-body-2 text-medium-emphasis">
               {{
                 t(
                   "common.itemCount",
                   { count: certificatesStore.items.length },
-                  {
-                    plural: certificatesStore.items.length,
-                  }
+                  { plural: certificatesStore.items.length }
                 )
               }}
             </span>
           </div>
-
           <SectionState
             :show-loading="certificatesStore.loading && certificatesStore.items.length === 0"
             :error="certificatesStore.error"
@@ -75,22 +63,9 @@ onMounted(async () => {
             :empty-text="t('app.empty.certificates')"
           >
             <template #empty-icon>
-              <svg
-                class="w-12 h-12 mx-auto text-gray-400 dark:text-gray-500 mb-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
+              <v-icon size="48" color="medium-emphasis" icon="mdi-file-certificate" class="mb-3" />
             </template>
-
-            <div class="container-card-list">
+            <div class="d-flex flex-column ga-3">
               <CertificateCard
                 v-for="(cert, index) in certificatesStore.items"
                 :key="cert.id"
@@ -102,25 +77,19 @@ onMounted(async () => {
           </SectionState>
         </section>
 
-        <!-- CRLs Section -->
         <section>
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-              {{ t("app.sections.crls") }}
-            </h2>
-            <span v-if="!crlsStore.loading" class="text-sm text-gray-500 dark:text-gray-400">
+          <div class="d-flex align-center justify-space-between mb-3">
+            <h2 class="text-h6">{{ t("app.sections.crls") }}</h2>
+            <span v-if="!crlsStore.loading" class="text-body-2 text-medium-emphasis">
               {{
                 t(
                   "common.itemCount",
                   { count: crlsStore.fullCrls.length },
-                  {
-                    plural: crlsStore.fullCrls.length,
-                  }
+                  { plural: crlsStore.fullCrls.length }
                 )
               }}
             </span>
           </div>
-
           <SectionState
             :show-loading="crlsStore.loading && crlsStore.allCrls.length === 0"
             :error="crlsStore.error"
@@ -128,22 +97,14 @@ onMounted(async () => {
             :empty-text="t('app.empty.crls')"
           >
             <template #empty-icon>
-              <svg
-                class="w-12 h-12 mx-auto text-gray-400 dark:text-gray-500 mb-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                />
-              </svg>
+              <v-icon
+                size="48"
+                color="medium-emphasis"
+                icon="mdi-file-document-outline"
+                class="mb-3"
+              />
             </template>
-
-            <div class="container-card-list">
+            <div class="d-flex flex-column ga-3">
               <CrlCard
                 v-for="(crl, index) in crlsStore.fullCrls"
                 :key="crl.id"
@@ -155,26 +116,20 @@ onMounted(async () => {
           </SectionState>
         </section>
 
-        <!-- Delta CRLs Section -->
         <section v-if="crlsStore.deltaCrls.length > 0">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-              {{ t("app.sections.deltaCrls") }}
-            </h2>
-            <span class="text-sm text-gray-500 dark:text-gray-400">
+          <div class="d-flex align-center justify-space-between mb-3">
+            <h2 class="text-h6">{{ t("app.sections.deltaCrls") }}</h2>
+            <span class="text-body-2 text-medium-emphasis">
               {{
                 t(
                   "common.itemCount",
                   { count: crlsStore.deltaCrls.length },
-                  {
-                    plural: crlsStore.deltaCrls.length,
-                  }
+                  { plural: crlsStore.deltaCrls.length }
                 )
               }}
             </span>
           </div>
-
-          <div class="container-card-list">
+          <div class="d-flex flex-column ga-3">
             <CrlCard
               v-for="(crl, index) in crlsStore.deltaCrls"
               :key="crl.id"
@@ -185,22 +140,16 @@ onMounted(async () => {
           </div>
         </section>
 
-        <!-- Upload Section -->
         <section>
           <CrlUpload />
         </section>
-      </div>
-    </main>
+      </v-container>
+    </v-main>
 
-    <!-- Footer -->
-    <footer
-      class="border-t border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface mt-12"
-    >
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <p class="text-sm text-gray-500 dark:text-gray-400 text-center">
-          {{ t("app.footer") }}
-        </p>
-      </div>
-    </footer>
-  </div>
+    <v-footer border>
+      <v-container>
+        <p class="text-center text-body-2 text-medium-emphasis">{{ t("app.footer") }}</p>
+      </v-container>
+    </v-footer>
+  </v-app>
 </template>
