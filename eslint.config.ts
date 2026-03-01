@@ -28,11 +28,9 @@ export default [
     },
   },
   {
-    // Browser globals for Vue frontend
     files: ["src/web/**/*.ts", "src/web/**/*.tsx", "src/web/**/*.vue"],
     languageOptions: {
       globals: {
-        // Browser APIs
         window: "readonly",
         document: "readonly",
         navigator: "readonly",
@@ -54,7 +52,6 @@ export default [
     },
   },
   {
-    // Worker and contract TypeScript files
     files: ["src/worker/**/*.ts", "src/contracts/**/*.ts", "tests/**/*.ts"],
     languageOptions: {
       parser: typescriptEslint.parser,
@@ -65,7 +62,6 @@ export default [
       },
     },
     rules: {
-      // Core ESLint Rules
       "no-console": ["warn", { allow: ["warn", "error"] }],
       "no-debugger": "error",
       "no-duplicate-imports": "error",
@@ -76,8 +72,6 @@ export default [
       "prefer-template": "error",
       curly: ["error", "all"],
       semi: ["error", "always"],
-
-      // TypeScript-specific rules
       "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": [
         "error",
@@ -148,7 +142,6 @@ export default [
     },
   },
   {
-    // Web frontend TypeScript files (basic linting only, no type-aware checking)
     files: ["src/web/**/*.ts", "src/web/**/*.tsx"],
     rules: {
       "@typescript-eslint/no-explicit-any": "warn",
@@ -166,14 +159,12 @@ export default [
     },
   },
   {
-    // Config files (JS only, no TypeScript parsing)
-    files: ["vite.config.js", "eslint.config.js"],
+    files: ["vite.config.ts", "eslint.config.ts", "tailwind.config.ts"],
     rules: {
       "no-undef": "off",
     },
   },
   {
-    // Vue single-file components
     files: ["src/web/**/*.vue"],
     languageOptions: {
       parser: vueEslintParser,

@@ -9,20 +9,15 @@ export default defineConfig(({ mode }) => {
   const nodeEnv = env.NODE_ENV || process.env.NODE_ENV || mode || "development";
 
   return {
-    // Build configuration
     build: {
       outDir: path.resolve(__dirname, "public"),
       emptyOutDir: true,
       rollupOptions: {
         output: {
-          // Code splitting for better caching
           manualChunks: {
-            // Vendor chunks
             vue: ["vue", "vue-router"],
             state: ["pinia"],
-            // These can be lazy-loaded
           },
-          // Put built assets in js/ to match current structure
           entryFileNames: (chunkInfo) => {
             if (chunkInfo.name === "index") {
               return "js/main.js";
@@ -32,21 +27,17 @@ export default defineConfig(({ mode }) => {
           chunkFileNames: "js/[name]-[hash].js",
           assetFileNames: (assetInfo) => {
             if (assetInfo.name?.endsWith(".css")) {
-              return "styles.css"; // Keep the same CSS filename
+              return "styles.css";
             }
             return "[name].[ext]";
           },
         },
       },
-      // Ensure compatibility with ES modules
       target: "es2022",
       minify: "esbuild",
     },
-
-    // Development server configuration
     server: {
       port: 3000,
-      // Proxy API requests to the Wrangler dev server
       proxy: {
         "/api": "http://localhost:8787",
         "/ca": "http://localhost:8787",
@@ -54,13 +45,8 @@ export default defineConfig(({ mode }) => {
         "/dcrl": "http://localhost:8787",
       },
     },
-
-    // Root directory for frontend source
     root: "src/web",
-
-    // Public directory for static assets
     publicDir: path.resolve(__dirname, "src/web/public"),
-
     plugins: [
       vue(),
       {
@@ -71,16 +57,12 @@ export default defineConfig(({ mode }) => {
       },
       tailwindcss(),
     ],
-
-    // Resolve
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "src/web"),
         "@contracts": path.resolve(__dirname, "src/contracts"),
       },
     },
-
-    // Environment variables
     define: {
       __VITE_ENV__: JSON.stringify(nodeEnv),
       __SITE_NAME__: JSON.stringify(siteName),

@@ -1,11 +1,9 @@
-/** @type {import('tailwindcss').Config} */
-export default {
+const config = {
   content: ["./src/web/**/*.{vue,js,ts,jsx,tsx,html}"],
   darkMode: "class",
   theme: {
     extend: {
       colors: {
-        // Dark mode theme
         dark: {
           bg: "#0d1117",
           surface: "#161b22",
@@ -18,7 +16,6 @@ export default {
   },
   plugins: [],
   safelist: [
-    // Dynamic status badge colors (StatusBadge component)
     "bg-green-100",
     "text-green-700",
     "border-green-300",
@@ -33,3 +30,5 @@ export default {
     "bg-yellow-600",
   ],
 };
+
+export default config;

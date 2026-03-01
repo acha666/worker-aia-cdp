@@ -30,8 +30,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "type-check:worker": "tsc --noEmit -p tsconfig.json",
-    "type-check:web": "vue-tsc --noEmit -p tsconfig.web.json",
-    "type-check": "npm-run-all type-check:worker type-check:web",
+    "type-check:web": "vue-tsc --noEmit -p tsconfig.app.json",
+    "type-check:node": "tsc --noEmit -p tsconfig.node.json",
+    "type-check": "npm-run-all type-check:worker type-check:web type-check:node",
     "check": "npm-run-all type-check lint format:check",
     "check:fix": "npm-run-all --serial lint:fix format type-check"
   },
