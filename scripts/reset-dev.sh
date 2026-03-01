@@ -18,4 +18,4 @@ else
 fi
 
 echo ""
-echo "💡 To reseed the bucket: npm run seed:dev"
+echo "💡 To reseed the bucket: pnpm run seed:dev"
