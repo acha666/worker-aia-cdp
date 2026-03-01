@@ -24,6 +24,7 @@ coverage/
 
 # Lockfiles (let prettier-ignore them)
 pnpm-lock.yaml
+.pnpm-store/
 yarn.lock
 package-lock.json
 
