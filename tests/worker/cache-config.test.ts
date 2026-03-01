@@ -14,7 +14,12 @@ import {
   createMetaCacheKey,
   listCacheKeys,
 } from "../../src/worker/cache/keys";
-import { cacheResponse, getEdgeCache, withCacheStatus } from "../../src/worker/cache/operations";
+import {
+  cacheResponse,
+  getEdgeCache,
+  runSingleFlight,
+  withCacheStatus,
+} from "../../src/worker/cache/operations";
 
 class MemoryCache {
   readonly store = new Map<string, Response>();
@@ -109,4 +114,28 @@ test("cacheResponse stores clone and labels outgoing response", async () => {
   const stored = memoryCache.store.get(cacheKey.url);
   assert.ok(stored);
   assert.equal(stored?.headers.get("X-Cache-Status"), null);
+});
+
+test("runSingleFlight deduplicates concurrent work by key", async () => {
+  let runs = 0;
+  const work = async () => {
+    runs += 1;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    return "ok";
+  };
+
+  const [a, b, c] = await Promise.all([
+    runSingleFlight("k1", work),
+    runSingleFlight("k1", work),
+    runSingleFlight("k1", work),
+  ]);
+
+  assert.equal(a, "ok");
+  assert.equal(b, "ok");
+  assert.equal(c, "ok");
+  assert.equal(runs, 1);
+
+  const d = await runSingleFlight("k1", work);
+  assert.equal(d, "ok");
+  assert.equal(runs, 2);
 });

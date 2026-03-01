@@ -2,6 +2,7 @@ import type { Env } from "../env";
 import { parseCertificate, parseCRL, getCN, isDeltaCRL } from "../pki/parsers";
 import { toJSDate } from "../pki/utils/conversion";
 import { extractPEMBlock } from "../pki/crls/pem";
+import { runSingleFlight } from "../cache/operations";
 
 export type SummaryKind = "certificate" | "crl" | "other";
 
@@ -243,39 +244,41 @@ export async function ensureSummaryMetadata(
     return null;
   }
 
-  try {
-    const object = await env.STORE.get(key);
-    if (!object) {
+  return runSingleFlight(`summary:${kind}:${key}`, async () => {
+    try {
+      const object = await env.STORE.get(key);
+      if (!object) {
+        return null;
+      }
+
+      const buffer = await object.arrayBuffer();
+      const summary = await computeSummaryFromBody(buffer, key, kind);
+      if (!summary) {
+        return null;
+      }
+
+      const newMetadata = buildSummaryMetadata(
+        summary,
+        object.customMetadata ?? context.existingMeta ?? {}
+      );
+
+      const etagMatch =
+        normalizeEtag(readOptionalEtag(object)) ??
+        normalizeEtag(object.httpEtag) ??
+        normalizeEtag(context.expectedEtag);
+
+      await env.STORE.put(key, buffer, {
+        httpMetadata: object.httpMetadata,
+        customMetadata: newMetadata,
+        onlyIf: etagMatch ? { etagMatches: etagMatch } : undefined,
+      });
+
+      return summary;
+    } catch (error) {
+      console.error("ensureSummaryMetadata error", { key, error });
       return null;
     }
-
-    const buffer = await object.arrayBuffer();
-    const summary = await computeSummaryFromBody(buffer, key, kind);
-    if (!summary) {
-      return null;
-    }
-
-    const newMetadata = buildSummaryMetadata(
-      summary,
-      object.customMetadata ?? context.existingMeta ?? {}
-    );
-
-    const etagMatch =
-      normalizeEtag(readOptionalEtag(object)) ??
-      normalizeEtag(object.httpEtag) ??
-      normalizeEtag(context.expectedEtag);
-
-    await env.STORE.put(key, buffer, {
-      httpMetadata: object.httpMetadata,
-      customMetadata: newMetadata,
-      onlyIf: etagMatch ? { etagMatches: etagMatch } : undefined,
-    });
-
-    return summary;
-  } catch (error) {
-    console.error("ensureSummaryMetadata error", { key, error });
-    return null;
-  }
+  });
 }
 
 export function buildSummaryMetadata(

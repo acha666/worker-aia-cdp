@@ -30,7 +30,7 @@ export function createServerRouter<T extends AppRouter>(
   handlers: ServerRouter<T>;
   handle: (req: Request, env: Env, ctx: ExecutionContext) => Promise<Response | null>;
 } {
-  const routeMap = new Map<string, { method: string; pattern: RegExp; handler: RouteHandler }>();
+  const routesByMethod = new Map<string, { pattern: RegExp; handler: RouteHandler }[]>();
 
   // Build route map from contract and handlers
   function buildRoutes(contract: AppRouter, handlerObj: Record<string, unknown>, prefix = "") {
@@ -44,11 +44,16 @@ export function createServerRouter<T extends AppRouter>(
         const method = value.method.toUpperCase();
 
         if (typeof handler === "function") {
-          routeMap.set(`${method}:${fullPath}`, {
-            method,
+          const routeList = routesByMethod.get(method);
+          const route = {
             pattern,
             handler: handler as RouteHandler,
-          });
+          };
+          if (routeList) {
+            routeList.push(route);
+          } else {
+            routesByMethod.set(method, [route]);
+          }
         }
       } else if (typeof value === "object" && value !== null) {
         // This is a nested router
@@ -64,10 +69,15 @@ export function createServerRouter<T extends AppRouter>(
     handle: async (req: Request, env: Env, ctx: ExecutionContext): Promise<Response | null> => {
       const url = new URL(req.url);
       const method = req.method.toUpperCase();
+      const methodRoutes = routesByMethod.get(method);
+
+      if (!methodRoutes) {
+        return null;
+      }
 
       // Find matching route
-      for (const [, route] of routeMap) {
-        if (route.method === method && route.pattern.test(url.pathname)) {
+      for (const route of methodRoutes) {
+        if (route.pattern.test(url.pathname)) {
           try {
             return await route.handler(req, env, ctx);
           } catch (error) {

@@ -5,6 +5,8 @@
 
 export type CacheStatus = "HIT" | "MISS" | "STALE";
 
+const inFlightByKey = new Map<string, Promise<unknown>>();
+
 /**
  * Get the edge cache instance
  */
@@ -43,4 +45,22 @@ export async function cacheResponse(
 ): Promise<Response> {
   await cache.put(cacheKey, response.clone());
   return withCacheStatus(response, "MISS", headerName);
+}
+
+/**
+ * Deduplicate concurrent work by key within the same isolate.
+ * Useful to avoid cache stampede on expensive R2/list/parse operations.
+ */
+export async function runSingleFlight<T>(key: string, work: () => Promise<T>): Promise<T> {
+  const existing = inFlightByKey.get(key) as Promise<T> | undefined;
+  if (existing) {
+    return existing;
+  }
+
+  const pending = work().finally(() => {
+    inFlightByKey.delete(key);
+  });
+
+  inFlightByKey.set(key, pending as Promise<unknown>);
+  return pending;
 }

@@ -36,7 +36,7 @@ const CERT_PREFIX = "ca/";
  * is returned per certificate with the DER format preferred. Clients can request the
  * PEM format via the downloadUrl by appending .pem to the base filename.
  */
-export const listCertificates: RouteHandler = async (req, env) => {
+export const listCertificates: RouteHandler = async (req, env, ctx) => {
   const url = new URL(req.url);
 
   // Parse query parameters
@@ -76,35 +76,30 @@ export const listCertificates: RouteHandler = async (req, env) => {
       break;
     }
 
-    let metadata = (object as { customMetadata?: Record<string, string> }).customMetadata;
+    const metadata = (object as { customMetadata?: Record<string, string> }).customMetadata;
 
     // Lazy-load summary metadata if missing (for initially-uploaded certificates)
     // When certificates are manually uploaded to R2 (without going through the API),
     // they lack the computed summary metadata. This ensures such certificates get
     // their metadata generated and cached on first access to the list endpoint.
-    const hasSummaryMetadata =
+    const hasSummaryMetadata = Boolean(
       metadata?.summarySubjectCN ??
       metadata?.summaryIssuerCN ??
       metadata?.summaryNotBefore ??
-      metadata?.summaryNotAfter;
+      metadata?.summaryNotAfter
+    );
 
     if (!hasSummaryMetadata) {
-      try {
-        const summary = await ensureSummaryMetadata({
+      ctx.waitUntil(
+        ensureSummaryMetadata({
           env,
           key: object.key,
           kind: "certificate",
           existingMeta: metadata,
-        });
-        if (summary) {
-          // Fetch updated metadata after summary generation
-          const updated = await env.STORE.head(object.key);
-          metadata = (updated as { customMetadata?: Record<string, string> })?.customMetadata;
-        }
-      } catch (error) {
-        // If metadata generation fails, continue with null summary fields
-        console.error(`Failed to generate summary for ${object.key}:`, error);
-      }
+        }).catch((error) => {
+          console.error(`Failed to generate summary for ${object.key}:`, error);
+        })
+      );
     }
 
     // Always report DER format (canonical format)

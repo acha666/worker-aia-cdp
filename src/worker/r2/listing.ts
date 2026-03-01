@@ -1,7 +1,7 @@
 import type { Env } from "../env";
 import { cacheDurations } from "../cache/config";
 import { listCacheKeys } from "../cache/keys";
-import { getEdgeCache } from "../cache/operations";
+import { getEdgeCache, runSingleFlight } from "../cache/operations";
 
 export async function listAllWithPrefix(env: Env, prefix: string) {
   const out: R2Object[] = [];
@@ -47,28 +47,45 @@ export async function cachedListAllWithPrefix(
     );
   }
 
-  const objects = await listAllWithPrefix(env, prefix);
-  const typedObjects = objects as unknown as {
-    key: string;
-    size?: number;
-    uploaded?: Date | string;
-  }[];
-  const payload = JSON.stringify({
-    items: typedObjects.map((obj) => ({
-      key: obj.key,
-      size: obj.size ?? 0,
-      uploaded: obj.uploaded instanceof Date ? obj.uploaded.toISOString() : undefined,
-    })),
-    cachedAt: new Date().toISOString(),
-  });
+  return runSingleFlight(`r2:list:${prefix}`, async () => {
+    const secondHit = await cache.match(key);
+    if (secondHit) {
+      const json = (await secondHit.json()) as unknown as {
+        items: { key: string; size: number; uploaded?: string }[];
+      };
+      return (json.items as { key: string; size: number; uploaded?: string }[]).map(
+        (item) =>
+          ({
+            key: item.key,
+            size: item.size,
+            uploaded: item.uploaded ? new Date(item.uploaded) : undefined,
+          }) as unknown as R2Object
+      );
+    }
 
-  const response = new Response(payload, {
-    headers: {
-      "Content-Type": "application/json",
-      "Cache-Control": `public, max-age=${cacheDurations.LIST_CACHE_TTL}, s-maxage=${cacheDurations.LIST_CACHE_SMAXAGE}, stale-while-revalidate=${cacheDurations.LIST_CACHE_SWR}`,
-    },
-  });
+    const objects = await listAllWithPrefix(env, prefix);
+    const typedObjects = objects as unknown as {
+      key: string;
+      size?: number;
+      uploaded?: Date | string;
+    }[];
+    const payload = JSON.stringify({
+      items: typedObjects.map((obj) => ({
+        key: obj.key,
+        size: obj.size ?? 0,
+        uploaded: obj.uploaded instanceof Date ? obj.uploaded.toISOString() : undefined,
+      })),
+      cachedAt: new Date().toISOString(),
+    });
 
-  await cache.put(key, response.clone());
-  return objects;
+    const response = new Response(payload, {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": `public, max-age=${cacheDurations.LIST_CACHE_TTL}, s-maxage=${cacheDurations.LIST_CACHE_SMAXAGE}, stale-while-revalidate=${cacheDurations.LIST_CACHE_SWR}`,
+      },
+    });
+
+    await cache.put(key, response.clone());
+    return objects;
+  });
 }

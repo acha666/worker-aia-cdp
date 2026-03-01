@@ -112,3 +112,41 @@ test("cachedListAllWithPrefix fetches from R2 and populates cache when missing",
     globalThis.caches = originalCaches;
   }
 });
+
+test("cachedListAllWithPrefix deduplicates concurrent miss requests", async () => {
+  const cache = new MemoryCache();
+  const originalCaches = globalThis.caches;
+  globalThis.caches = { default: cache } as any;
+
+  let listCalls = 0;
+  const env = createEnv(async () => {
+    listCalls += 1;
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    return {
+      objects: [
+        {
+          key: "ca/root.cer",
+          size: 123,
+          uploaded: new Date("2025-10-01T00:00:00.000Z"),
+        },
+      ],
+      truncated: false,
+    };
+  });
+
+  try {
+    const [a, b, c] = await Promise.all([
+      cachedListAllWithPrefix(env, "ca/"),
+      cachedListAllWithPrefix(env, "ca/"),
+      cachedListAllWithPrefix(env, "ca/"),
+    ]);
+
+    assert.equal(a.length, 1);
+    assert.equal(b.length, 1);
+    assert.equal(c.length, 1);
+    assert.equal(listCalls, 1);
+    assert.equal(cache.putCalls.length, 1);
+  } finally {
+    globalThis.caches = originalCaches;
+  }
+});
