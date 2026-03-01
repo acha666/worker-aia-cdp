@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@config "../../../tailwind.config.js";
+@import "tailwindcss";
 
 /* Custom base styles */
 @layer base {
@@ -63,7 +62,7 @@
   }
 
   .border-rounded-base {
-    @apply border-base rounded-lg;
+    @apply border border-gray-200 dark:border-dark-border rounded-lg;
   }
 
   /* Divider utilities */
@@ -73,6 +72,6 @@
 
   /* Container styles */
   .container-card-list {
-    @apply border-rounded-base overflow-hidden;
+    @apply border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden;
   }
 }
