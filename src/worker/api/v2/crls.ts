@@ -348,7 +348,6 @@ export const uploadCrl: RouteHandler = async (req, env) => {
 
   let derBytes: Uint8Array;
   let pemText: string | undefined;
-  let filename = "unknown.crl";
 
   try {
     const formData = await req.formData();
@@ -364,7 +363,7 @@ export const uploadCrl: RouteHandler = async (req, env) => {
 
     // Extract filename for format detection
     const file = crlFile as File;
-    filename = file.name;
+    const filename = file.name;
     const fileExt = filename.toLowerCase();
 
     // Read file content
