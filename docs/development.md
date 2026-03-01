@@ -7,6 +7,7 @@ Node 22+ and pnpm 10+ are expected, along with Wrangler for local Worker develop
 ## Local Development
 
 Start the Worker in local mode. This runs the Worker with the local R2 bucket configuration.
+Wrangler handles serving the built frontend assets in this mode.
 
 ```bash
 pnpm run dev
@@ -79,11 +80,14 @@ the repository workflow locally.
 act
 ```
 
+If parallel local execution is unstable in your environment, run jobs one-by-one with `-j`.
+
 To run only a specific job from `.github/workflows/ci.yml`:
 
 ```bash
-act -j lint
+act -j check
 act -j test
+act -j build
 ```
 
 ## Fixtures

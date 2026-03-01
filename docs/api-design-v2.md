@@ -23,8 +23,10 @@ If anything conflicts, code is authoritative.
 Local commands:
 
 - Generate OpenAPI: `pnpm run openapi:generate`
+- Diff generated OpenAPI vs committed file: `pnpm run openapi:diff`
 - Verify OpenAPI is committed: `pnpm run openapi:check`
 - Lint OpenAPI: `pnpm run docs:lint`
+- Build OpenAPI artifacts (generate + lint + bundle): `pnpm run docs:openapi`
 - Build docs site (lint + bundle + Redoc): `pnpm run docs:build`
 
 ---

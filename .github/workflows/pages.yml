@@ -60,5 +60,6 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy
+        if: ${{ !env.ACT }}
         id: deployment
         uses: actions/deploy-pages@v4

@@ -16,7 +16,7 @@ pnpm run dev
 If you need to regenerate them manually, run:
 
 ```bash
-bash scripts/generate-test-data.sh
+pnpm run fixtures:generate
 ```
 
 ## Deployment
@@ -88,10 +88,13 @@ JSON endpoints for programmatic access. See full API design in [docs/api-design-
 
 - Runtime spec endpoint: `/api/v2/openapi.json`
 - Regenerate spec file with: `pnpm run openapi:generate`
+- Diff generated spec against committed file: `pnpm run openapi:diff`
+- Generate + diff check in one command: `pnpm run openapi:check`
 - Generated file: `docs/openapi-v2.json`
 
 ### HTML API Docs (Redoc)
 
+- Build OpenAPI artifacts (generate + lint + bundle): `pnpm run docs:openapi`
 - Build full docs site (OpenAPI + lint + bundle + Redoc): `pnpm run docs:build`
 - Local output: `site/`
 - Redoc page output: `site/api/index.html`
