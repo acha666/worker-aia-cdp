@@ -46,11 +46,11 @@ importers:
         version: 3.25.76
     devDependencies:
       '@cloudflare/workers-types':
-        specifier: ^4.20260205.0
+        specifier: ^4.20260301.1
         version: 4.20260301.1
       '@eslint/js':
-        specifier: ^9.39.2
-        version: 9.39.3
+        specifier: ^10.0.1
+        version: 10.0.1(eslint@10.0.2(jiti@2.6.1))
       '@tailwindcss/vite':
         specifier: ^4.2.1
         version: 4.2.1(vite@7.3.1(@types/node@25.3.3)(jiti@2.6.1)(lightningcss@1.31.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
@@ -97,7 +97,7 @@ importers:
         specifier: ^3.2.4
         version: 3.2.5(typescript@5.9.3)
       wrangler:
-        specifier: ^4.62.0
+        specifier: ^4.69.0
         version: 4.69.0(@cloudflare/workers-types@4.20260301.1)
 
 packages:
@@ -824,9 +824,14 @@ packages:
     resolution: {integrity: sha512-/nr9K9wkr3P1EzFTdFdMoLuo1PmIxjmwvPozwoSodjNBdefGujXQUF93u1DDZpEaTuDvMsIQddsd35BwtrW9Xw==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
-  '@eslint/js@9.39.3':
-    resolution: {integrity: sha512-1B1VkCq6FuUNlQvlBYb+1jDu/gV297TIs/OeiaSR9l1H27SVW55ONE1e1Vp16NqP683+xEGzxYtv4XCiDPaQiw==}
-    engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+  '@eslint/js@10.0.1':
+    resolution: {integrity: sha512-zeR9k5pd4gxjZ0abRoIaxdc7I3nDktoXZk2qOv9gCNWx3mVwEn32VRhyLaRsDiJjTs0xq/T8mfPtyuXu7GWBcA==}
+    engines: {node: ^20.19.0 || ^22.13.0 || >=24}
+    peerDependencies:
+      eslint: ^10.0.0
+    peerDependenciesMeta:
+      eslint:
+        optional: true
 
   '@eslint/object-schema@3.0.2':
     resolution: {integrity: sha512-HOy56KJt48Bx8KmJ+XGQNSUMT/6dZee/M54XyUyuvTvPXJmsERRvBchsUVx1UMe1WwIH49XLAczNC7V2INsuUw==}
@@ -863,8 +868,8 @@ packages:
     resolution: {integrity: sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ==}
     engines: {node: '>=18.18'}
 
-  '@img/colour@1.0.0':
-    resolution: {integrity: sha512-A5P/LfWGFSl6nsckYtjw9da+19jB8hkJ6ACTGcDfEJ0aE+l2n2El7dsVM7UVHZQ9s2lmYMWlrS21YLy2IR1LUw==}
+  '@img/colour@1.1.0':
+    resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
     engines: {node: '>=18'}
 
   '@img/sharp-darwin-arm64@0.34.5':
@@ -3699,7 +3704,9 @@ snapshots:
     dependencies:
       '@types/json-schema': 7.0.15
 
-  '@eslint/js@9.39.3': {}
+  '@eslint/js@10.0.1(eslint@10.0.2(jiti@2.6.1))':
+    optionalDependencies:
+      eslint: 10.0.2(jiti@2.6.1)
 
   '@eslint/object-schema@3.0.2': {}
 
@@ -3728,7 +3735,7 @@ snapshots:
 
   '@humanwhocodes/retry@0.4.3': {}
 
-  '@img/colour@1.0.0': {}
+  '@img/colour@1.1.0': {}
 
   '@img/sharp-darwin-arm64@0.34.5':
     optionalDependencies:
@@ -5479,7 +5486,7 @@ snapshots:
 
   sharp@0.34.5:
     dependencies:
-      '@img/colour': 1.0.0
+      '@img/colour': 1.1.0
       detect-libc: 2.1.2
       semver: 7.7.4
     optionalDependencies:
