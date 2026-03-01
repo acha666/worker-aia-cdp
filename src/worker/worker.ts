@@ -2,6 +2,7 @@ import { initializePkijsEngine } from "./pki/pkijs";
 import type { Env } from "./env";
 import { apiRouter } from "./api/v2/server";
 import { buildHeadersForObject } from "./utils/content";
+import { openApiDocument } from "@contracts/openapi";
 
 initializePkijsEngine();
 
@@ -10,6 +11,21 @@ export default {
     const url = new URL(req.url);
 
     try {
+      if (url.pathname === "/api/v2/openapi.json") {
+        if (req.method !== "GET" && req.method !== "HEAD") {
+          return new Response("Method Not Allowed", { status: 405 });
+        }
+
+        const body = req.method === "HEAD" ? null : JSON.stringify(openApiDocument, null, 2);
+        return new Response(body, {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "public, max-age=300",
+          },
+        });
+      }
+
       // =======================================================================
       // API v2 Routes (handled by ts-rest router)
       // =======================================================================

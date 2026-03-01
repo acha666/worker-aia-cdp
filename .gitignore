@@ -35,3 +35,11 @@ Thumbs.db
 
 # Generated test fixtures (certificates, keys, CRLs)
 tests/fixtures
+
+# Generated API docs site artifacts
+site/
+
+# Local workflow runner files
+.act/
+.actrc
+.secrets

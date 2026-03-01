@@ -1,0 +1,3376 @@
+{
+  "openapi": "3.0.3",
+  "paths": {
+    "/api/v2/certificates": {
+      "get": {
+        "description": "Returns a paginated list of certificates. Results are deduplicated to canonical DER metadata when both DER and PEM variants exist.",
+        "summary": "List all certificates",
+        "tags": [
+          "certificates"
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "number",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "operationId": "certificates.list",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "certificate"
+                            ]
+                          },
+                          "href": {
+                            "type": "string"
+                          },
+                          "downloadUrl": {
+                            "type": "string"
+                          },
+                          "storage": {
+                            "type": "object",
+                            "properties": {
+                              "filename": {
+                                "type": "string"
+                              },
+                              "format": {
+                                "type": "string",
+                                "enum": [
+                                  "der"
+                                ]
+                              },
+                              "size": {
+                                "type": "number"
+                              },
+                              "uploadedAt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "filename",
+                              "format",
+                              "size",
+                              "uploadedAt"
+                            ]
+                          },
+                          "summary": {
+                            "type": "object",
+                            "properties": {
+                              "subjectCN": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "issuerCN": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "serialNumber": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "notBefore": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "notAfter": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "subjectCN",
+                              "issuerCN",
+                              "serialNumber",
+                              "notBefore",
+                              "notAfter"
+                            ]
+                          },
+                          "fingerprints": {
+                            "type": "object",
+                            "properties": {
+                              "sha1": {
+                                "type": "string"
+                              },
+                              "sha256": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "sha1",
+                              "sha256"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "type",
+                          "href",
+                          "downloadUrl",
+                          "storage",
+                          "summary",
+                          "fingerprints"
+                        ]
+                      },
+                      "nullable": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "timestamp": {
+                          "type": "string"
+                        },
+                        "cached": {
+                          "type": "boolean"
+                        },
+                        "cacheAge": {
+                          "type": "number"
+                        },
+                        "links": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "cursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "nextCursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "hasMore": {
+                              "type": "boolean"
+                            },
+                            "pageSize": {
+                              "type": "number"
+                            },
+                            "totalCount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "cursor",
+                            "nextCursor",
+                            "hasMore",
+                            "pageSize"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "timestamp"
+                      ],
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "nullable": true
+                        },
+                        "field": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta",
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/certificates/{id}": {
+      "get": {
+        "description": "Returns detailed information about a specific certificate including its TBS structure. Optional sections can be controlled with the include query parameter.",
+        "summary": "Get certificate details",
+        "tags": [
+          "certificates"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "operationId": "certificates.get",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "certificate"
+                          ]
+                        },
+                        "href": {
+                          "type": "string"
+                        },
+                        "downloadUrl": {
+                          "type": "string"
+                        },
+                        "storage": {
+                          "type": "object",
+                          "properties": {
+                            "filename": {
+                              "type": "string"
+                            },
+                            "format": {
+                              "type": "string",
+                              "enum": [
+                                "der"
+                              ]
+                            },
+                            "size": {
+                              "type": "number"
+                            },
+                            "uploadedAt": {
+                              "type": "string"
+                            },
+                            "etag": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "filename",
+                            "format",
+                            "size",
+                            "uploadedAt"
+                          ]
+                        },
+                        "fingerprints": {
+                          "type": "object",
+                          "properties": {
+                            "sha1": {
+                              "type": "string"
+                            },
+                            "sha256": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "sha1",
+                            "sha256"
+                          ]
+                        },
+                        "tbsCertificate": {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "object",
+                              "properties": {
+                                "raw": {
+                                  "type": "number"
+                                },
+                                "display": {
+                                  "type": "string",
+                                  "enum": [
+                                    "v1",
+                                    "v2",
+                                    "v3"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "raw",
+                                "display"
+                              ]
+                            },
+                            "serialNumber": {
+                              "type": "object",
+                              "properties": {
+                                "hex": {
+                                  "type": "string"
+                                },
+                                "decimal": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "hex"
+                              ]
+                            },
+                            "signature": {
+                              "type": "object",
+                              "properties": {
+                                "algorithm": {
+                                  "type": "object",
+                                  "properties": {
+                                    "oid": {
+                                      "type": "string"
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "nullable": true
+                                    }
+                                  },
+                                  "required": [
+                                    "oid",
+                                    "name"
+                                  ]
+                                },
+                                "parameters": {
+                                  "type": "object",
+                                  "properties": {
+                                    "parsed": {
+                                      "nullable": true
+                                    },
+                                    "rawHex": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "rawHex"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "algorithm"
+                              ]
+                            },
+                            "issuer": {
+                              "type": "object",
+                              "properties": {
+                                "commonName": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "organization": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "organizationalUnit": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "country": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "stateOrProvince": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "locality": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "rdnSequence": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "attributes": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "type": {
+                                              "type": "object",
+                                              "properties": {
+                                                "oid": {
+                                                  "type": "string"
+                                                },
+                                                "name": {
+                                                  "type": "string",
+                                                  "nullable": true
+                                                }
+                                              },
+                                              "required": [
+                                                "oid",
+                                                "name"
+                                              ]
+                                            },
+                                            "value": {
+                                              "type": "object",
+                                              "properties": {
+                                                "string": {
+                                                  "type": "string",
+                                                  "nullable": true
+                                                },
+                                                "encoding": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "utf8String",
+                                                    "printableString",
+                                                    "ia5String",
+                                                    "bmpString",
+                                                    "universalString",
+                                                    "unknown"
+                                                  ]
+                                                },
+                                                "rawHex": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "string",
+                                                "encoding"
+                                              ]
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "value"
+                                          ]
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "attributes"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "commonName",
+                                "organization",
+                                "organizationalUnit",
+                                "country",
+                                "stateOrProvince",
+                                "locality",
+                                "rdnSequence"
+                              ]
+                            },
+                            "validity": {
+                              "type": "object",
+                              "properties": {
+                                "notBefore": {
+                                  "type": "object",
+                                  "properties": {
+                                    "iso": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "type": "string",
+                                      "enum": [
+                                        "utcTime",
+                                        "generalizedTime"
+                                      ]
+                                    },
+                                    "raw": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "iso",
+                                    "type",
+                                    "raw"
+                                  ]
+                                },
+                                "notAfter": {
+                                  "type": "object",
+                                  "properties": {
+                                    "iso": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "type": "string",
+                                      "enum": [
+                                        "utcTime",
+                                        "generalizedTime"
+                                      ]
+                                    },
+                                    "raw": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "iso",
+                                    "type",
+                                    "raw"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "notBefore",
+                                "notAfter"
+                              ]
+                            },
+                            "subject": {
+                              "type": "object",
+                              "properties": {
+                                "commonName": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "organization": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "organizationalUnit": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "country": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "stateOrProvince": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "locality": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "rdnSequence": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "attributes": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "type": {
+                                              "type": "object",
+                                              "properties": {
+                                                "oid": {
+                                                  "type": "string"
+                                                },
+                                                "name": {
+                                                  "type": "string",
+                                                  "nullable": true
+                                                }
+                                              },
+                                              "required": [
+                                                "oid",
+                                                "name"
+                                              ]
+                                            },
+                                            "value": {
+                                              "type": "object",
+                                              "properties": {
+                                                "string": {
+                                                  "type": "string",
+                                                  "nullable": true
+                                                },
+                                                "encoding": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "utf8String",
+                                                    "printableString",
+                                                    "ia5String",
+                                                    "bmpString",
+                                                    "universalString",
+                                                    "unknown"
+                                                  ]
+                                                },
+                                                "rawHex": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "string",
+                                                "encoding"
+                                              ]
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "value"
+                                          ]
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "attributes"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "commonName",
+                                "organization",
+                                "organizationalUnit",
+                                "country",
+                                "stateOrProvince",
+                                "locality",
+                                "rdnSequence"
+                              ]
+                            },
+                            "subjectPublicKeyInfo": {
+                              "type": "object",
+                              "properties": {
+                                "algorithm": {
+                                  "type": "object",
+                                  "properties": {
+                                    "algorithm": {
+                                      "type": "object",
+                                      "properties": {
+                                        "oid": {
+                                          "type": "string"
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "nullable": true
+                                        }
+                                      },
+                                      "required": [
+                                        "oid",
+                                        "name"
+                                      ]
+                                    },
+                                    "parameters": {
+                                      "type": "object",
+                                      "properties": {
+                                        "parsed": {
+                                          "nullable": true
+                                        },
+                                        "rawHex": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "rawHex"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "algorithm"
+                                  ]
+                                },
+                                "subjectPublicKey": {
+                                  "type": "object",
+                                  "properties": {
+                                    "hex": {
+                                      "type": "string"
+                                    },
+                                    "bitLength": {
+                                      "type": "number"
+                                    },
+                                    "unusedBits": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "hex",
+                                    "bitLength",
+                                    "unusedBits"
+                                  ]
+                                },
+                                "parsed": {
+                                  "discriminator": {
+                                    "propertyName": "type"
+                                  },
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "enum": [
+                                            "rsa"
+                                          ]
+                                        },
+                                        "modulus": {
+                                          "type": "object",
+                                          "properties": {
+                                            "hex": {
+                                              "type": "string"
+                                            },
+                                            "bitLength": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "required": [
+                                            "hex",
+                                            "bitLength"
+                                          ]
+                                        },
+                                        "publicExponent": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "type",
+                                        "modulus",
+                                        "publicExponent"
+                                      ]
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "enum": [
+                                            "ec"
+                                          ]
+                                        },
+                                        "curve": {
+                                          "type": "object",
+                                          "properties": {
+                                            "oid": {
+                                              "type": "string"
+                                            },
+                                            "name": {
+                                              "type": "string",
+                                              "nullable": true
+                                            }
+                                          },
+                                          "required": [
+                                            "oid",
+                                            "name"
+                                          ]
+                                        },
+                                        "point": {
+                                          "type": "object",
+                                          "properties": {
+                                            "hex": {
+                                              "type": "string"
+                                            },
+                                            "x": {
+                                              "type": "string"
+                                            },
+                                            "y": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "hex"
+                                          ]
+                                        },
+                                        "keySize": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "type",
+                                        "curve",
+                                        "point",
+                                        "keySize"
+                                      ]
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "enum": [
+                                            "ed25519",
+                                            "ed448"
+                                          ]
+                                        },
+                                        "publicKey": {
+                                          "type": "object",
+                                          "properties": {
+                                            "hex": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "hex"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "type",
+                                        "publicKey"
+                                      ]
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "enum": [
+                                            "unknown"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "type"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                "fingerprints": {
+                                  "type": "object",
+                                  "properties": {
+                                    "sha1": {
+                                      "type": "string"
+                                    },
+                                    "sha256": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "sha1",
+                                    "sha256"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "algorithm",
+                                "subjectPublicKey",
+                                "fingerprints"
+                              ]
+                            },
+                            "issuerUniqueID": {
+                              "type": "object",
+                              "properties": {
+                                "hex": {
+                                  "type": "string"
+                                },
+                                "bitLength": {
+                                  "type": "number"
+                                },
+                                "unusedBits": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "hex",
+                                "bitLength",
+                                "unusedBits"
+                              ]
+                            },
+                            "subjectUniqueID": {
+                              "type": "object",
+                              "properties": {
+                                "hex": {
+                                  "type": "string"
+                                },
+                                "bitLength": {
+                                  "type": "number"
+                                },
+                                "unusedBits": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "hex",
+                                "bitLength",
+                                "unusedBits"
+                              ]
+                            },
+                            "extensions": {
+                              "type": "object",
+                              "properties": {
+                                "count": {
+                                  "type": "number"
+                                },
+                                "critical": {
+                                  "type": "number"
+                                },
+                                "items": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "extnID": {
+                                        "type": "object",
+                                        "properties": {
+                                          "oid": {
+                                            "type": "string"
+                                          },
+                                          "name": {
+                                            "type": "string",
+                                            "nullable": true
+                                          }
+                                        },
+                                        "required": [
+                                          "oid",
+                                          "name"
+                                        ]
+                                      },
+                                      "critical": {
+                                        "type": "boolean"
+                                      },
+                                      "extnValue": {
+                                        "type": "object",
+                                        "properties": {
+                                          "hex": {
+                                            "type": "string"
+                                          },
+                                          "byteLength": {
+                                            "type": "number"
+                                          }
+                                        },
+                                        "required": [
+                                          "hex",
+                                          "byteLength"
+                                        ]
+                                      },
+                                      "parseStatus": {
+                                        "type": "string",
+                                        "enum": [
+                                          "parsed",
+                                          "unsupported",
+                                          "error"
+                                        ]
+                                      },
+                                      "parseError": {
+                                        "type": "string"
+                                      },
+                                      "parsed": {
+                                        "nullable": true
+                                      }
+                                    },
+                                    "required": [
+                                      "extnID",
+                                      "critical",
+                                      "extnValue",
+                                      "parseStatus"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "count",
+                                "critical",
+                                "items"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "serialNumber",
+                            "signature",
+                            "issuer",
+                            "validity",
+                            "subject",
+                            "subjectPublicKeyInfo"
+                          ]
+                        },
+                        "signatureAlgorithm": {
+                          "type": "object",
+                          "properties": {
+                            "algorithm": {
+                              "type": "object",
+                              "properties": {
+                                "oid": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "oid",
+                                "name"
+                              ]
+                            },
+                            "parameters": {
+                              "type": "object",
+                              "properties": {
+                                "parsed": {
+                                  "nullable": true
+                                },
+                                "rawHex": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "rawHex"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "algorithm"
+                          ]
+                        },
+                        "signatureValue": {
+                          "type": "object",
+                          "properties": {
+                            "hex": {
+                              "type": "string"
+                            },
+                            "bitLength": {
+                              "type": "number"
+                            },
+                            "unusedBits": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "hex",
+                            "bitLength",
+                            "unusedBits"
+                          ]
+                        },
+                        "relationships": {
+                          "type": "object",
+                          "properties": {
+                            "issuer": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "type": {
+                                  "type": "string"
+                                },
+                                "href": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "type",
+                                "href"
+                              ]
+                            },
+                            "issuedCrls": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "type": {
+                                    "type": "string"
+                                  },
+                                  "href": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "type",
+                                  "href"
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "type",
+                        "href",
+                        "downloadUrl",
+                        "storage",
+                        "fingerprints",
+                        "tbsCertificate",
+                        "relationships"
+                      ],
+                      "nullable": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "timestamp": {
+                          "type": "string"
+                        },
+                        "cached": {
+                          "type": "boolean"
+                        },
+                        "cacheAge": {
+                          "type": "number"
+                        },
+                        "links": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "cursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "nextCursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "hasMore": {
+                              "type": "boolean"
+                            },
+                            "pageSize": {
+                              "type": "number"
+                            },
+                            "totalCount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "cursor",
+                            "nextCursor",
+                            "hasMore",
+                            "pageSize"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "timestamp"
+                      ],
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "nullable": true
+                        },
+                        "field": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta",
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string",
+                      "format": "null",
+                      "nullable": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "timestamp": {
+                          "type": "string"
+                        },
+                        "cached": {
+                          "type": "boolean"
+                        },
+                        "cacheAge": {
+                          "type": "number"
+                        },
+                        "links": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "cursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "nextCursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "hasMore": {
+                              "type": "boolean"
+                            },
+                            "pageSize": {
+                              "type": "number"
+                            },
+                            "totalCount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "cursor",
+                            "nextCursor",
+                            "hasMore",
+                            "pageSize"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "timestamp"
+                      ],
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "nullable": true
+                        },
+                        "field": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta",
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/crls": {
+      "get": {
+        "description": "Returns a paginated list of CRLs. Supports filtering by type (full/delta). Results are deduplicated to canonical DER metadata when both DER and PEM variants exist.",
+        "summary": "List all CRLs",
+        "tags": [
+          "crls"
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "number",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "full",
+                "delta"
+              ]
+            }
+          }
+        ],
+        "operationId": "crls.list",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "crl"
+                            ]
+                          },
+                          "href": {
+                            "type": "string"
+                          },
+                          "downloadUrl": {
+                            "type": "string"
+                          },
+                          "storage": {
+                            "type": "object",
+                            "properties": {
+                              "filename": {
+                                "type": "string"
+                              },
+                              "format": {
+                                "type": "string",
+                                "enum": [
+                                  "der"
+                                ]
+                              },
+                              "size": {
+                                "type": "number"
+                              },
+                              "uploadedAt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "filename",
+                              "format",
+                              "size",
+                              "uploadedAt"
+                            ]
+                          },
+                          "summary": {
+                            "type": "object",
+                            "properties": {
+                              "crlType": {
+                                "type": "string",
+                                "enum": [
+                                  "full",
+                                  "delta"
+                                ]
+                              },
+                              "issuerCommonName": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "crlNumber": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "baseCrlNumber": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "thisUpdate": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "nextUpdate": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "revokedCount": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "crlType",
+                              "issuerCommonName",
+                              "crlNumber",
+                              "baseCrlNumber",
+                              "thisUpdate",
+                              "nextUpdate",
+                              "revokedCount"
+                            ]
+                          },
+                          "fingerprints": {
+                            "type": "object",
+                            "properties": {
+                              "sha1": {
+                                "type": "string"
+                              },
+                              "sha256": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "sha1",
+                              "sha256"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "type",
+                          "href",
+                          "downloadUrl",
+                          "storage",
+                          "summary",
+                          "fingerprints"
+                        ]
+                      },
+                      "nullable": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "timestamp": {
+                          "type": "string"
+                        },
+                        "cached": {
+                          "type": "boolean"
+                        },
+                        "cacheAge": {
+                          "type": "number"
+                        },
+                        "links": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "cursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "nextCursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "hasMore": {
+                              "type": "boolean"
+                            },
+                            "pageSize": {
+                              "type": "number"
+                            },
+                            "totalCount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "cursor",
+                            "nextCursor",
+                            "hasMore",
+                            "pageSize"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "timestamp"
+                      ],
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "nullable": true
+                        },
+                        "field": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta",
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Upload a CRL in PEM or DER format using multipart/form-data with a required file field named crl. The CRL is parsed, issuer-resolved, signature-verified, and stored only if newer than the current logical CRL.",
+        "summary": "Upload a new CRL",
+        "tags": [
+          "crls"
+        ],
+        "parameters": [],
+        "operationId": "crls.upload",
+        "requestBody": {
+          "required": true,
+          "description": "Upload a CRL file in DER or PEM format as multipart form-data",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "crl"
+                ],
+                "properties": {
+                  "crl": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "CRL file (.crl, .der, or .pem)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "201",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "crl"
+                          ]
+                        },
+                        "href": {
+                          "type": "string"
+                        },
+                        "downloadUrl": {
+                          "type": "string"
+                        },
+                        "crlType": {
+                          "type": "string",
+                          "enum": [
+                            "full",
+                            "delta"
+                          ]
+                        },
+                        "crlNumber": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "baseCrlNumber": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "thisUpdate": {
+                          "type": "string"
+                        },
+                        "nextUpdate": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "issuer": {
+                          "type": "object",
+                          "properties": {
+                            "commonName": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "keyIdentifier": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "commonName",
+                            "keyIdentifier"
+                          ]
+                        },
+                        "stored": {
+                          "type": "object",
+                          "properties": {
+                            "der": {
+                              "type": "string"
+                            },
+                            "pem": {
+                              "type": "string"
+                            },
+                            "byKeyId": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "der",
+                            "pem"
+                          ]
+                        },
+                        "replaced": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "crlNumber": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "archivedTo": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "crlNumber",
+                            "archivedTo"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "type",
+                        "href",
+                        "downloadUrl",
+                        "crlType",
+                        "crlNumber",
+                        "baseCrlNumber",
+                        "thisUpdate",
+                        "nextUpdate",
+                        "issuer",
+                        "stored"
+                      ],
+                      "nullable": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "timestamp": {
+                          "type": "string"
+                        },
+                        "cached": {
+                          "type": "boolean"
+                        },
+                        "cacheAge": {
+                          "type": "number"
+                        },
+                        "links": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "cursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "nextCursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "hasMore": {
+                              "type": "boolean"
+                            },
+                            "pageSize": {
+                              "type": "number"
+                            },
+                            "totalCount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "cursor",
+                            "nextCursor",
+                            "hasMore",
+                            "pageSize"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "timestamp"
+                      ],
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "nullable": true
+                        },
+                        "field": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta",
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string",
+                      "format": "null",
+                      "nullable": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "timestamp": {
+                          "type": "string"
+                        },
+                        "cached": {
+                          "type": "boolean"
+                        },
+                        "cacheAge": {
+                          "type": "number"
+                        },
+                        "links": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "cursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "nextCursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "hasMore": {
+                              "type": "boolean"
+                            },
+                            "pageSize": {
+                              "type": "number"
+                            },
+                            "totalCount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "cursor",
+                            "nextCursor",
+                            "hasMore",
+                            "pageSize"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "timestamp"
+                      ],
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "nullable": true
+                        },
+                        "field": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta",
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string",
+                      "format": "null",
+                      "nullable": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "timestamp": {
+                          "type": "string"
+                        },
+                        "cached": {
+                          "type": "boolean"
+                        },
+                        "cacheAge": {
+                          "type": "number"
+                        },
+                        "links": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "cursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "nextCursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "hasMore": {
+                              "type": "boolean"
+                            },
+                            "pageSize": {
+                              "type": "number"
+                            },
+                            "totalCount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "cursor",
+                            "nextCursor",
+                            "hasMore",
+                            "pageSize"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "timestamp"
+                      ],
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "nullable": true
+                        },
+                        "field": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta",
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/crls/{id}": {
+      "get": {
+        "description": "Returns detailed information about a specific CRL including its TBS structure and revocations. Optional sections and revocation pagination are controlled via query parameters.",
+        "summary": "Get CRL details",
+        "tags": [
+          "crls"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "revocations.limit",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000,
+              "nullable": true
+            }
+          },
+          {
+            "name": "revocations.cursor",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "minimum": 0,
+              "nullable": true
+            }
+          }
+        ],
+        "operationId": "crls.get",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "crl"
+                          ]
+                        },
+                        "href": {
+                          "type": "string"
+                        },
+                        "downloadUrl": {
+                          "type": "string"
+                        },
+                        "storage": {
+                          "type": "object",
+                          "properties": {
+                            "filename": {
+                              "type": "string"
+                            },
+                            "format": {
+                              "type": "string",
+                              "enum": [
+                                "der"
+                              ]
+                            },
+                            "size": {
+                              "type": "number"
+                            },
+                            "uploadedAt": {
+                              "type": "string"
+                            },
+                            "etag": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "filename",
+                            "format",
+                            "size",
+                            "uploadedAt"
+                          ]
+                        },
+                        "fingerprints": {
+                          "type": "object",
+                          "properties": {
+                            "sha1": {
+                              "type": "string"
+                            },
+                            "sha256": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "sha1",
+                            "sha256"
+                          ]
+                        },
+                        "crlType": {
+                          "type": "string",
+                          "enum": [
+                            "full",
+                            "delta"
+                          ]
+                        },
+                        "tbsCertList": {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "object",
+                              "properties": {
+                                "raw": {
+                                  "type": "number"
+                                },
+                                "display": {
+                                  "type": "string",
+                                  "enum": [
+                                    "v1",
+                                    "v2",
+                                    "v3"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "raw",
+                                "display"
+                              ]
+                            },
+                            "signature": {
+                              "type": "object",
+                              "properties": {
+                                "algorithm": {
+                                  "type": "object",
+                                  "properties": {
+                                    "oid": {
+                                      "type": "string"
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "nullable": true
+                                    }
+                                  },
+                                  "required": [
+                                    "oid",
+                                    "name"
+                                  ]
+                                },
+                                "parameters": {
+                                  "type": "object",
+                                  "properties": {
+                                    "parsed": {
+                                      "nullable": true
+                                    },
+                                    "rawHex": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "rawHex"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "algorithm"
+                              ]
+                            },
+                            "issuer": {
+                              "type": "object",
+                              "properties": {
+                                "commonName": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "organization": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "organizationalUnit": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "country": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "stateOrProvince": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "locality": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "rdnSequence": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "attributes": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "type": {
+                                              "type": "object",
+                                              "properties": {
+                                                "oid": {
+                                                  "type": "string"
+                                                },
+                                                "name": {
+                                                  "type": "string",
+                                                  "nullable": true
+                                                }
+                                              },
+                                              "required": [
+                                                "oid",
+                                                "name"
+                                              ]
+                                            },
+                                            "value": {
+                                              "type": "object",
+                                              "properties": {
+                                                "string": {
+                                                  "type": "string",
+                                                  "nullable": true
+                                                },
+                                                "encoding": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "utf8String",
+                                                    "printableString",
+                                                    "ia5String",
+                                                    "bmpString",
+                                                    "universalString",
+                                                    "unknown"
+                                                  ]
+                                                },
+                                                "rawHex": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "string",
+                                                "encoding"
+                                              ]
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "value"
+                                          ]
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "attributes"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "commonName",
+                                "organization",
+                                "organizationalUnit",
+                                "country",
+                                "stateOrProvince",
+                                "locality",
+                                "rdnSequence"
+                              ]
+                            },
+                            "thisUpdate": {
+                              "type": "object",
+                              "properties": {
+                                "iso": {
+                                  "type": "string"
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "utcTime",
+                                    "generalizedTime"
+                                  ]
+                                },
+                                "raw": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "iso",
+                                "type",
+                                "raw"
+                              ]
+                            },
+                            "nextUpdate": {
+                              "type": "object",
+                              "properties": {
+                                "iso": {
+                                  "type": "string"
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "utcTime",
+                                    "generalizedTime"
+                                  ]
+                                },
+                                "raw": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "iso",
+                                "type",
+                                "raw"
+                              ]
+                            },
+                            "revokedCertificates": {
+                              "type": "object",
+                              "properties": {
+                                "count": {
+                                  "type": "number"
+                                },
+                                "items": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "userCertificate": {
+                                        "type": "object",
+                                        "properties": {
+                                          "hex": {
+                                            "type": "string"
+                                          },
+                                          "decimal": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "hex"
+                                        ]
+                                      },
+                                      "revocationDate": {
+                                        "type": "object",
+                                        "properties": {
+                                          "iso": {
+                                            "type": "string"
+                                          },
+                                          "type": {
+                                            "type": "string",
+                                            "enum": [
+                                              "utcTime",
+                                              "generalizedTime"
+                                            ]
+                                          },
+                                          "raw": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "iso",
+                                          "type",
+                                          "raw"
+                                        ]
+                                      },
+                                      "crlEntryExtensions": {
+                                        "type": "object",
+                                        "properties": {
+                                          "count": {
+                                            "type": "number"
+                                          },
+                                          "items": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "extnID": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "oid": {
+                                                      "type": "string"
+                                                    },
+                                                    "name": {
+                                                      "type": "string",
+                                                      "nullable": true
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "oid",
+                                                    "name"
+                                                  ]
+                                                },
+                                                "critical": {
+                                                  "type": "boolean"
+                                                },
+                                                "extnValue": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "hex": {
+                                                      "type": "string"
+                                                    },
+                                                    "byteLength": {
+                                                      "type": "number"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "hex",
+                                                    "byteLength"
+                                                  ]
+                                                },
+                                                "parseStatus": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "parsed",
+                                                    "unsupported",
+                                                    "error"
+                                                  ]
+                                                },
+                                                "parseError": {
+                                                  "type": "string"
+                                                },
+                                                "parsed": {
+                                                  "nullable": true
+                                                }
+                                              },
+                                              "required": [
+                                                "extnID",
+                                                "critical",
+                                                "extnValue",
+                                                "parseStatus"
+                                              ]
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "count",
+                                          "items"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "userCertificate",
+                                      "revocationDate"
+                                    ]
+                                  }
+                                },
+                                "hasMore": {
+                                  "type": "boolean"
+                                },
+                                "nextCursor": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "count",
+                                "items",
+                                "hasMore"
+                              ]
+                            },
+                            "crlExtensions": {
+                              "type": "object",
+                              "properties": {
+                                "count": {
+                                  "type": "number"
+                                },
+                                "critical": {
+                                  "type": "number"
+                                },
+                                "items": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "extnID": {
+                                        "type": "object",
+                                        "properties": {
+                                          "oid": {
+                                            "type": "string"
+                                          },
+                                          "name": {
+                                            "type": "string",
+                                            "nullable": true
+                                          }
+                                        },
+                                        "required": [
+                                          "oid",
+                                          "name"
+                                        ]
+                                      },
+                                      "critical": {
+                                        "type": "boolean"
+                                      },
+                                      "extnValue": {
+                                        "type": "object",
+                                        "properties": {
+                                          "hex": {
+                                            "type": "string"
+                                          },
+                                          "byteLength": {
+                                            "type": "number"
+                                          }
+                                        },
+                                        "required": [
+                                          "hex",
+                                          "byteLength"
+                                        ]
+                                      },
+                                      "parseStatus": {
+                                        "type": "string",
+                                        "enum": [
+                                          "parsed",
+                                          "unsupported",
+                                          "error"
+                                        ]
+                                      },
+                                      "parseError": {
+                                        "type": "string"
+                                      },
+                                      "parsed": {
+                                        "nullable": true
+                                      }
+                                    },
+                                    "required": [
+                                      "extnID",
+                                      "critical",
+                                      "extnValue",
+                                      "parseStatus"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "count",
+                                "critical",
+                                "items"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "signature",
+                            "issuer",
+                            "thisUpdate"
+                          ]
+                        },
+                        "signatureAlgorithm": {
+                          "type": "object",
+                          "properties": {
+                            "algorithm": {
+                              "type": "object",
+                              "properties": {
+                                "oid": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "oid",
+                                "name"
+                              ]
+                            },
+                            "parameters": {
+                              "type": "object",
+                              "properties": {
+                                "parsed": {
+                                  "nullable": true
+                                },
+                                "rawHex": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "rawHex"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "algorithm"
+                          ]
+                        },
+                        "signatureValue": {
+                          "type": "object",
+                          "properties": {
+                            "hex": {
+                              "type": "string"
+                            },
+                            "bitLength": {
+                              "type": "number"
+                            },
+                            "unusedBits": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "hex",
+                            "bitLength",
+                            "unusedBits"
+                          ]
+                        },
+                        "relationships": {
+                          "type": "object",
+                          "properties": {
+                            "issuer": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "type": {
+                                  "type": "string"
+                                },
+                                "href": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "type",
+                                "href"
+                              ]
+                            },
+                            "baseCrl": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "type": {
+                                  "type": "string"
+                                },
+                                "href": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "type",
+                                "href"
+                              ]
+                            },
+                            "deltaCrls": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "type": {
+                                    "type": "string"
+                                  },
+                                  "href": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "type",
+                                  "href"
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "type",
+                        "href",
+                        "downloadUrl",
+                        "storage",
+                        "fingerprints",
+                        "crlType",
+                        "tbsCertList",
+                        "relationships"
+                      ],
+                      "nullable": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "timestamp": {
+                          "type": "string"
+                        },
+                        "cached": {
+                          "type": "boolean"
+                        },
+                        "cacheAge": {
+                          "type": "number"
+                        },
+                        "links": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "cursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "nextCursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "hasMore": {
+                              "type": "boolean"
+                            },
+                            "pageSize": {
+                              "type": "number"
+                            },
+                            "totalCount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "cursor",
+                            "nextCursor",
+                            "hasMore",
+                            "pageSize"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "timestamp"
+                      ],
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "nullable": true
+                        },
+                        "field": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta",
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string",
+                      "format": "null",
+                      "nullable": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "timestamp": {
+                          "type": "string"
+                        },
+                        "cached": {
+                          "type": "boolean"
+                        },
+                        "cacheAge": {
+                          "type": "number"
+                        },
+                        "links": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "cursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "nextCursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "hasMore": {
+                              "type": "boolean"
+                            },
+                            "pageSize": {
+                              "type": "number"
+                            },
+                            "totalCount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "cursor",
+                            "nextCursor",
+                            "hasMore",
+                            "pageSize"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "timestamp"
+                      ],
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "nullable": true
+                        },
+                        "field": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta",
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/stats": {
+      "get": {
+        "description": "Returns aggregate statistics about stored certificates and CRLs including counts, CRL-type breakdown, revocation totals, and storage usage by prefix.",
+        "summary": "Get statistics",
+        "tags": [
+          "stats"
+        ],
+        "parameters": [],
+        "operationId": "stats.get",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "certificates": {
+                          "type": "object",
+                          "properties": {
+                            "total": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "total"
+                          ]
+                        },
+                        "crls": {
+                          "type": "object",
+                          "properties": {
+                            "total": {
+                              "type": "number"
+                            },
+                            "full": {
+                              "type": "number"
+                            },
+                            "delta": {
+                              "type": "number"
+                            },
+                            "totalRevocations": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "total",
+                            "full",
+                            "delta",
+                            "totalRevocations"
+                          ]
+                        },
+                        "storage": {
+                          "type": "object",
+                          "properties": {
+                            "totalSize": {
+                              "type": "number"
+                            },
+                            "byPrefix": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "number"
+                              }
+                            }
+                          },
+                          "required": [
+                            "totalSize",
+                            "byPrefix"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "certificates",
+                        "crls",
+                        "storage"
+                      ],
+                      "nullable": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "timestamp": {
+                          "type": "string"
+                        },
+                        "cached": {
+                          "type": "boolean"
+                        },
+                        "cacheAge": {
+                          "type": "number"
+                        },
+                        "links": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "cursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "nextCursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "hasMore": {
+                              "type": "boolean"
+                            },
+                            "pageSize": {
+                              "type": "number"
+                            },
+                            "totalCount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "cursor",
+                            "nextCursor",
+                            "hasMore",
+                            "pageSize"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "timestamp"
+                      ],
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "nullable": true
+                        },
+                        "field": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta",
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/health": {
+      "get": {
+        "description": "Returns service health status and dependency checks. Responds with HTTP 200 when healthy and 503 when unhealthy.",
+        "summary": "Health check",
+        "tags": [
+          "health"
+        ],
+        "parameters": [],
+        "operationId": "health.get",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "healthy",
+                            "degraded",
+                            "unhealthy"
+                          ]
+                        },
+                        "version": {
+                          "type": "string"
+                        },
+                        "checks": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string"
+                              },
+                              "latencyMs": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "version",
+                        "checks"
+                      ],
+                      "nullable": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "timestamp": {
+                          "type": "string"
+                        },
+                        "cached": {
+                          "type": "boolean"
+                        },
+                        "cacheAge": {
+                          "type": "number"
+                        },
+                        "links": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "cursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "nextCursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "hasMore": {
+                              "type": "boolean"
+                            },
+                            "pageSize": {
+                              "type": "number"
+                            },
+                            "totalCount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "cursor",
+                            "nextCursor",
+                            "hasMore",
+                            "pageSize"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "timestamp"
+                      ],
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "nullable": true
+                        },
+                        "field": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta",
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "healthy",
+                            "degraded",
+                            "unhealthy"
+                          ]
+                        },
+                        "version": {
+                          "type": "string"
+                        },
+                        "checks": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string"
+                              },
+                              "latencyMs": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "version",
+                        "checks"
+                      ],
+                      "nullable": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "timestamp": {
+                          "type": "string"
+                        },
+                        "cached": {
+                          "type": "boolean"
+                        },
+                        "cacheAge": {
+                          "type": "number"
+                        },
+                        "links": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "cursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "nextCursor": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "hasMore": {
+                              "type": "boolean"
+                            },
+                            "pageSize": {
+                              "type": "number"
+                            },
+                            "totalCount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "cursor",
+                            "nextCursor",
+                            "hasMore",
+                            "pageSize"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "timestamp"
+                      ],
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "nullable": true
+                        },
+                        "field": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta",
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "info": {
+    "title": "PKI AIA/CDP Worker API",
+    "version": "2.0.0",
+    "description": "OpenAPI specification generated from the ts-rest contract and Zod schemas. Worker implementation is authoritative."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Relative base URL"
+    }
+  ],
+  "tags": [
+    {
+      "name": "certificates",
+      "description": "Certificate listing and detail operations"
+    },
+    {
+      "name": "crls",
+      "description": "CRL listing, detail, and upload operations"
+    },
+    {
+      "name": "stats",
+      "description": "Service statistics"
+    },
+    {
+      "name": "health",
+      "description": "Service health checks"
+    }
+  ]
+}

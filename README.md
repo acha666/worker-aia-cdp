@@ -82,6 +82,26 @@ JSON endpoints for programmatic access. See full API design in [docs/api-design-
 | `/api/v2/crls/{id}`         | GET    | CRL details             |
 | `/api/v2/crls`              | POST   | Upload CRL (PEM or DER) |
 | `/api/v2/stats`             | GET    | Service statistics      |
+| `/api/v2/openapi.json`      | GET    | OpenAPI specification   |
+
+### OpenAPI
+
+- Runtime spec endpoint: `/api/v2/openapi.json`
+- Regenerate spec file with: `pnpm run openapi:generate`
+- Generated file: `docs/openapi-v2.json`
+
+### HTML API Docs (Redoc)
+
+- Build full docs site (OpenAPI + lint + bundle + Redoc): `pnpm run docs:build`
+- Local output: `site/`
+- Redoc page output: `site/api/index.html`
+- Bundled OpenAPI output: `site/api/openapi.json`
+
+### GitHub Pages hosting
+
+- Workflow: `.github/workflows/pages.yml`
+- CI quality gate includes OpenAPI/doc checks in `.github/workflows/ci.yml`
+- On pushes to `main`, Pages publishes the `site/` directory artifact
 
 ## Windows AD CS helper
 

@@ -13,7 +13,7 @@ concurrency:
 jobs:
   # Fast checks: lint, format, type-check combined with shared setup
   check:
-    name: Lint, Format & Type Check
+    name: Lint, Format, Type & API Docs Check
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -39,6 +39,12 @@ jobs:
 
       - name: Type check
         run: pnpm run type-check
+
+      - name: Verify OpenAPI artifact is up to date
+        run: pnpm run openapi:check
+
+      - name: Build bundled Redoc docs
+        run: pnpm run docs:build
 
   # Run tests in parallel
   test:

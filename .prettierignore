@@ -30,3 +30,5 @@ package-lock.json
 
 # Generated files
 tests/fixtures/
+docs/openapi-v2.json
+site/

@@ -1,0 +1,15 @@
+apis:
+  worker-v2:
+    root: ./docs/openapi-v2.json
+
+extends:
+  - recommended
+
+rules:
+  operation-operationId: error
+  operation-summary: warn
+  no-unused-components: warn
+  nullable-type-sibling: off
+  security-defined: off
+  info-license: off
+  operation-4xx-response: off

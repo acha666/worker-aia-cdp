@@ -35,7 +35,8 @@ const certificatesContract = c.router({
       200: createApiResponseSchema(z.array(CertificateListItemSchema)),
     },
     summary: "List all certificates",
-    description: "Returns a paginated list of certificates.",
+    description:
+      "Returns a paginated list of certificates. Results are deduplicated to canonical DER metadata when both DER and PEM variants exist.",
   },
 
   get: {
@@ -51,7 +52,7 @@ const certificatesContract = c.router({
     },
     summary: "Get certificate details",
     description:
-      "Returns detailed information about a specific certificate including its TBS structure.",
+      "Returns detailed information about a specific certificate including its TBS structure. Optional sections can be controlled with the include query parameter.",
   },
 });
 
@@ -68,7 +69,8 @@ const crlsContract = c.router({
       200: createApiResponseSchema(z.array(CrlListItemSchema)),
     },
     summary: "List all CRLs",
-    description: "Returns a paginated list of CRLs. Filter by type (full/delta) and status.",
+    description:
+      "Returns a paginated list of CRLs. Supports filtering by type (full/delta). Results are deduplicated to canonical DER metadata when both DER and PEM variants exist.",
   },
 
   get: {
@@ -84,7 +86,7 @@ const crlsContract = c.router({
     },
     summary: "Get CRL details",
     description:
-      "Returns detailed information about a specific CRL including its TBS structure and revocations.",
+      "Returns detailed information about a specific CRL including its TBS structure and revocations. Optional sections and revocation pagination are controlled via query parameters.",
   },
 
   upload: {
@@ -97,7 +99,8 @@ const crlsContract = c.router({
       409: createApiResponseSchema(z.null()),
     },
     summary: "Upload a new CRL",
-    description: "Upload a CRL in PEM or DER format. The CRL will be validated and stored.",
+    description:
+      "Upload a CRL in PEM or DER format using multipart/form-data with a required file field named crl. The CRL is parsed, issuer-resolved, signature-verified, and stored only if newer than the current logical CRL.",
   },
 });
 
@@ -114,7 +117,7 @@ const statsContract = c.router({
     },
     summary: "Get statistics",
     description:
-      "Returns statistics about stored certificates and CRLs including counts and storage usage.",
+      "Returns aggregate statistics about stored certificates and CRLs including counts, CRL-type breakdown, revocation totals, and storage usage by prefix.",
   },
 });
 
@@ -128,9 +131,11 @@ const healthContract = c.router({
     path: "/api/v2/health",
     responses: {
       200: createApiResponseSchema(HealthResultSchema),
+      503: createApiResponseSchema(HealthResultSchema),
     },
     summary: "Health check",
-    description: "Returns the health status of the service including dependency checks.",
+    description:
+      "Returns service health status and dependency checks. Responds with HTTP 200 when healthy and 503 when unhealthy.",
   },
 });
 

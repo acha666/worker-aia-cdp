@@ -17,5 +17,8 @@
 // Export the main API contract
 export { apiContract, type ApiContract } from "./api";
 
+// Export OpenAPI document generated from contract + schemas
+export { openApiDocument } from "./openapi";
+
 // Export all schemas for validation
 export * from "./schemas";
