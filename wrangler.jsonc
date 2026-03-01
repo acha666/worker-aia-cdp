@@ -1,7 +1,7 @@
 {
   "name": "aia-cdp-worker",
   "main": "src/worker/worker.ts",
-  "compatibility_date": "2025-09-16",
+  "compatibility_date": "2026-02-28",
   "build": {
     "command": "pnpm run build"
   },
@@ -27,8 +27,10 @@
         }
       ],
       "build": {
-        "command": "pnpm run build:dev",
-        "watch": "src/web"
+        "command": "pnpm run build:dev"
+      },
+      "vars": {
+        "SITE_NAME": "PKI AIA/CDP (Local)"
       }
     }
   },
@@ -43,8 +45,6 @@
   },
   "assets": {
     "directory": "./public",
-    "binding": "ASSETS",
-    "include": ["index.html"],
-    "exclude": ["*.map"]
+    "binding": "ASSETS"
   }
 }
