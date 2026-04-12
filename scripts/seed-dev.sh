@@ -25,9 +25,14 @@ if [ -f "${CA_CERT_DIR}/root-ca.cert.der" ]; then
     npx wrangler r2 object put aia-cdp-local/ca/root-ca.crt --file="${CA_CERT_DIR}/root-ca.cert.der" --local --persist-to=.wrangler/state
 fi
 
-if [ -f "${CA_CERT_DIR}/intermediate-ca.cert.der" ]; then
-    echo "  → ca/intermediate-ca.crt"
-    npx wrangler r2 object put aia-cdp-local/ca/intermediate-ca.crt --file="${CA_CERT_DIR}/intermediate-ca.cert.der" --local --persist-to=.wrangler/state
+if [ -f "${CA_CERT_DIR}/intermediate-ca-1.cert.der" ]; then
+    echo "  → ca/intermediate-ca-1.crt"
+    npx wrangler r2 object put aia-cdp-local/ca/intermediate-ca-1.crt --file="${CA_CERT_DIR}/intermediate-ca-1.cert.der" --local --persist-to=.wrangler/state
+fi
+
+if [ -f "${CA_CERT_DIR}/intermediate-ca-2.cert.der" ]; then
+    echo "  → ca/intermediate-ca-2.crt"
+    npx wrangler r2 object put aia-cdp-local/ca/intermediate-ca-2.crt --file="${CA_CERT_DIR}/intermediate-ca-2.cert.der" --local --persist-to=.wrangler/state
 fi
 
 echo ""

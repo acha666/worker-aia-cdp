@@ -235,7 +235,7 @@ test("ensureSummaryMetadata parses certificate and writes metadata", async () =>
   assert.equal(summary.kind, "certificate");
   assert.equal(summary.displayName, "Leaf Certificate");
   assert.equal(summary.subjectCommonName, "Leaf Certificate");
-  assert.equal(summary.issuerCommonName, "Test Intermediate CA");
+  assert.equal(summary.issuerCommonName, "Test Intermediate CA 1");
   assert(summary.notBefore);
   assert(summary.notAfter);
 
