@@ -47,7 +47,11 @@ pnpm run deploy
 
 ## Initial Setup
 
-Upload your CA certificates to R2 prior to uploading CRLs. The certificates stored in R2 define the whitelist of issuers whose CRLs are accepted. CRL validation checks that the issuer certificate exists in the bucket before storing a new CRL.
+Upload your CA certificates (`.crt` / `.cer`) to `ca/` in R2 prior to uploading CRLs. Certificates in `ca/` define the whitelist of issuers whose CRLs are accepted.
+
+For CRL uploads, Authority Key Identifier is required in the parsed CRL and is matched against Subject Key Identifier of whitelisted certificates under `ca/`.
+
+For certificate initialization, the worker can derive `.pem` variants from `.crt` / `.cer` objects and populate summary metadata when needed.
 
 Use the web UI or POST to `/api/v2/crls` to upload CRL files after certificates are in place.
 

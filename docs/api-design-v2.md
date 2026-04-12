@@ -118,6 +118,7 @@ Behavior:
 
 - Deduplicates DER/PEM variants to one logical item.
 - Search matches subject/issuer common name metadata.
+- For `.crt` / `.cer` objects in `ca/`, workers may derive `.pem` variants and summary metadata when missing.
 
 ### GET /api/v2/certificates/{id}
 
@@ -185,8 +186,11 @@ Format handling:
 
 Validation and storage:
 
-- CRL is parsed and issuer certificate must resolve.
+- CRL must include a parseable Authority Key Identifier (AKI).
+- AKI must match Subject Key Identifier (SKI) of a whitelisted certificate in `ca/` (`.crt` / `.cer`).
 - Signature verification is required.
+- Default CRL object keys are derived from the matched issuer certificate key.
+- If an existing by-keyid object and root-level CRL object already exist for the issuer key id, the root-level key is reused.
 - Uploaded CRL must be newer than existing logical CRL (`409 stale_crl` otherwise).
 
 Examples:
@@ -232,6 +236,7 @@ Current response behavior:
 | `invalid_body`           | 400            | Request body parse/read failure            |
 | `invalid_certificate`    | 400            | Certificate parse/read failure             |
 | `invalid_crl`            | 400            | CRL parse/read failure                     |
+| `missing_aki`            | 400            | CRL AKI extension could not be parsed      |
 | `issuer_not_found`       | 400            | No issuer certificate resolved             |
 | `invalid_signature`      | 400            | CRL signature verification failed          |
 | `not_found`              | 404            | Resource not found                         |

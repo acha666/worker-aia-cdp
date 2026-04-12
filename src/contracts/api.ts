@@ -100,7 +100,7 @@ const crlsContract = c.router({
     },
     summary: "Upload a new CRL",
     description:
-      "Upload a CRL in PEM or DER format using multipart/form-data with a required file field named crl. The CRL is parsed, issuer-resolved, signature-verified, and stored only if newer than the current logical CRL.",
+      "Upload a CRL in PEM or DER format using multipart/form-data with a required file field named crl. Authority Key Identifier is required and must match a whitelisted CA certificate Subject Key Identifier from ca/. The CRL is signature-verified and stored only if newer than the current logical CRL.",
   },
 });
 

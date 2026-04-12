@@ -23,9 +23,11 @@ import { parseCertificate } from "../../pki/parsers";
 import { extractPEMBlock } from "../../pki/crls/pem";
 import { getCacheControlHeader } from "../../cache/config";
 import { SIGNATURE_ALG_NAMES } from "../../pki/constants";
-import { ensureSummaryMetadata } from "../../r2/summary";
+import { ensureSummaryMetadata, buildSummaryMetadata } from "../../r2/summary";
 
 const CERT_PREFIX = "ca/";
+
+const DER_CERT_PATTERN = /\.(crt|cer)$/i;
 
 /**
  * GET /api/v2/certificates
@@ -98,6 +100,14 @@ export const listCertificates: RouteHandler = async (req, env, ctx) => {
           existingMeta: metadata,
         }).catch((error) => {
           console.error(`Failed to generate summary for ${object.key}:`, error);
+        })
+      );
+    }
+
+    if (DER_CERT_PATTERN.test(object.key)) {
+      ctx.waitUntil(
+        ensureCertificatePemVariant(env, object.key, metadata).catch((error) => {
+          console.error(`Failed to ensure PEM variant for ${object.key}:`, error);
         })
       );
     }
@@ -307,4 +317,48 @@ function isCertificateFile(key: string): boolean {
     key.endsWith(".crt.pem") ||
     key.endsWith(".cer.pem")
   );
+}
+
+async function ensureCertificatePemVariant(
+  env: Parameters<RouteHandler>[1],
+  key: string,
+  existingMeta?: Record<string, string>
+): Promise<void> {
+  if (!DER_CERT_PATTERN.test(key)) {
+    return;
+  }
+
+  const pemKey = `${key}.pem`;
+  const existingPem = await env.STORE.get(pemKey);
+  if (existingPem) {
+    return;
+  }
+
+  const source = await env.STORE.get(key);
+  if (!source) {
+    return;
+  }
+
+  const der = await source.arrayBuffer();
+  parseCertificate(der);
+
+  const summary = await ensureSummaryMetadata({
+    env,
+    key,
+    kind: "certificate",
+    existingMeta: existingMeta ?? source.customMetadata,
+  });
+
+  const metadata = summary
+    ? buildSummaryMetadata(summary, source.customMetadata ?? existingMeta ?? {})
+    : (source.customMetadata ?? existingMeta ?? {});
+
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(der)));
+  const lines = base64.match(/.{1,64}/g) ?? [];
+  const pemText = `-----BEGIN CERTIFICATE-----\n${lines.join("\n")}\n-----END CERTIFICATE-----\n`;
+
+  await env.STORE.put(pemKey, new TextEncoder().encode(pemText), {
+    httpMetadata: {},
+    customMetadata: metadata,
+  });
 }
