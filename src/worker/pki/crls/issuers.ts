@@ -1,13 +1,6 @@
 import type { Env } from "../../env";
 import { cachedListAllWithPrefix } from "../../r2/listing";
-import {
-  parseCertificate,
-  getCRLAKIHex,
-  getSKIHex,
-  getCRLNumber,
-  getDeltaBaseCRLNumber,
-  friendlyNameFromCert,
-} from "../parsers";
+import { parseCertificate, getCRLAKIHex, getSKIHex, getCRLNumber } from "../parsers";
 import { toJSDate, sha256Hex } from "../utils/conversion";
 import { putBinary } from "../../r2/objects";
 import type * as pkijs from "pkijs";
@@ -22,7 +15,7 @@ export async function listCACandidates(env: Env): Promise<CACandidate[]> {
   const results: CACandidate[] = [];
   const caObjects = await cachedListAllWithPrefix(env, "ca/");
   for (const object of caObjects) {
-    if (!object.key.endsWith(".crt")) {
+    if (!isAllowedCACertificateKey(object.key)) {
       continue;
     }
     const file = await env.STORE.get(object.key);
@@ -40,28 +33,24 @@ export async function listCACandidates(env: Env): Promise<CACandidate[]> {
   return results;
 }
 
-export async function findIssuerCertForCRL(env: Env, crl: pkijs.CertificateRevocationList) {
-  const akiHex = getCRLAKIHex(crl);
-  const candidates = await listCACandidates(env);
-  if (akiHex) {
-    for (const candidate of candidates) {
-      const ski = getSKIHex(candidate.cert);
-      if (ski?.toLowerCase() === akiHex.toLowerCase()) {
-        return candidate;
-      }
-    }
+export async function findIssuerCertForCRL(
+  env: Env,
+  crl: pkijs.CertificateRevocationList,
+  akiHex?: string
+) {
+  const parsedAkiHex = akiHex ?? getCRLAKIHex(crl);
+  if (!parsedAkiHex) {
+    return undefined;
   }
-  const issuerDN = crl.issuer.typesAndValues
-    .map((tv) => `${tv.type}=${tv.value.valueBlock.value}`)
-    .join(",");
+
+  const candidates = await listCACandidates(env);
   for (const candidate of candidates) {
-    const subjectDN = candidate.cert.subject.typesAndValues
-      .map((tv) => `${tv.type}=${tv.value.valueBlock.value}`)
-      .join(",");
-    if (issuerDN === subjectDN) {
+    const ski = getSKIHex(candidate.cert);
+    if (ski?.toLowerCase() === parsedAkiHex.toLowerCase()) {
       return candidate;
     }
   }
+
   return undefined;
 }
 
@@ -106,29 +95,126 @@ export function isNewerCRL(
   return false;
 }
 
-export function classifyCRL(crl: pkijs.CertificateRevocationList, issuer: pkijs.Certificate) {
-  const friendly = friendlyNameFromCert(issuer)
-    .replace(/IssuingCA/gi, "IssuingCA")
-    .replace(/RootCA/gi, "RootCA");
-  const deltaBase = getDeltaBaseCRLNumber(crl);
-  const isDelta = deltaBase !== undefined;
-  const logicalBase = /Issuing/i.test(friendly) ? "AchaIssuingCA01" : "AchaRootCA";
-  const folder = isDelta ? "dcrl" : "crl";
-  const logicalDERKey = `${folder}/${logicalBase}.crl`;
-  const logicalPEMKey = `${folder}/${logicalBase}.crl.pem`;
-  const byAkiKey = (() => {
-    const aki = getCRLAKIHex(crl);
-    return aki ? `${folder}/by-keyid/${aki}.crl` : undefined;
-  })();
+function isAllowedCACertificateKey(key: string): boolean {
+  return /\.crt$/i.test(key) || /\.cer$/i.test(key);
+}
+
+function deriveLogicalBaseFromIssuerKey(issuerKey: string): string {
+  const withoutPrefix = issuerKey.replace(/^ca\//i, "");
+  const withoutExt = withoutPrefix.replace(/\.(crt|cer)$/i, "");
+  const normalized = withoutExt
+    .replace(/[^A-Za-z0-9._/-]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^[-/]+|[-/]+$/g, "");
+  return normalized || "issuer";
+}
+
+async function findRootLevelCrlKeyByIssuerKeyId(
+  env: Env,
+  folder: "crl" | "dcrl",
+  issuerKeyId: string
+): Promise<string | undefined> {
+  const expectedIssuerKeyId = issuerKeyId.toLowerCase();
+  let cursor: string | undefined;
+
+  do {
+    const listing = await env.STORE.list({
+      prefix: `${folder}/`,
+      delimiter: "/",
+      cursor,
+      include: ["customMetadata"],
+    } as R2ListOptions);
+
+    for (const object of listing.objects) {
+      const key = object.key;
+      if (!key.endsWith(".crl") || key.endsWith(".crl.pem")) {
+        continue;
+      }
+
+      const metadata = (object as { customMetadata?: Record<string, string> }).customMetadata;
+      const metaIssuerKeyId = metadata?.issuerKeyId?.toLowerCase();
+      if (metaIssuerKeyId === expectedIssuerKeyId) {
+        return key;
+      }
+    }
+
+    cursor = listing.truncated ? listing.cursor : undefined;
+  } while (cursor);
+
+  return undefined;
+}
+
+function keyLooksLikeRootLevelDER(folder: "crl" | "dcrl", key: string): boolean {
+  if (!key.startsWith(`${folder}/`)) {
+    return false;
+  }
+  if (key.startsWith(`${folder}/by-keyid/`) || key.startsWith(`${folder}/archive/`)) {
+    return false;
+  }
+  return key.endsWith(".crl") && !key.endsWith(".crl.pem");
+}
+
+async function resolveLegacyCanonicalKeyFromByKeyId(
+  env: Env,
+  folder: "crl" | "dcrl",
+  byAkiKey: string
+): Promise<string | undefined> {
+  const byAkiObject = await env.STORE.get(byAkiKey);
+  if (!byAkiObject) {
+    return undefined;
+  }
+
+  const metadata = (byAkiObject as { customMetadata?: Record<string, string> }).customMetadata;
+  const candidate = metadata?.canonicalKey;
+  if (!candidate || !keyLooksLikeRootLevelDER(folder, candidate)) {
+    return undefined;
+  }
+
+  const exists = await env.STORE.get(candidate);
+  return exists ? candidate : undefined;
+}
+
+export async function resolveCRLStorageKeys(options: {
+  env: Env;
+  issuerKey: string;
+  issuerKeyId: string;
+  isDelta: boolean;
+}): Promise<{
+  isDelta: boolean;
+  folder: "crl" | "dcrl";
+  logicalBase: string;
+  logicalDERKey: string;
+  logicalPEMKey: string;
+  byAkiKey: string;
+  friendly: string;
+}> {
+  const folder: "crl" | "dcrl" = options.isDelta ? "dcrl" : "crl";
+  const logicalBase = deriveLogicalBaseFromIssuerKey(options.issuerKey);
+  const defaultLogicalDERKey = `${folder}/${logicalBase}.crl`;
+  const byAkiKey = `${folder}/by-keyid/${options.issuerKeyId}.crl`;
+
+  // Preserve user-managed URL/key when a by-keyid alias already exists for the same issuer key id.
+  const existingByCanonical = await resolveLegacyCanonicalKeyFromByKeyId(
+    options.env,
+    folder,
+    byAkiKey
+  );
+  const existingByMetadata =
+    existingByCanonical ??
+    (await findRootLevelCrlKeyByIssuerKeyId(options.env, folder, options.issuerKeyId));
+
+  const logicalDERKey = existingByMetadata ?? defaultLogicalDERKey;
+  const logicalPEMKey = `${logicalDERKey}.pem`;
+  const friendly = logicalBase.split("/").pop() ?? logicalBase;
+
   return {
-    friendly,
-    isDelta,
-    deltaBase,
+    isDelta: options.isDelta,
     folder,
     logicalBase,
     logicalDERKey,
     logicalPEMKey,
     byAkiKey,
+    friendly,
   };
 }
 

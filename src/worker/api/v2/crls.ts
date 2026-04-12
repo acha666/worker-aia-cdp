@@ -32,7 +32,7 @@ import { extractPEMBlock } from "../../pki/crls/pem";
 import {
   findIssuerCertForCRL,
   verifyCRLWithIssuer,
-  classifyCRL,
+  resolveCRLStorageKeys,
   isNewerCRL,
   archiveExistingCRL,
 } from "../../pki/crls/issuers";
@@ -416,8 +416,13 @@ export const uploadCrl: RouteHandler = async (req, env) => {
     });
   }
 
+  const parsedAki = getCRLAKIHex(crl);
+  if (!parsedAki) {
+    return jsonError(400, "missing_aki", "Failed to parse Authority Key Identifier from CRL");
+  }
+
   // Find and verify issuer
-  const issuer = await findIssuerCertForCRL(env, crl);
+  const issuer = await findIssuerCertForCRL(env, crl, parsedAki);
   if (!issuer) {
     return jsonError(
       400,
@@ -431,8 +436,14 @@ export const uploadCrl: RouteHandler = async (req, env) => {
     return jsonError(400, "invalid_signature", "CRL signature validation failed");
   }
 
-  // Classify and check for existing
-  const classification = classifyCRL(crl, issuer.cert);
+  // Resolve storage keys and check for existing
+  const deltaBase = getDeltaBaseCRLNumber(crl);
+  const classification = await resolveCRLStorageKeys({
+    env,
+    issuerKey: issuer.key,
+    issuerKeyId: parsedAki,
+    isDelta: deltaBase !== undefined,
+  });
   const existing = await getExistingCRL(env, classification.logicalDERKey);
 
   if (!isNewerCRL(crl, existing?.parsed ?? undefined)) {
@@ -448,12 +459,12 @@ export const uploadCrl: RouteHandler = async (req, env) => {
   const thisUpdate = toJSDate(crl.thisUpdate);
   const nextUpdate = toJSDate(crl.nextUpdate);
   const crlNumber = getCRLNumber(crl);
-  const deltaBase = getDeltaBaseCRLNumber(crl);
   const issuerCN = getCN(issuer.cert) ?? "";
-  const issuerKeyId = getCRLAKIHex(crl) ?? "";
+  const issuerKeyId = parsedAki;
 
   const baseMeta: Record<string, string> = {
     issuerKeyId,
+    canonicalKey: classification.logicalDERKey,
     isDelta: classification.isDelta ? "true" : "false",
   };
   if (issuerCN) {
