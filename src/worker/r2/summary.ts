@@ -3,6 +3,7 @@ import { parseCertificate, parseCRL, getCN, isDeltaCRL } from "../pki/parsers";
 import { toJSDate } from "../pki/utils/conversion";
 import { extractPEMBlock } from "../pki/crls/pem";
 import { runSingleFlight } from "../cache/operations";
+import { SUMMARY_METADATA_KEYS, readCustomMetadata } from "./metadata";
 
 export type SummaryKind = "certificate" | "crl" | "other";
 
@@ -19,19 +20,6 @@ export interface ObjectSummary {
 }
 
 export const SUMMARY_VERSION = "1";
-
-const SUMMARY_KEYS = {
-  version: "summaryVersion",
-  kind: "summaryObjectType",
-  subject: "summarySubjectCN",
-  issuer: "summaryIssuerCN",
-  notBefore: "summaryNotBefore",
-  notAfter: "summaryNotAfter",
-  thisUpdate: "summaryThisUpdate",
-  nextUpdate: "summaryNextUpdate",
-  isDelta: "summaryIsDelta",
-  displayName: "summaryDisplayName",
-} as const;
 
 const PEM_MARKERS = {
   certificate: {
@@ -161,17 +149,17 @@ export function readSummaryFromMetadata(
   if (!meta) {
     return null;
   }
-  const kind = (meta[SUMMARY_KEYS.kind] as SummaryKind | undefined) ?? null;
+  const kind = (meta[SUMMARY_METADATA_KEYS.kind] as SummaryKind | undefined) ?? null;
   const subjectCommonName =
-    meta[SUMMARY_KEYS.subject] ?? meta.subjectCommonName ?? meta.subjectCN ?? null;
+    meta[SUMMARY_METADATA_KEYS.subject] ?? meta.subjectCommonName ?? meta.subjectCN ?? null;
   const issuerCommonName =
-    meta[SUMMARY_KEYS.issuer] ?? meta.issuerCommonName ?? meta.issuerCN ?? null;
-  const notBefore = meta[SUMMARY_KEYS.notBefore] ?? meta.notBefore ?? null;
-  const notAfter = meta[SUMMARY_KEYS.notAfter] ?? meta.notAfter ?? null;
-  const thisUpdate = meta[SUMMARY_KEYS.thisUpdate] ?? meta.thisUpdate ?? null;
-  const nextUpdate = meta[SUMMARY_KEYS.nextUpdate] ?? meta.nextUpdate ?? null;
-  const isDeltaRaw = meta[SUMMARY_KEYS.isDelta] ?? meta.isDelta ?? null;
-  const displayName = meta[SUMMARY_KEYS.displayName] ?? null;
+    meta[SUMMARY_METADATA_KEYS.issuer] ?? meta.issuerCommonName ?? meta.issuerCN ?? null;
+  const notBefore = meta[SUMMARY_METADATA_KEYS.notBefore] ?? meta.notBefore ?? null;
+  const notAfter = meta[SUMMARY_METADATA_KEYS.notAfter] ?? meta.notAfter ?? null;
+  const thisUpdate = meta[SUMMARY_METADATA_KEYS.thisUpdate] ?? meta.thisUpdate ?? null;
+  const nextUpdate = meta[SUMMARY_METADATA_KEYS.nextUpdate] ?? meta.nextUpdate ?? null;
+  const isDeltaRaw = meta[SUMMARY_METADATA_KEYS.isDelta] ?? meta.isDelta ?? null;
+  const displayName = meta[SUMMARY_METADATA_KEYS.displayName] ?? null;
 
   if (!kind) {
     if (!subjectCommonName && !issuerCommonName) {
@@ -257,10 +245,8 @@ export async function ensureSummaryMetadata(
         return null;
       }
 
-      const newMetadata = buildSummaryMetadata(
-        summary,
-        object.customMetadata ?? context.existingMeta ?? {}
-      );
+      const objectMetadata = readCustomMetadata(object) ?? context.existingMeta ?? {};
+      const newMetadata = buildSummaryMetadata(summary, objectMetadata);
 
       const etagMatch =
         normalizeEtag(readOptionalEtag(object)) ??
@@ -292,31 +278,31 @@ export function buildSummaryMetadata(
     }
     output[key] = value;
   }
-  output[SUMMARY_KEYS.version] = SUMMARY_VERSION;
-  output[SUMMARY_KEYS.kind] = summary.kind;
+  output[SUMMARY_METADATA_KEYS.version] = SUMMARY_VERSION;
+  output[SUMMARY_METADATA_KEYS.kind] = summary.kind;
   if (summary.displayName) {
-    output[SUMMARY_KEYS.displayName] = summary.displayName;
+    output[SUMMARY_METADATA_KEYS.displayName] = summary.displayName;
   }
   if (summary.subjectCommonName) {
-    output[SUMMARY_KEYS.subject] = summary.subjectCommonName;
+    output[SUMMARY_METADATA_KEYS.subject] = summary.subjectCommonName;
   }
   if (summary.issuerCommonName) {
-    output[SUMMARY_KEYS.issuer] = summary.issuerCommonName;
+    output[SUMMARY_METADATA_KEYS.issuer] = summary.issuerCommonName;
   }
   if (summary.notBefore) {
-    output[SUMMARY_KEYS.notBefore] = summary.notBefore;
+    output[SUMMARY_METADATA_KEYS.notBefore] = summary.notBefore;
   }
   if (summary.notAfter) {
-    output[SUMMARY_KEYS.notAfter] = summary.notAfter;
+    output[SUMMARY_METADATA_KEYS.notAfter] = summary.notAfter;
   }
   if (summary.thisUpdate) {
-    output[SUMMARY_KEYS.thisUpdate] = summary.thisUpdate;
+    output[SUMMARY_METADATA_KEYS.thisUpdate] = summary.thisUpdate;
   }
   if (summary.nextUpdate) {
-    output[SUMMARY_KEYS.nextUpdate] = summary.nextUpdate;
+    output[SUMMARY_METADATA_KEYS.nextUpdate] = summary.nextUpdate;
   }
   if (summary.isDelta !== null) {
-    output[SUMMARY_KEYS.isDelta] = String(summary.isDelta);
+    output[SUMMARY_METADATA_KEYS.isDelta] = String(summary.isDelta);
   }
   return output;
 }

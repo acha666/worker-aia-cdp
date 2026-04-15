@@ -3,6 +3,7 @@ import { cachedListAllWithPrefix } from "../../r2/listing";
 import { parseCertificate, parseCRL, getCRLAKIHex, getSKIHex, getCRLNumber } from "../parsers";
 import { toJSDate, sha256Hex } from "../utils/conversion";
 import { putBinary } from "../../r2/objects";
+import { readCustomMetadata } from "../../r2/metadata";
 import type * as pkijs from "pkijs";
 
 export interface CACandidate {
@@ -131,7 +132,7 @@ async function findRootLevelCrlKeyByIssuerKeyId(
         continue;
       }
 
-      const metadata = (object as { customMetadata?: Record<string, string> }).customMetadata;
+      const metadata = readCustomMetadata(object);
       const metaIssuerKeyId = metadata?.issuerKeyId?.toLowerCase();
       if (metaIssuerKeyId === expectedIssuerKeyId) {
         return key;
@@ -181,7 +182,7 @@ async function resolveLegacyCanonicalKeyFromByKeyId(
     return undefined;
   }
 
-  const metadata = (byAkiObject as { customMetadata?: Record<string, string> }).customMetadata;
+  const metadata = readCustomMetadata(byAkiObject);
   const candidate = metadata?.canonicalKey;
   if (!candidate || !keyLooksLikeRootLevelDER(folder, candidate)) {
     return undefined;

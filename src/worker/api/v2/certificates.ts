@@ -24,6 +24,12 @@ import { extractPEMBlock } from "../../pki/crls/pem";
 import { getCacheControlHeader } from "../../cache/config";
 import { SIGNATURE_ALG_NAMES } from "../../pki/constants";
 import { ensureSummaryMetadata, buildSummaryMetadata } from "../../r2/summary";
+import {
+  hasCertificateSummaryMetadata,
+  readCertificateSummaryMetadata,
+  readCustomMetadata,
+  readFingerprintMetadata,
+} from "../../r2/metadata";
 
 const CERT_PREFIX = "ca/";
 
@@ -78,18 +84,13 @@ export const listCertificates: RouteHandler = async (req, env, ctx) => {
       break;
     }
 
-    const metadata = (object as { customMetadata?: Record<string, string> }).customMetadata;
+    const metadata = readCustomMetadata(object);
 
     // Lazy-load summary metadata if missing (for initially-uploaded certificates)
     // When certificates are manually uploaded to R2 (without going through the API),
     // they lack the computed summary metadata. This ensures such certificates get
     // their metadata generated and cached on first access to the list endpoint.
-    const hasSummaryMetadata = Boolean(
-      metadata?.summarySubjectCN ??
-      metadata?.summaryIssuerCN ??
-      metadata?.summaryNotBefore ??
-      metadata?.summaryNotAfter
-    );
+    const hasSummaryMetadata = hasCertificateSummaryMetadata(metadata);
 
     if (!hasSummaryMetadata) {
       ctx.waitUntil(
@@ -116,11 +117,8 @@ export const listCertificates: RouteHandler = async (req, env, ctx) => {
     const format = "der";
 
     // Extract summary from metadata or use defaults
-    const subjectCN = metadata?.summarySubjectCN ?? metadata?.subjectCN ?? null;
-    const issuerCN = metadata?.summaryIssuerCN ?? metadata?.issuerCN ?? null;
-    const notBefore = metadata?.summaryNotBefore ?? metadata?.notBefore ?? null;
-    const notAfter = metadata?.summaryNotAfter ?? metadata?.notAfter ?? null;
-    const serialNumber = metadata?.serialNumber ?? null;
+    const { subjectCN, issuerCN, notBefore, notAfter, serialNumber } =
+      readCertificateSummaryMetadata(metadata);
 
     if (search) {
       const searchable = `${subjectCN ?? ""} ${issuerCN ?? ""}`.toLowerCase();
@@ -130,8 +128,7 @@ export const listCertificates: RouteHandler = async (req, env, ctx) => {
     }
 
     // Get fingerprints from metadata or generate placeholder
-    const sha1 = metadata?.fingerprintSha1 ?? "";
-    const sha256 = metadata?.fingerprintSha256 ?? "";
+    const { sha1, sha256 } = readFingerprintMetadata(metadata);
 
     // Use base filename for canonical DER representation
     const canonicalId = baseFilename;
@@ -346,12 +343,13 @@ async function ensureCertificatePemVariant(
     env,
     key,
     kind: "certificate",
-    existingMeta: existingMeta ?? source.customMetadata,
+    existingMeta: existingMeta ?? readCustomMetadata(source),
   });
 
+  const sourceMetadata = readCustomMetadata(source);
   const metadata = summary
-    ? buildSummaryMetadata(summary, source.customMetadata ?? existingMeta ?? {})
-    : (source.customMetadata ?? existingMeta ?? {});
+    ? buildSummaryMetadata(summary, sourceMetadata ?? existingMeta ?? {})
+    : (sourceMetadata ?? existingMeta ?? {});
 
   const base64 = btoa(String.fromCharCode(...new Uint8Array(der)));
   const lines = base64.match(/.{1,64}/g) ?? [];

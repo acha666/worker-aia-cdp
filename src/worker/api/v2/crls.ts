@@ -42,6 +42,11 @@ import { getEdgeCache } from "../../cache/operations";
 import { SIGNATURE_ALG_NAMES } from "../../pki/constants";
 import { putBinary, getExistingCRL } from "../../r2/objects";
 import { buildSummaryMetadata, type ObjectSummary } from "../../r2/summary";
+import {
+  readCrlSummaryMetadata,
+  readCustomMetadata,
+  readFingerprintMetadata,
+} from "../../r2/metadata";
 
 const CRL_PREFIX = "crl/";
 const DCRL_PREFIX = "dcrl/";
@@ -118,25 +123,26 @@ export const listCrls: RouteHandler = async (req, env) => {
         break;
       }
 
-      const metadata = (object as { customMetadata?: Record<string, string> }).customMetadata;
+      const metadata = readCustomMetadata(object);
       const format = "der"; // Always report as DER (the canonical format)
 
       // Determine CRL type from path
       const crlType: CrlType = prefix === DCRL_PREFIX ? "delta" : "full";
 
       // Extract summary from metadata
-      let issuerCN = metadata?.summaryIssuerCN ?? metadata?.issuerCN ?? null;
-      let crlNumber = metadata?.crlNumber ?? null;
-      let baseCrlNumber = metadata?.baseCRLNumber ?? null;
-      let thisUpdate = metadata?.summaryThisUpdate ?? metadata?.thisUpdate ?? null;
-      let nextUpdate = metadata?.summaryNextUpdate ?? metadata?.nextUpdate ?? null;
-      let revokedCount = parseInt(metadata?.revokedCount ?? "0", 10) || 0;
+      const metadataSummary = readCrlSummaryMetadata(metadata);
+      let issuerCN = metadataSummary.issuerCN;
+      let crlNumber = metadataSummary.crlNumber;
+      let baseCrlNumber = metadataSummary.baseCrlNumber;
+      let thisUpdate = metadataSummary.thisUpdate;
+      let nextUpdate = metadataSummary.nextUpdate;
+      let revokedCount = metadataSummary.revokedCount;
 
       const needsFallback =
         !issuerCN ||
         !thisUpdate ||
         !nextUpdate ||
-        metadata?.revokedCount === undefined ||
+        !metadataSummary.hasRevokedCount ||
         crlNumber === null ||
         (crlType === "delta" && baseCrlNumber === null);
 
@@ -152,7 +158,7 @@ export const listCrls: RouteHandler = async (req, env) => {
           if (!nextUpdate && fallback.nextUpdate) {
             nextUpdate = fallback.nextUpdate;
           }
-          if (metadata?.revokedCount === undefined && fallback.revokedCount !== null) {
+          if (!metadataSummary.hasRevokedCount && fallback.revokedCount !== null) {
             revokedCount = fallback.revokedCount;
           }
           if (crlNumber === null && fallback.crlNumber !== null) {
@@ -165,8 +171,7 @@ export const listCrls: RouteHandler = async (req, env) => {
       }
 
       // Get fingerprints from metadata
-      const sha1 = metadata?.fingerprintSha1 ?? "";
-      const sha256 = metadata?.fingerprintSha256 ?? "";
+      const { sha1, sha256 } = readFingerprintMetadata(metadata);
 
       // Use base filename without .pem for the id and downloadUrl
       const canonicalKey = `${prefix}${baseFilename}`;
