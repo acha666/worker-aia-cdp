@@ -2,7 +2,7 @@
  * API v2 - CRL Handlers
  */
 
-import type { RouteHandler } from "../../env";
+import type { RouteHandler, Env } from "../../env";
 import type { CrlListItem, CrlDetail, CrlUploadResult, StorageInfo, CrlType } from "./types";
 import {
   jsonSuccess,
@@ -125,12 +125,44 @@ export const listCrls: RouteHandler = async (req, env) => {
       const crlType: CrlType = prefix === DCRL_PREFIX ? "delta" : "full";
 
       // Extract summary from metadata
-      const issuerCN = metadata?.summaryIssuerCN ?? metadata?.issuerCN ?? null;
-      const crlNumber = metadata?.crlNumber ?? null;
-      const baseCrlNumber = metadata?.baseCRLNumber ?? null;
-      const thisUpdate = metadata?.summaryThisUpdate ?? metadata?.thisUpdate ?? null;
-      const nextUpdate = metadata?.summaryNextUpdate ?? metadata?.nextUpdate ?? null;
-      const revokedCount = parseInt(metadata?.revokedCount ?? "0", 10) || 0;
+      let issuerCN = metadata?.summaryIssuerCN ?? metadata?.issuerCN ?? null;
+      let crlNumber = metadata?.crlNumber ?? null;
+      let baseCrlNumber = metadata?.baseCRLNumber ?? null;
+      let thisUpdate = metadata?.summaryThisUpdate ?? metadata?.thisUpdate ?? null;
+      let nextUpdate = metadata?.summaryNextUpdate ?? metadata?.nextUpdate ?? null;
+      let revokedCount = parseInt(metadata?.revokedCount ?? "0", 10) || 0;
+
+      const needsFallback =
+        !issuerCN ||
+        !thisUpdate ||
+        !nextUpdate ||
+        metadata?.revokedCount === undefined ||
+        crlNumber === null ||
+        (crlType === "delta" && baseCrlNumber === null);
+
+      if (needsFallback) {
+        const fallback = await parseCrlInfoFromStorage(env, object.key);
+        if (fallback) {
+          if (!issuerCN && fallback.issuerCN) {
+            issuerCN = fallback.issuerCN;
+          }
+          if (!thisUpdate && fallback.thisUpdate) {
+            thisUpdate = fallback.thisUpdate;
+          }
+          if (!nextUpdate && fallback.nextUpdate) {
+            nextUpdate = fallback.nextUpdate;
+          }
+          if (metadata?.revokedCount === undefined && fallback.revokedCount !== null) {
+            revokedCount = fallback.revokedCount;
+          }
+          if (crlNumber === null && fallback.crlNumber !== null) {
+            crlNumber = fallback.crlNumber;
+          }
+          if (baseCrlNumber === null && fallback.baseCrlNumber !== null) {
+            baseCrlNumber = fallback.baseCrlNumber;
+          }
+        }
+      }
 
       // Get fingerprints from metadata
       const sha1 = metadata?.fingerprintSha1 ?? "";
@@ -583,4 +615,51 @@ export const uploadCrl: RouteHandler = async (req, env) => {
 
 function isCrlFile(key: string): boolean {
   return key.endsWith(".crl") || key.endsWith(".crl.pem");
+}
+
+async function parseCrlInfoFromStorage(env: Env, key: string) {
+  try {
+    const object = await env.STORE.get(key);
+    if (!object) {
+      return null;
+    }
+
+    const bytes = new Uint8Array(await object.arrayBuffer());
+    const der = key.endsWith(".pem")
+      ? extractPEMBlock(
+          new TextDecoder().decode(bytes),
+          "-----BEGIN X509 CRL-----",
+          "-----END X509 CRL-----"
+        ).slice().buffer
+      : bytes.buffer;
+
+    const crl = parseCRL(der);
+    const issuerCN = (() => {
+      for (const tv of crl.issuer.typesAndValues) {
+        if (tv.type === "2.5.4.3") {
+          return tv.value.valueBlock.value as string;
+        }
+      }
+      return null;
+    })();
+
+    const thisUpdate = toJSDate(crl.thisUpdate)?.toISOString() ?? null;
+    const nextUpdate = toJSDate(crl.nextUpdate)?.toISOString() ?? null;
+    const crlNumber = getCRLNumber(crl);
+    const baseCrlNumber = getDeltaBaseCRLNumber(crl);
+    const revokedCerts = (crl as { revokedCertificates?: unknown[] }).revokedCertificates;
+    const revokedCount = revokedCerts ? revokedCerts.length : 0;
+
+    return {
+      issuerCN,
+      thisUpdate,
+      nextUpdate,
+      revokedCount,
+      crlNumber: crlNumber !== undefined ? crlNumber.toString() : null,
+      baseCrlNumber: baseCrlNumber !== undefined ? baseCrlNumber.toString() : null,
+    };
+  } catch (error) {
+    console.warn("parseCrlInfoFromStorage failed", { key, error: String(error) });
+    return null;
+  }
 }

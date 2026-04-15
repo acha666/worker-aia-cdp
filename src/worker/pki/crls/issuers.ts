@@ -1,6 +1,6 @@
 import type { Env } from "../../env";
 import { cachedListAllWithPrefix } from "../../r2/listing";
-import { parseCertificate, getCRLAKIHex, getSKIHex, getCRLNumber } from "../parsers";
+import { parseCertificate, parseCRL, getCRLAKIHex, getSKIHex, getCRLNumber } from "../parsers";
 import { toJSDate, sha256Hex } from "../utils/conversion";
 import { putBinary } from "../../r2/objects";
 import type * as pkijs from "pkijs";
@@ -135,6 +135,23 @@ async function findRootLevelCrlKeyByIssuerKeyId(
       const metaIssuerKeyId = metadata?.issuerKeyId?.toLowerCase();
       if (metaIssuerKeyId === expectedIssuerKeyId) {
         return key;
+      }
+
+      if (!metaIssuerKeyId) {
+        try {
+          const file = await env.STORE.get(key);
+          if (!file) {
+            continue;
+          }
+          const der = await file.arrayBuffer();
+          const parsed = parseCRL(der);
+          const aki = getCRLAKIHex(parsed)?.toLowerCase();
+          if (aki === expectedIssuerKeyId) {
+            return key;
+          }
+        } catch (error) {
+          console.warn("Skip CRL parse during key resolution", { key, error: String(error) });
+        }
       }
     }
 
