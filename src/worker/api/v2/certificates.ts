@@ -20,7 +20,7 @@ import {
   buildBitString,
 } from "./builders";
 import { parseCertificate } from "../../pki/parsers";
-import { extractPEMBlock } from "../../pki/crls/pem";
+import { derBufferFromMaybePem, PEM_BLOCK_MARKERS } from "../../pki/crls/pem";
 import { getCacheControlHeader } from "../../cache/config";
 import { SIGNATURE_ALG_NAMES } from "../../pki/constants";
 import { ensureSummaryMetadata, buildSummaryMetadata } from "../../r2/summary";
@@ -223,18 +223,7 @@ export const getCertificate: RouteHandler = async (req, env) => {
   // Parse the certificate
   let der: ArrayBuffer;
   try {
-    const bytes = await object.arrayBuffer();
-    if (key.endsWith(".pem")) {
-      const pemText = new TextDecoder().decode(bytes);
-      const block = extractPEMBlock(
-        pemText,
-        "-----BEGIN CERTIFICATE-----",
-        "-----END CERTIFICATE-----"
-      );
-      der = block.slice().buffer as ArrayBuffer;
-    } else {
-      der = bytes;
-    }
+    der = derBufferFromMaybePem(await object.arrayBuffer(), key, PEM_BLOCK_MARKERS.certificate);
   } catch (error) {
     return jsonError(400, "invalid_certificate", "Failed to read certificate data", {
       details: error instanceof Error ? error.message : String(error),

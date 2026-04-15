@@ -4,12 +4,7 @@
 
 import type { ApiResponse, ResponseMeta, ApiError, PaginationMeta } from "./types";
 import { withCacheStatus as cacheWithStatus, type CacheStatus } from "../../cache/operations";
-
-const DEFAULT_JSON_HEADERS = {
-  "Content-Type": "application/json; charset=utf-8",
-};
-
-type JsonHeaders = Headers | Record<string, string> | [string, string][];
+import { mergeJsonHeaders, type JsonHeaders } from "../../utils/json-response";
 
 interface SuccessOptions {
   status?: number;
@@ -21,15 +16,6 @@ interface ErrorOptions {
   headers?: JsonHeaders;
   details?: unknown;
   field?: string;
-}
-
-function mergeJsonHeaders(extra?: JsonHeaders): Headers {
-  const headers = new Headers(DEFAULT_JSON_HEADERS);
-  if (extra) {
-    const additional = new Headers(extra);
-    additional.forEach((value, key) => headers.set(key, value));
-  }
-  return headers;
 }
 
 /**

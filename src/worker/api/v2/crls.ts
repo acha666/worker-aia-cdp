@@ -28,7 +28,7 @@ import {
   getCN,
 } from "../../pki/parsers";
 import { toJSDate, sha256Hex } from "../../pki/utils/conversion";
-import { extractPEMBlock } from "../../pki/crls/pem";
+import { derBufferFromMaybePem, extractPEMBlock, PEM_BLOCK_MARKERS } from "../../pki/crls/pem";
 import {
   findIssuerCertForCRL,
   verifyCRLWithIssuer,
@@ -276,14 +276,7 @@ export const getCrl: RouteHandler = async (req, env) => {
   // Parse the CRL
   let der: ArrayBuffer;
   try {
-    const bytes = await object.arrayBuffer();
-    if (key.endsWith(".pem")) {
-      const pemText = new TextDecoder().decode(bytes);
-      const block = extractPEMBlock(pemText, "-----BEGIN X509 CRL-----", "-----END X509 CRL-----");
-      der = block.slice().buffer as ArrayBuffer;
-    } else {
-      der = bytes;
-    }
+    der = derBufferFromMaybePem(await object.arrayBuffer(), key, PEM_BLOCK_MARKERS.crl);
   } catch (error) {
     return jsonError(400, "invalid_crl", "Failed to read CRL data", {
       details: error instanceof Error ? error.message : String(error),
@@ -629,14 +622,7 @@ async function parseCrlInfoFromStorage(env: Env, key: string) {
       return null;
     }
 
-    const bytes = new Uint8Array(await object.arrayBuffer());
-    const der = key.endsWith(".pem")
-      ? extractPEMBlock(
-          new TextDecoder().decode(bytes),
-          "-----BEGIN X509 CRL-----",
-          "-----END X509 CRL-----"
-        ).slice().buffer
-      : bytes.buffer;
+    const der = derBufferFromMaybePem(await object.arrayBuffer(), key, PEM_BLOCK_MARKERS.crl);
 
     const crl = parseCRL(der);
     const issuerCN = (() => {
