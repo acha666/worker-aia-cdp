@@ -6,6 +6,7 @@ import { test } from "node:test";
 import {
   SUMMARY_METADATA_KEYS,
   hasCertificateSummaryMetadata,
+  hasCrlListMetadata,
   readCertificateSummaryMetadata,
   readCrlSummaryMetadata,
   readCustomMetadata,
@@ -98,6 +99,35 @@ test("readCrlSummaryMetadata parses values and revoked count presence", () => {
 
   assert.equal(noRevocations.revokedCount, 0);
   assert.equal(noRevocations.hasRevokedCount, false);
+});
+
+test("hasCrlListMetadata validates required CRL list fields", () => {
+  const full = {
+    summaryIssuerCN: "Issuer A",
+    summaryThisUpdate: "2025-09-01T00:00:00.000Z",
+    summaryNextUpdate: "2025-09-02T00:00:00.000Z",
+    crlNumber: "10",
+    revokedCount: "3",
+  };
+
+  assert.equal(hasCrlListMetadata(full), true);
+  assert.equal(hasCrlListMetadata(full, { requireBaseCrlNumber: true }), false);
+
+  const delta = {
+    ...full,
+    baseCRLNumber: "9",
+  };
+  assert.equal(hasCrlListMetadata(delta, { requireBaseCrlNumber: true }), true);
+
+  assert.equal(
+    hasCrlListMetadata({
+      summaryIssuerCN: "Issuer A",
+      summaryThisUpdate: "2025-09-01T00:00:00.000Z",
+      summaryNextUpdate: "2025-09-02T00:00:00.000Z",
+      crlNumber: "10",
+    }),
+    false
+  );
 });
 
 test("readFingerprintMetadata returns defaults for missing values", () => {

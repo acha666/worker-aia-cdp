@@ -96,6 +96,25 @@ export function readCrlSummaryMetadata(meta: MetadataInput): {
   };
 }
 
+export function hasCrlListMetadata(
+  meta: MetadataInput,
+  options?: {
+    requireBaseCrlNumber?: boolean;
+  }
+): boolean {
+  const summary = readCrlSummaryMetadata(meta);
+  if (!summary.issuerCN || !summary.thisUpdate || !summary.nextUpdate) {
+    return false;
+  }
+  if (!summary.hasRevokedCount || summary.crlNumber === null) {
+    return false;
+  }
+  if (options?.requireBaseCrlNumber && summary.baseCrlNumber === null) {
+    return false;
+  }
+  return true;
+}
+
 export function readFingerprintMetadata(meta: MetadataInput): {
   sha1: string;
   sha256: string;
