@@ -1,8 +1,9 @@
 import type { Env } from "../env";
 import { parseCertificate, parseCRL, getCN, isDeltaCRL } from "../pki/parsers";
 import { toJSDate } from "../pki/utils/conversion";
-import { extractPEMBlock } from "../pki/crls/pem";
+import { derBufferFromMaybePem, PEM_BLOCK_MARKERS } from "../pki/crls/pem";
 import { runSingleFlight } from "../cache/operations";
+import { SUMMARY_METADATA_KEYS, readCustomMetadata } from "./metadata";
 
 export type SummaryKind = "certificate" | "crl" | "other";
 
@@ -20,57 +21,35 @@ export interface ObjectSummary {
 
 export const SUMMARY_VERSION = "1";
 
-const SUMMARY_KEYS = {
-  version: "summaryVersion",
-  kind: "summaryObjectType",
-  subject: "summarySubjectCN",
-  issuer: "summaryIssuerCN",
-  notBefore: "summaryNotBefore",
-  notAfter: "summaryNotAfter",
-  thisUpdate: "summaryThisUpdate",
-  nextUpdate: "summaryNextUpdate",
-  isDelta: "summaryIsDelta",
-  displayName: "summaryDisplayName",
+const SUMMARY_READ_KEYS = {
+  kind: [SUMMARY_METADATA_KEYS.kind] as const,
+  displayName: [SUMMARY_METADATA_KEYS.displayName] as const,
+  subjectCommonName: [SUMMARY_METADATA_KEYS.subject, "subjectCommonName", "subjectCN"] as const,
+  issuerCommonName: [SUMMARY_METADATA_KEYS.issuer, "issuerCommonName", "issuerCN"] as const,
+  notBefore: [SUMMARY_METADATA_KEYS.notBefore, "notBefore"] as const,
+  notAfter: [SUMMARY_METADATA_KEYS.notAfter, "notAfter"] as const,
+  thisUpdate: [SUMMARY_METADATA_KEYS.thisUpdate, "thisUpdate"] as const,
+  nextUpdate: [SUMMARY_METADATA_KEYS.nextUpdate, "nextUpdate"] as const,
+  isDelta: [SUMMARY_METADATA_KEYS.isDelta, "isDelta"] as const,
 } as const;
 
-const PEM_MARKERS = {
-  certificate: {
-    begin: "-----BEGIN CERTIFICATE-----",
-    end: "-----END CERTIFICATE-----",
-  },
-  crl: {
-    begin: "-----BEGIN X509 CRL-----",
-    end: "-----END X509 CRL-----",
-  },
-} as const;
+const SUMMARY_WRITE_FIELDS = [
+  ["displayName", SUMMARY_METADATA_KEYS.displayName],
+  ["subjectCommonName", SUMMARY_METADATA_KEYS.subject],
+  ["issuerCommonName", SUMMARY_METADATA_KEYS.issuer],
+  ["notBefore", SUMMARY_METADATA_KEYS.notBefore],
+  ["notAfter", SUMMARY_METADATA_KEYS.notAfter],
+  ["thisUpdate", SUMMARY_METADATA_KEYS.thisUpdate],
+  ["nextUpdate", SUMMARY_METADATA_KEYS.nextUpdate],
+] as const;
 
-function bufferFromMaybePem(
-  bytes: Uint8Array,
-  key: string,
-  markers: { begin: string; end: string }
-): ArrayBuffer {
-  if (!/\.pem$/i.test(key)) {
-    return bytes.slice().buffer;
-  }
-  const pemText = new TextDecoder().decode(bytes);
-  const block = extractPEMBlock(pemText, markers.begin, markers.end);
-  const copy = block.slice();
-  return copy.buffer as ArrayBuffer;
-}
-
-function issuerCommonNameFromCertificate(cert: ReturnType<typeof parseCertificate>): string | null {
-  for (const tv of cert.issuer.typesAndValues) {
+function commonNameFromDistinguishedName(name: {
+  typesAndValues: { type: string; value: { valueBlock: { value: unknown } } }[];
+}): string | null {
+  for (const tv of name.typesAndValues) {
     if (tv.type === "2.5.4.3") {
-      return tv.value.valueBlock.value;
-    }
-  }
-  return null;
-}
-
-function issuerCommonNameFromCrl(crl: ReturnType<typeof parseCRL>): string | null {
-  for (const tv of crl.issuer.typesAndValues) {
-    if (tv.type === "2.5.4.3") {
-      return tv.value.valueBlock.value;
+      const value = tv.value.valueBlock.value;
+      return typeof value === "string" ? value : String(value);
     }
   }
   return null;
@@ -80,10 +59,10 @@ async function createCertificateSummary(
   bytes: Uint8Array,
   key: string
 ): Promise<ObjectSummary | null> {
-  const der = bufferFromMaybePem(bytes, key, PEM_MARKERS.certificate);
+  const der = derBufferFromMaybePem(bytes, key, PEM_BLOCK_MARKERS.certificate);
   const cert = parseCertificate(der);
   const subject = getCN(cert) ?? null;
-  const issuer = issuerCommonNameFromCertificate(cert);
+  const issuer = commonNameFromDistinguishedName(cert.issuer);
   const notBefore = toJSDate(cert.notBefore.value)?.toISOString() ?? null;
   const notAfter = toJSDate(cert.notAfter.value)?.toISOString() ?? null;
   const displayName = subject ?? issuer ?? fallbackDisplayName(key, "certificate");
@@ -101,9 +80,9 @@ async function createCertificateSummary(
 }
 
 async function createCrlSummary(bytes: Uint8Array, key: string): Promise<ObjectSummary | null> {
-  const der = bufferFromMaybePem(bytes, key, PEM_MARKERS.crl);
+  const der = derBufferFromMaybePem(bytes, key, PEM_BLOCK_MARKERS.crl);
   const crl = parseCRL(der);
-  const issuer = issuerCommonNameFromCrl(crl);
+  const issuer = commonNameFromDistinguishedName(crl.issuer);
   const thisUpdate = toJSDate(crl.thisUpdate)?.toISOString() ?? null;
   const nextUpdate = toJSDate(crl.nextUpdate)?.toISOString() ?? null;
   const isDelta = isDeltaCRL(crl);
@@ -161,17 +140,15 @@ export function readSummaryFromMetadata(
   if (!meta) {
     return null;
   }
-  const kind = (meta[SUMMARY_KEYS.kind] as SummaryKind | undefined) ?? null;
-  const subjectCommonName =
-    meta[SUMMARY_KEYS.subject] ?? meta.subjectCommonName ?? meta.subjectCN ?? null;
-  const issuerCommonName =
-    meta[SUMMARY_KEYS.issuer] ?? meta.issuerCommonName ?? meta.issuerCN ?? null;
-  const notBefore = meta[SUMMARY_KEYS.notBefore] ?? meta.notBefore ?? null;
-  const notAfter = meta[SUMMARY_KEYS.notAfter] ?? meta.notAfter ?? null;
-  const thisUpdate = meta[SUMMARY_KEYS.thisUpdate] ?? meta.thisUpdate ?? null;
-  const nextUpdate = meta[SUMMARY_KEYS.nextUpdate] ?? meta.nextUpdate ?? null;
-  const isDeltaRaw = meta[SUMMARY_KEYS.isDelta] ?? meta.isDelta ?? null;
-  const displayName = meta[SUMMARY_KEYS.displayName] ?? null;
+  const kind = pickMetadataValue(meta, SUMMARY_READ_KEYS.kind) as SummaryKind | null;
+  const subjectCommonName = pickMetadataValue(meta, SUMMARY_READ_KEYS.subjectCommonName);
+  const issuerCommonName = pickMetadataValue(meta, SUMMARY_READ_KEYS.issuerCommonName);
+  const notBefore = pickMetadataValue(meta, SUMMARY_READ_KEYS.notBefore);
+  const notAfter = pickMetadataValue(meta, SUMMARY_READ_KEYS.notAfter);
+  const thisUpdate = pickMetadataValue(meta, SUMMARY_READ_KEYS.thisUpdate);
+  const nextUpdate = pickMetadataValue(meta, SUMMARY_READ_KEYS.nextUpdate);
+  const isDeltaRaw = pickMetadataValue(meta, SUMMARY_READ_KEYS.isDelta);
+  const displayName = pickMetadataValue(meta, SUMMARY_READ_KEYS.displayName);
 
   if (!kind) {
     if (!subjectCommonName && !issuerCommonName) {
@@ -197,6 +174,19 @@ export function readSummaryFromMetadata(
     nextUpdate: nextUpdate ?? null,
     isDelta: parseBoolean(isDeltaRaw),
   };
+}
+
+function pickMetadataValue(
+  meta: Record<string, string | undefined>,
+  keys: readonly string[]
+): string | null {
+  for (const key of keys) {
+    const value = meta[key];
+    if (value !== undefined) {
+      return value;
+    }
+  }
+  return null;
 }
 
 function inferKindFromFields(fields: {
@@ -257,10 +247,8 @@ export async function ensureSummaryMetadata(
         return null;
       }
 
-      const newMetadata = buildSummaryMetadata(
-        summary,
-        object.customMetadata ?? context.existingMeta ?? {}
-      );
+      const objectMetadata = readCustomMetadata(object) ?? context.existingMeta ?? {};
+      const newMetadata = buildSummaryMetadata(summary, objectMetadata);
 
       const etagMatch =
         normalizeEtag(readOptionalEtag(object)) ??
@@ -292,31 +280,16 @@ export function buildSummaryMetadata(
     }
     output[key] = value;
   }
-  output[SUMMARY_KEYS.version] = SUMMARY_VERSION;
-  output[SUMMARY_KEYS.kind] = summary.kind;
-  if (summary.displayName) {
-    output[SUMMARY_KEYS.displayName] = summary.displayName;
-  }
-  if (summary.subjectCommonName) {
-    output[SUMMARY_KEYS.subject] = summary.subjectCommonName;
-  }
-  if (summary.issuerCommonName) {
-    output[SUMMARY_KEYS.issuer] = summary.issuerCommonName;
-  }
-  if (summary.notBefore) {
-    output[SUMMARY_KEYS.notBefore] = summary.notBefore;
-  }
-  if (summary.notAfter) {
-    output[SUMMARY_KEYS.notAfter] = summary.notAfter;
-  }
-  if (summary.thisUpdate) {
-    output[SUMMARY_KEYS.thisUpdate] = summary.thisUpdate;
-  }
-  if (summary.nextUpdate) {
-    output[SUMMARY_KEYS.nextUpdate] = summary.nextUpdate;
+  output[SUMMARY_METADATA_KEYS.version] = SUMMARY_VERSION;
+  output[SUMMARY_METADATA_KEYS.kind] = summary.kind;
+  for (const [field, metadataKey] of SUMMARY_WRITE_FIELDS) {
+    const value = summary[field];
+    if (value) {
+      output[metadataKey] = value;
+    }
   }
   if (summary.isDelta !== null) {
-    output[SUMMARY_KEYS.isDelta] = String(summary.isDelta);
+    output[SUMMARY_METADATA_KEYS.isDelta] = String(summary.isDelta);
   }
   return output;
 }
@@ -366,15 +339,5 @@ export function summaryToPayload(summary: ObjectSummary | null) {
   if (!summary) {
     return null;
   }
-  return {
-    kind: summary.kind,
-    displayName: summary.displayName,
-    subjectCommonName: summary.subjectCommonName,
-    issuerCommonName: summary.issuerCommonName,
-    notBefore: summary.notBefore,
-    notAfter: summary.notAfter,
-    thisUpdate: summary.thisUpdate,
-    nextUpdate: summary.nextUpdate,
-    isDelta: summary.isDelta,
-  };
+  return { ...summary };
 }

@@ -3,6 +3,7 @@ import type { Env } from "./env";
 import { apiRouter } from "./api/v2/server";
 import { buildHeadersForObject } from "./utils/content";
 import { openApiDocument } from "@contracts/openapi";
+import { readCustomMetadata } from "./r2/metadata";
 
 initializePkijsEngine();
 
@@ -62,7 +63,7 @@ export default {
           return new Response("Not Found", { status: 404 });
         }
 
-        const metadata = (object as { customMetadata?: Record<string, string> }).customMetadata;
+        const metadata = readCustomMetadata(object);
         const headers = buildHeadersForObject(object, key, metadata);
         const filename = key.split("/").pop() ?? "download";
         headers.set("Content-Disposition", `attachment; filename="${filename}"`);

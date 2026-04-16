@@ -6,6 +6,7 @@ import type { RouteHandler } from "../../env";
 import type { StatsResult, HealthResult } from "./types";
 import { jsonSuccess } from "./response";
 import { getCacheControlHeader } from "../../cache/config";
+import { readCrlSummaryMetadata, readCustomMetadata } from "../../r2/metadata";
 
 const VERSION = "2.0.0";
 
@@ -48,7 +49,7 @@ export const getStats: RouteHandler = async (_req, env) => {
       } as R2ListOptions);
 
       for (const object of list.objects) {
-        const metadata = (object as { customMetadata?: Record<string, string> }).customMetadata;
+        const metadata = readCustomMetadata(object);
         const size = object.size;
 
         // Update storage stats
@@ -77,7 +78,7 @@ export const getStats: RouteHandler = async (_req, env) => {
           }
 
           // Count revocations
-          const revokedCount = parseInt(metadata?.revokedCount ?? "0", 10) || 0;
+          const revokedCount = readCrlSummaryMetadata(metadata).revokedCount;
           stats.crls.totalRevocations += revokedCount;
         }
       }

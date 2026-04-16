@@ -1,3 +1,5 @@
+import { readNextUpdateDate } from "../r2/metadata";
+
 function contentTypeByKey(key: string) {
   if (key.endsWith(".pem") || key.endsWith(".crt.pem") || key.endsWith(".crl.pem")) {
     return "text/plain; charset=utf-8";
@@ -9,21 +11,6 @@ function contentTypeByKey(key: string) {
     return "application/pkix-crl";
   }
   return "application/octet-stream";
-}
-
-function readNextUpdate(metadata?: Record<string, string>): Date | null {
-  if (!metadata) {
-    return null;
-  }
-  const raw = metadata.summaryNextUpdate ?? metadata.nextUpdate;
-  if (!raw) {
-    return null;
-  }
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-  return parsed;
 }
 
 export function buildHeadersForObject(
@@ -54,7 +41,7 @@ export function buildHeadersForObject(
       "public, max-age=31536000, immutable, s-maxage=31536000, stale-while-revalidate=604800"
     );
   } else if (key.endsWith(".crl") || key.endsWith(".crl.pem")) {
-    const nextUpdate = readNextUpdate(metadata);
+    const nextUpdate = readNextUpdateDate(metadata);
     const now = Date.now();
     const maxAge = nextUpdate ? Math.max(0, Math.floor((nextUpdate.getTime() - now) / 1000)) : 300;
     headers.set("Cache-Control", `public, max-age=${maxAge}, s-maxage=${maxAge}, must-revalidate`);
