@@ -33,7 +33,7 @@ jobs:
 
       - name: Setup GitHub Pages
         if: ${{ !env.ACT }}
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
