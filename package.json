@@ -69,7 +69,7 @@
     "@eslint/js": "^10.0.1",
     "@redocly/cli": "^2.20.4",
     "@tailwindcss/vite": "^4.2.1",
-    "@types/node": "^25.2.1",
+    "@types/node": "^25.6.0",
     "@vitejs/plugin-legacy": "^7.2.1",
     "eslint": "^10.0.2",
     "eslint-plugin-vue": "^10.7.0",
