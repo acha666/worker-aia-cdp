@@ -54,7 +54,7 @@
     "@heroicons/vue": "^2.2.0",
     "@ts-rest/core": "^3.52.1",
     "@ts-rest/open-api": "^3.52.1",
-    "@vitejs/plugin-vue": "^6.0.4",
+    "@vitejs/plugin-vue": "^6.0.6",
     "asn1js": "^3.0.7",
     "pinia": "^3.0.4",
     "pkijs": "^3.3.3",
